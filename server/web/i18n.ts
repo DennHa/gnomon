@@ -1,7 +1,7 @@
 // English and German, following the phone's language.
 const en = {
   pairTitle: 'Connect this device',
-  pairHelp: 'On the server, run gnomon-admin pair "iPhone" and enter the code here.',
+  pairHelp: 'Scan the QR code from Gnomon on the Mac (Settings → Connections) or from another phone, or type the code.',
   pairCode: 'Pairing code',
   pairButton: 'Connect',
   pairOrKey: 'Or paste a device key',
@@ -52,6 +52,11 @@ const en = {
   untitled: 'Untitled',
   addEntry: 'Add entry',
   minutesShort: 'min',
+  scanQr: 'Scan QR code',
+  scanHelp: 'Point the camera at the QR code on the Mac or on another phone.',
+  cameraDenied: 'No access to the camera. Allow it in the settings (Safari → Camera), or type the code.',
+  noCamera: 'The camera can’t be used here. Type the code instead.',
+  orTypeCode: 'or type the code',
   timerTab: 'Timer',
   clockTab: 'Time clock',
   workedToday: 'Worked today',
@@ -82,7 +87,7 @@ const en = {
 type Key = keyof typeof en;
 const de: Record<Key, string> = {
   pairTitle: 'Dieses Gerät verbinden',
-  pairHelp: 'Auf dem Server gnomon-admin pair "iPhone" ausführen und den Code hier eingeben.',
+  pairHelp: 'Scanne den QR-Code aus Gnomon am Mac (Einstellungen → Verbindungen) oder von einem anderen Handy, oder gib den Code ein.',
   pairCode: 'Kopplungscode',
   pairButton: 'Verbinden',
   pairOrKey: 'Oder einen Geräteschlüssel einfügen',
@@ -133,6 +138,11 @@ const de: Record<Key, string> = {
   untitled: 'Ohne Titel',
   addEntry: 'Eintrag hinzufügen',
   minutesShort: 'Min.',
+  scanQr: 'QR-Code scannen',
+  scanHelp: 'Halte die Kamera auf den QR-Code am Mac oder auf einem anderen Handy.',
+  cameraDenied: 'Kein Zugriff auf die Kamera. Erlaube ihn in den Einstellungen (Safari → Kamera) oder gib den Code ein.',
+  noCamera: 'Die Kamera lässt sich hier nicht nutzen. Gib den Code stattdessen ein.',
+  orTypeCode: 'oder Code eingeben',
   timerTab: 'Timer',
   clockTab: 'Stempeln',
   workedToday: 'Heute gearbeitet',

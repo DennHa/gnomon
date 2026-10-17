@@ -1,9 +1,10 @@
 // Gnomon on the phone: Today (attendance, timer, entries), Week, and this device.
-import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, getKey, setKey, setUnauthorizedHandler, type Activity, type Entry, type Project, type State, type Workday } from './api';
 import { t } from './i18n';
 import { Icon, type IconName } from './icons';
+import jsQR from 'jsqr';
 import qrcode from 'qrcode-generator';
 import { addDays, atTime, dayKey, entryMs, fmtClock, fmtDay, fmtHM, fmtTime, mondayOf, parseMinutes, toTimeInput } from './time';
 import './styles.css';
@@ -140,6 +141,7 @@ function Pair({ onPaired }: { onPaired: (key: string) => void }) {
   const [code, setCode] = useState(PAIR_FROM_LINK ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   async function pair(value: string, fromLink = false) {
     setBusy(true);
@@ -177,6 +179,10 @@ function Pair({ onPaired }: { onPaired: (key: string) => void }) {
       </div>
       <h1>{t('pairTitle')}</h1>
       <p className="muted">{t('pairHelp')}</p>
+      <button type="button" className="primary big" onClick={() => setScanning(true)} disabled={busy}>
+        <Icon name="qr_code_scanner" size={26} /> {t('scanQr')}
+      </button>
+      <p className="muted small">{t('orTypeCode')}</p>
       <input
         className="code"
         value={code}
@@ -190,10 +196,99 @@ function Pair({ onPaired }: { onPaired: (key: string) => void }) {
       />
       <p className="muted small">{t('pairOrKey')}</p>
       {error && <p className="error">{error}</p>}
-      <button className="primary big" disabled={busy || !code.trim()}>
+      <button className="soft big" disabled={busy || !code.trim()}>
         {t('pairButton')}
       </button>
+      {scanning && (
+        <Scanner
+          onCode={(c) => {
+            setScanning(false);
+            setCode(c);
+            void pair(c);
+          }}
+          onClose={() => setScanning(false)}
+        />
+      )}
     </form>
+  );
+}
+
+/** Full-screen camera that reads a pairing QR code (a link with #pair=… or a bare code). */
+function Scanner({ onCode, onClose }: { onCode: (code: string) => void; onClose: () => void }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const done = useRef(onCode);
+  done.current = onCode;
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let stream: MediaStream | undefined;
+    let stopped = false;
+    let timer = 0;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    // Chrome has a built-in reader; Safari doesn't, so jsQR decodes the frames there.
+    type Detector = { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
+    const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
+    const detector = BD ? new BD({ formats: ['qr_code'] }) : null;
+    const found = (text: string) => {
+      const m = text.match(/pair=([A-Za-z0-9]{4}-?[A-Za-z0-9]{4})/) ?? text.trim().match(/^([A-Za-z0-9]{4}-?[A-Za-z0-9]{4})$/);
+      if (!m) return false;
+      stopped = true;
+      done.current(m[1].toUpperCase());
+      return true;
+    };
+    const tick = async () => {
+      if (stopped) return;
+      const v = video.current;
+      if (v && v.readyState >= 2 && v.videoWidth) {
+        try {
+          if (detector) {
+            for (const r of await detector.detect(v)) if (found(r.rawValue)) return;
+          } else if (ctx) {
+            const w = Math.min(640, v.videoWidth);
+            const h = Math.round((v.videoHeight * w) / v.videoWidth);
+            canvas.width = w;
+            canvas.height = h;
+            ctx.drawImage(v, 0, 0, w, h);
+            const r = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+            if (r && found(r.data)) return;
+          }
+        } catch {
+          /* a frame that can't be read; try the next one */
+        }
+      }
+      timer = window.setTimeout(tick, 200);
+    };
+    if (!navigator.mediaDevices?.getUserMedia) setError(t('noCamera'));
+    else
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(
+        (s) => {
+          stream = s;
+          if (stopped || !video.current) return s.getTracks().forEach((tr) => tr.stop());
+          video.current.srcObject = s;
+          void video.current.play().catch(() => {});
+          void tick();
+        },
+        (e: unknown) => setError((e as { name?: string })?.name === 'NotAllowedError' ? t('cameraDenied') : t('noCamera')),
+      );
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      stream?.getTracks().forEach((tr) => tr.stop());
+    };
+  }, []);
+
+  return (
+    <div className="scanner" role="dialog" aria-label={t('scanQr')}>
+      <video ref={video} playsInline muted autoPlay />
+      <div className="scan-frame" />
+      <div className="scan-bottom">
+        <p>{error ?? t('scanHelp')}</p>
+        <button type="button" className="soft big" onClick={onClose}>
+          <Icon name="close" /> {t('cancel')}
+        </button>
+      </div>
+    </div>
   );
 }
 

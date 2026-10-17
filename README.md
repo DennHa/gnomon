@@ -11,6 +11,25 @@ Clock in and out, track your projects, catch up later, and always know your over
 
 <p align="center"><b><a href="https://github.com/DennHa/gnomon/releases/latest">⬇ Download the latest version</a></b> · <a href="CHANGELOG.md">What's new</a></p>
 
+## Two ways to work
+
+Gnomon asks on the first start how you like to work, and fits around it. You can switch any time.
+
+**Clock in, fill in later.** The bare minimum is knowing when you came and went.
+1. Morning: **Start day** (sidebar, menu bar, or the phone's time clock).
+2. Lunch: **Break**. Evening: **Leave**. That's your attendance: 8:00–19:00 with an hour's break is 10 hours.
+3. Later, with your calendar open: the Week view shows **"1:30 to assign"** per day. Type hours into the cells or
+   **fill from plan**; they land inside the time you were clocked in.
+
+**Track live, precisely.** You time what you're doing as you do it.
+1. Start a timer (⌃⌥P from any app, or the Track page). The first timer **clocks you in**.
+2. Switch project or activity as you go; there's no stopping in between.
+3. Stopped the timer for lunch? The next start asks **"Were you on a break from 12:05 to 12:50?"**
+4. **Leave** stops the timer. Forgot to? Gnomon suggests the end of your last timer the next morning.
+
+Either way, the two stay consistent: tracked time always lies inside your clocked-in time. A day with entries but no
+clock-in gets its workday from the entries, and entries outside your hours move arrival or leaving to cover them.
+
 ## What it does
 
 ### 1. Clock in, clock out

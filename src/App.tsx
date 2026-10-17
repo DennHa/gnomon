@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store';
-import { closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
+import { addBreakBetween, breakBeforeRunning, closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
 import { planItemsOn } from './plan';
 import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from './time';
 import { targetHoursOn } from './schedule';
@@ -187,6 +187,24 @@ function useDaylight(on: boolean, previewAt: number | null) {
   }, [on, now, dark, previewAt]);
 }
 
+/** Says when Gnomon moved or created a workday to fit the entries (src/fit.ts). */
+function FitToast() {
+  const { fitNotices, dismissFitNotices } = useStore();
+  useEffect(() => {
+    if (!fitNotices.length) return;
+    const t = setTimeout(dismissFitNotices, 6000);
+    return () => clearTimeout(t);
+  }, [fitNotices]);
+  if (!fitNotices.length) return null;
+  return (
+    <div className="fit-toast" role="status" onClick={dismissFitNotices}>
+      {fitNotices.slice(0, 3).map((n) => (
+        <span key={`${n.kind}${n.date}${n.at}`}>{t(`fit.${n.kind}`, { day: fmtDayLabel(n.date), time: fmtTime(n.at) })}</span>
+      ))}
+    </div>
+  );
+}
+
 function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const { data, update } = useStore();
   const now = useNow();
@@ -241,6 +259,11 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
     return () => clearTimeout(t);
   }, [targetReached, today]);
   const signed = (ms: number) => `${ms < 0 ? '−' : '+'}${fmtDuration(Math.abs(ms))}`;
+  // Live trackers who stop the timer for lunch: offer the pause as a break when the next timer starts.
+  const gap = breakBeforeRunning(data);
+  const [askedGap, setAskedGap] = useState<string | null>(null);
+  const gapKey = gap ? `${gap.start}|${gap.end}` : null;
+  const showGap = gap && gapKey !== askedGap && Date.now() - Date.parse(gap.end) < 30 * 60_000;
 
   return (
     <div className={`attendance ${state}`}>
@@ -289,6 +312,19 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
               <strong>{t('moment.today', { duration: fmtDuration(summary.worked) })}</strong> <span className={summary.diff >= 0 ? 'pos' : 'neg'}>{signed(summary.diff)}</span>
             </span>
           )}
+        </div>
+      )}
+      {showGap && (
+        <div className="att-toast att-ask" role="status">
+          <span>{t('gap.ask', { from: fmtTime(gap.start), to: fmtTime(gap.end) })}</span>
+          <span className="att-ask-btns">
+            <button className="btn small primary" onClick={() => (update((d) => addBreakBetween(d, gap.date, gap.start, gap.end)), setAskedGap(gapKey))}>
+              {t('gap.yes')}
+            </button>
+            <button className="btn small" onClick={() => setAskedGap(gapKey)}>
+              {t('gap.no')}
+            </button>
+          </span>
         </div>
       )}
       <div className="att-actions">
@@ -459,6 +495,7 @@ export default function App() {
         {view === 'settings' && <Settings />}
         {view === 'about' && <About />}
       </main>
+      <FitToast />
       {/* First launch: the feature tour. The integrations guide opens only on request (tour's last step or Settings). */}
       {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && !profile?.managed && <Onboarding />}
     </div>

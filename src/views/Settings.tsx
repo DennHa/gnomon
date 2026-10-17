@@ -5,6 +5,7 @@ import { FloatConnect, PersonioConnect } from './integrations';
 import { Icon, type IconName } from '../icons';
 import type { Settings as S } from '../types';
 import { dayKey, fmtDate, useNow } from '../time';
+import { workStyleDefaults } from '../actions';
 import { removeSchedule, SCHEDULE_PRESETS, scheduleOn, schedulesOf, setSchedule, SINCE_ALWAYS, weekTotal } from '../schedule';
 import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel, type LayoutMap } from '../shortcuts';
 import { LANGUAGE_NAMES, locale, resolveLanguage, t, type MsgKey } from '../i18n';
@@ -566,6 +567,17 @@ export default function Settings() {
         <>
           <section className="card">
             <h3>{t('set.clockIn')}</h3>
+        <label className="field">
+          <span>
+            {t('style.setting')}
+            <span className="muted small field-hint">{t('style.settingHint')}</span>
+          </span>
+          <select value={s.workStyle ?? ''} onChange={(e) => e.target.value && set(workStyleDefaults(e.target.value as 'clock' | 'live'))}>
+            {!s.workStyle && <option value="">—</option>}
+            <option value="clock">{t('style.clock')}</option>
+            <option value="live">{t('style.live')}</option>
+          </select>
+        </label>
         <label className="check-row">
           <input type="checkbox" checked={s.autoStartDay} onChange={(e) => set({ autoStartDay: e.target.checked })} />
           {t('set.autoStartDay')}

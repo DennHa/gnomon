@@ -7,6 +7,7 @@ import { PROJECT_COLORS } from './actions';
 import { dayKey, uid } from './time';
 import { fullDayHours } from './schedule';
 import { t, useLanguage } from './i18n';
+import { fitAll, fitWorkdays, type FitNotice } from './fit';
 import { applyChanges, baseOf, markChanges, planSync, rebase, type Change } from './sync';
 
 const DEFAULT_DATA: Data = {
@@ -73,6 +74,9 @@ type Store = {
   commit: (next: Data) => void;
   /** The company settings profile (Iru), or null on a personal Mac. */
   profile: CompanyProfile | null;
+  /** What the last change moved or created to keep the workday around the entries. */
+  fitNotices: FitNotice[];
+  dismissFitNotices: () => void;
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -99,6 +103,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // On a fresh install, the company's defaults are the starting values; the person can change them later.
       if (!raw && p) d = { ...d, settings: { ...d.settings, ...(p.dailyTargetHours && { dailyTargetHours: p.dailyTargetHours }), ...(p.language && { language: p.language }) } };
       setProfile(p);
+      // Once: give days that have entries but no fitting workday one (see src/fit.ts).
+      if (!d.settings.workdaysFitted) d = { ...fitAll(d), settings: { ...d.settings, workdaysFitted: true } };
       setData(d);
     });
   }, []);
@@ -116,7 +122,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeunload', flush);
   }, []);
 
-  const update = useCallback((fn: (d: Data) => Data) => setData((d) => (d ? fn(d) : d)), []);
+  // Every change goes through fitWorkdays, so the workday always covers the day's entries (src/fit.ts).
+  const pendingNotices = useRef(new Map<string, FitNotice>());
+  const fit = (prev: Data, next: Data) => {
+    const r = fitWorkdays(prev, next);
+    for (const n of r.notices) pendingNotices.current.set(`${n.kind}:${n.date}:${n.at}`, n);
+    return r.data;
+  };
+  const [fitNotices, setFitNotices] = useState<FitNotice[]>([]);
+  useEffect(() => {
+    if (!pendingNotices.current.size) return;
+    setFitNotices([...pendingNotices.current.values()]);
+    pendingNotices.current.clear();
+  }, [data]);
+  const dismissFitNotices = useCallback(() => setFitNotices([]), []);
+
+  const update = useCallback((fn: (d: Data) => Data) => setData((d) => (d ? fit(d, fn(d)) : d)), []);
 
   const runFloatSync = useCallback(async () => {
     const s = dataRef.current?.settings;
@@ -195,7 +216,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const after = plan.push.length ? await pullAll(pulled.cursor) : pulled;
       if (after !== pulled) merged = applyChanges(merged, after.changes);
       await window.api.serverSetSyncState({ cursor: after.cursor, base: baseOf(merged) });
-      setData((d) => (d ? rebase(d, before, merged) : d));
+      // Entries from the phone get their workday fitted too; that change syncs back on the next round.
+      setData((d) => (d ? fit(d, rebase(d, before, merged)) : d));
       // Edits up to the start of this sync are settled; later ones keep their time for the next sync.
       for (const [k, at] of changedAt.current) if (at <= now) changedAt.current.delete(k);
       setServerSync((s) => ({ ...s, busy: false, error: plan.invalid.length ? t('srv.syncInvalid', { n: plan.invalid.length }) : undefined, at: new Date().toISOString() }));
@@ -243,12 +265,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const getData = useCallback(() => dataRef.current!, []);
   const commit = useCallback((next: Data) => {
-    dataRef.current = next;
-    setData(next);
+    const fitted = dataRef.current ? fit(dataRef.current, next) : next;
+    dataRef.current = fitted;
+    setData(fitted);
   }, []);
 
   if (!data) return <div className="loading">{t('loading')}</div>;
-  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, serverSync, runServerSync, refreshServer, getData, commit, profile }}>{children}</StoreContext.Provider>;
+  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, serverSync, runServerSync, refreshServer, getData, commit, profile, fitNotices, dismissFitNotices }}>{children}</StoreContext.Provider>;
 }
 
 export function useStore(): Store {

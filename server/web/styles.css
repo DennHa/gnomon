@@ -192,3 +192,13 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 .correct label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .correct input { border: 0; border-radius: 12px; background: var(--field); padding: 12px; font-size: 16px; color: var(--text); min-height: 46px; min-width: 0; }
 .still { display: flex; align-items: center; min-height: 46px; padding: 0 12px; border-radius: 12px; background: var(--ok-soft); color: var(--ok); font-size: 15px; }
+
+/* ---- QR scanner ---- */
+.scanner { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; }
+.scanner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-frame { position: absolute; left: 50%; top: 42%; width: min(66vw, 280px); aspect-ratio: 1; transform: translate(-50%, -50%);
+  border-radius: 24px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45); outline: 3px solid rgba(255, 255, 255, 0.9); }
+.scan-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 20px calc(20px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 12px; color: #fff; text-align: center; }
+.scan-bottom p { margin: 0; }
+.scan-bottom .soft { background: rgba(255, 255, 255, 0.16); color: #fff; }

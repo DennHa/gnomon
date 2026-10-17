@@ -6,6 +6,8 @@ import { useStore } from '../store';
 import { Icon, type IconName } from '../icons';
 import { t, type MsgKey } from '../i18n';
 import { prettyAccel } from '../shortcuts';
+import { workStyleDefaults } from '../actions';
+import type { WorkStyle } from '../types';
 // Close-ups rendered from the demo screenshots (scripts/hero-shots.cjs), scaled down for the app.
 import imgTimer from '../assets/tour/timer.jpg';
 import imgStartDay from '../assets/tour/start-day.jpg';
@@ -13,24 +15,32 @@ import imgSwitcher from '../assets/tour/switcher.png';
 import imgWeek from '../assets/tour/week.jpg';
 import imgBalance from '../assets/tour/balance.jpg';
 
-const STEPS: { icon: IconName; title: MsgKey; text: MsgKey; img: string }[] = [
-  { icon: 'waving_hand', title: 'tour.welcomeTitle', text: 'tour.welcomeText', img: imgTimer },
-  { icon: 'login', title: 'tour.dayTitle', text: 'tour.dayText', img: imgStartDay },
-  { icon: 'timer', title: 'tour.trackTitle', text: 'tour.trackText', img: imgSwitcher },
-  { icon: 'calendar_view_week', title: 'tour.laterTitle', text: 'tour.laterText', img: imgWeek },
-  { icon: 'savings', title: 'tour.balanceTitle', text: 'tour.balanceText', img: imgBalance },
-];
+type Step = { icon: IconName; title: MsgKey; text: MsgKey; img?: string; choice?: boolean };
+const WELCOME: Step = { icon: 'waving_hand', title: 'tour.welcomeTitle', text: 'tour.welcomeText', img: imgTimer };
+const STYLE: Step = { icon: 'tune', title: 'tour.styleTitle', text: 'tour.styleText', choice: true };
+const DAY: Step = { icon: 'login', title: 'tour.dayTitle', text: 'tour.dayText', img: imgStartDay };
+const TRACK: Step = { icon: 'timer', title: 'tour.trackTitle', text: 'tour.trackText', img: imgSwitcher };
+const LATER: Step = { icon: 'calendar_view_week', title: 'tour.laterTitle', text: 'tour.laterText', img: imgWeek };
+const BALANCE: Step = { icon: 'savings', title: 'tour.balanceTitle', text: 'tour.balanceText', img: imgBalance };
+/** After the welcome you pick how you work; the steps then follow that way of working. */
+const stepsFor = (style?: WorkStyle): Step[] => [WELCOME, STYLE, ...(style === 'live' ? [TRACK, DAY, LATER] : [DAY, LATER, TRACK]), BALANCE];
+const STEP_COUNT = stepsFor().length;
 
 /** The step to open with, e.g. "#tour@3" for screenshots. */
 const initialStep = () => {
   const m = /tour@(\d)/.exec(window.location.hash);
-  return m ? Math.min(STEPS.length - 1, Math.max(0, Number(m[1]) - 1)) : 0;
+  return m ? Math.min(STEP_COUNT - 1, Math.max(0, Number(m[1]) - 1)) : 0;
 };
 
 export default function Tour() {
   const { data, update, profile } = useStore();
   const [step, setStep] = useState(initialStep);
+  const STEPS = stepsFor(data.settings.workStyle);
   const last = step === STEPS.length - 1;
+  const choose = (style: WorkStyle) => {
+    update((d) => ({ ...d, settings: { ...d.settings, ...workStyleDefaults(style) } }));
+    setStep(step + 1);
+  };
   const finish = (openGuide = false) =>
     update((d) => ({ ...d, settings: { ...d.settings, tourDone: true, ...(openGuide && { onboardingDone: false }) } }));
 
@@ -62,10 +72,21 @@ export default function Tour() {
           <h2 id="tour-title">{t(s.title)}</h2>
         </div>
 
-        <img className="tour-img" src={s.img} alt="" />
+        {s.img && <img className="tour-img" src={s.img} alt="" />}
 
         <div className="onb-body">
           <p>{t(s.text, { key: prettyAccel(data.settings.shortcuts.quick) || '⌃⌥P' })}</p>
+          {s.choice && (
+            <div className="style-cards">
+              {(['clock', 'live'] as const).map((style) => (
+                <button key={style} className={`style-card ${data.settings.workStyle === style ? 'active' : ''}`} onClick={() => choose(style)}>
+                  <Icon name={style === 'clock' ? 'login' : 'timer'} size={26} />
+                  <strong>{t(`style.${style}`)}</strong>
+                  <span className="muted small">{t(`style.${style}Text`)}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {last && !profile?.managed && (
             <div className="tour-connect">
               <span className="muted small">{t('tour.connectHint')}</span>

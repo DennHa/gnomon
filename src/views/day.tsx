@@ -145,12 +145,29 @@ export function MissingHours({ onOpenDay }: { onOpenDay: (d: string) => void }) 
  * A past workday that's still open, or that the midnight auto-stop closed at 23:59:
  * ask once for the real leave time.
  */
+/**
+ * A good guess for when you left on a day you forgot to clock out: the end of your last timer (one cut off at midnight
+ * doesn't count), else your arrival plus that day's target and a half-hour break, else 17:00.
+ */
+export function leaveSuggestion(data: Data, date: string): string {
+  const hhmm = (ms: number) => new Date(ms).toTimeString().slice(0, 5);
+  const midnightCut = Date.parse(atTime(date, '23:58'));
+  const ends = data.entries.filter((e) => e.end && dayKey(e.start) === date).map((e) => Date.parse(e.end!)).filter((ms) => ms < midnightCut);
+  if (ends.length) return hhmm(Math.max(...ends));
+  const wd = data.workdays.find((w) => w.date === date);
+  const target = hoursToMs(targetHoursOn(data, date));
+  if (wd && target > 0) return hhmm(Math.min(midnightCut - 60_000, Date.parse(wd.start) + target + (target >= 6 * 3_600_000 ? 30 * 60_000 : 0)));
+  return '17:00';
+}
+
 export function StaleBanner({ onOpenDay }: { onOpenDay: (d: string) => void }) {
   const { data, update } = useStore();
   const today = dayKey(new Date());
   const stale = data.workdays.filter((w) => w.date < today && !w.off && (!w.end || w.autoClosed)).sort((a, b) => b.date.localeCompare(a.date))[0];
-  const [leftAt, setLeftAt] = useState('17:00');
+  const [leftAt, setLeftAt] = useState<string | null>(null);
   if (!stale) return null;
+  const suggested = leaveSuggestion(data, stale.date);
+  const value = leftAt ?? suggested;
   return (
     <div className="banner warn">
       <Icon name="warning" size={18} />
@@ -161,8 +178,8 @@ export function StaleBanner({ onOpenDay }: { onOpenDay: (d: string) => void }) {
         </button>
         {t(stale.end ? 'stale.autoAfter' : 'stale.openAfter', { time: fmtTime(stale.start) })}
       </span>
-      <input className="time-field" type="time" value={leftAt} onChange={(e) => setLeftAt(e.target.value)} />
-      <button className="btn small primary" onClick={() => update((d) => closeWorkday(d, stale.date, atTime(stale.date, leftAt)))}>
+      <input className="time-field" type="time" value={value} onChange={(e) => setLeftAt(e.target.value)} title={t('stale.suggestHint')} />
+      <button className="btn small primary" onClick={() => update((d) => closeWorkday(d, stale.date, atTime(stale.date, value)))}>
         {t('save')}
       </button>
       {stale.end && (
@@ -293,6 +310,7 @@ export function WorkdayEditor({ day }: { day: string }) {
           <Icon name="add" size={16} /> {t('break')}
         </button>
       </div>
+      {wd.fromEntries && <p className="muted small wd-from-entries">{t('fit.fromEntriesHint')}</p>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // Pure state transitions. Every function takes the current Data and returns the next one.
-import type { Activity, ActivityPreset, Break, Data, Entry, Project, Workday } from './types';
+import type { Activity, ActivityPreset, Break, Data, Entry, Project, Settings, Workday, WorkStyle } from './types';
 import { atTime, dayKey, nowIso, uid } from './time';
 import { goalFor, planItemsOn } from './plan';
 
@@ -11,7 +11,8 @@ export const isOnBreak = (w?: Workday) => Boolean(w && !w.end && w.breaks.some((
 
 const mapToday = (d: Data, fn: (w: Workday) => Workday): Data => {
   const today = dayKey(new Date());
-  return { ...d, workdays: d.workdays.map((w) => (w.date === today ? fn(w) : w)) };
+  // Clocking in or out, or a break, is a change by hand: the day no longer follows its entries (src/fit.ts).
+  return { ...d, workdays: d.workdays.map((w) => (w.date === today ? { ...fn(w), fromEntries: undefined } : w)) };
 };
 
 const closeBreaks = (w: Workday, at: string): Workday => ({ ...w, breaks: w.breaks.map((b) => (b.end ? b : { ...b, end: at })) });
@@ -45,12 +46,13 @@ export function toggleBreak(d: Data): Data {
 export function updateWorkday(d: Data, date: string, patch: Partial<Workday>): Data {
   // Editing the leave time confirms it, so an auto-closed day stops asking.
   const confirm = patch.end ? { autoClosed: undefined } : {};
-  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, ...patch, ...confirm } : w)) };
+  // Changed by hand: it no longer follows the entries.
+  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, ...patch, ...confirm, fromEntries: undefined } : w)) };
 }
 
 /** Close a day you forgot to clock out of. */
 export function closeWorkday(d: Data, date: string, end: string): Data {
-  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...closeBreaks(w, end), end, autoClosed: undefined } : w)) };
+  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...closeBreaks(w, end), end, autoClosed: undefined, fromEntries: undefined } : w)) };
 }
 
 /** Accept an auto-closed day's 23:59 as it is. */
@@ -96,7 +98,7 @@ export function setOffKind(d: Data, date: string, kind?: 'overtime'): Data {
 }
 
 export function updateBreak(d: Data, date: string, index: number, patch: Partial<Break>): Data {
-  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, breaks: w.breaks.map((b, i) => (i === index ? { ...b, ...patch } : b)) } : w)) };
+  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, fromEntries: undefined, breaks: w.breaks.map((b, i) => (i === index ? { ...b, ...patch } : b)) } : w)) };
 }
 
 export function addBreak(d: Data, date: string): Data {
@@ -105,13 +107,41 @@ export function addBreak(d: Data, date: string): Data {
     workdays: d.workdays.map((w) => {
       if (w.date !== date) return w;
       const start = atTime(date, '12:00');
-      return { ...w, breaks: [...w.breaks, { start, end: new Date(Date.parse(start) + 30 * 60_000).toISOString() }] };
+      return { ...w, fromEntries: undefined, breaks: [...w.breaks, { start, end: new Date(Date.parse(start) + 30 * 60_000).toISOString() }] };
     }),
   };
 }
 
+/** Add a finished break with given times (e.g. the gap between two timers, confirmed as lunch). */
+export function addBreakBetween(d: Data, date: string, start: string, end: string): Data {
+  return {
+    ...d,
+    workdays: d.workdays.map((w) =>
+      w.date === date ? { ...w, fromEntries: undefined, breaks: [...w.breaks, { start, end }].sort((a, b) => a.start.localeCompare(b.start)) } : w,
+    ),
+  };
+}
+
+/**
+ * The pause right before the running timer, if it looks like an unrecorded break: 15 min to 3 h since the previous
+ * timer of the day ended, inside the clocked-in time, and not already covered by a break.
+ */
+export function breakBeforeRunning(d: Data): { date: string; start: string; end: string } | null {
+  const run = runningEntry(d);
+  if (!run) return null;
+  const date = dayKey(run.start);
+  const wd = d.workdays.find((w) => w.date === date && !w.off);
+  if (!wd) return null;
+  const prev = d.entries.filter((e) => e.end && e.id !== run.id && dayKey(e.start) === date && e.end <= run.start).sort((a, b) => b.end!.localeCompare(a.end!))[0];
+  if (!prev) return null;
+  const gap = Date.parse(run.start) - Date.parse(prev.end!);
+  if (gap < 15 * 60_000 || gap > 3 * 3_600_000 || prev.end! < wd.start) return null;
+  if (wd.breaks.some((b) => b.start < run.start && (b.end ?? run.start) > prev.end!)) return null;
+  return { date, start: prev.end!, end: run.start };
+}
+
 export function removeBreak(d: Data, date: string, index: number): Data {
-  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, breaks: w.breaks.filter((_, i) => i !== index) } : w)) };
+  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, fromEntries: undefined, breaks: w.breaks.filter((_, i) => i !== index) } : w)) };
 }
 
 export function deleteWorkday(d: Data, date: string): Data {
@@ -134,10 +164,35 @@ export function startTimer(d: Data, input: TimerInput): Data {
   return { ...next, entries: [...next.entries, entry] };
 }
 
+/**
+ * Where a new entry of `ms` goes on a day: the first free stretch inside the time you were clocked in (between your
+ * arrival, breaks and existing entries) that fits it; otherwise right after the last entry or break. Without a
+ * clock-in, after the day's last entry, or at 09:00. So typing hours in later never moves your arrival.
+ */
+export function freeStart(d: Data, day: string, ms: number): string {
+  const wd = d.workdays.find((w) => w.date === day && !w.off);
+  const taken = [
+    ...d.entries.filter((e) => e.end && dayKey(e.start) === day).map((e) => [Date.parse(e.start), Date.parse(e.end!)]),
+    ...(wd?.breaks ?? []).filter((b) => b.end).map((b) => [Date.parse(b.start), Date.parse(b.end!)]),
+  ].sort((a, b) => a[0] - b[0]);
+  if (!wd) {
+    const lastEnd = d.entries.filter((e) => e.end && dayKey(e.start) === day).map((e) => Date.parse(e.end!));
+    return lastEnd.length ? new Date(Math.max(...lastEnd)).toISOString() : atTime(day, '09:00');
+  }
+  const until = wd.end ? Date.parse(wd.end) : Infinity;
+  let at = Date.parse(wd.start);
+  for (const [a, b] of taken) {
+    if (b <= at) continue;
+    if (a - at >= ms && at + ms <= until) return new Date(at).toISOString();
+    at = Math.max(at, b);
+  }
+  return new Date(at).toISOString();
+}
+
 /** Add a finished one-hour entry on any day, right after that day's last entry. */
 export function addEntry(d: Data, date: string): Data {
   const last = d.entries.filter((e) => e.end && dayKey(e.start) === date).sort((a, b) => b.end!.localeCompare(a.end!))[0];
-  const start = last?.end ?? atTime(date, '09:00');
+  const start = freeStart(d, date, 3_600_000);
   const end = new Date(Date.parse(start) + 3_600_000).toISOString();
   return { ...d, entries: [...d.entries, { id: uid(), description: '', projectId: last?.projectId, start, end }] };
 }
@@ -297,11 +352,10 @@ export function resolveIdle(d: Data, since: string, choice: 'keep' | 'discard' |
   return next;
 }
 
-/** Append a finished entry of `ms` on a day, right after that day's last entry (or at 09:00). */
+/** Append a finished entry of `ms` on a day, in the first free stretch of the clocked-in time (see freeStart). */
 export function appendEntry(d: Data, day: string, ms: number, fields: Partial<Entry>): Data {
   if (ms < 60_000) return d;
-  const ends = d.entries.filter((e) => e.end && dayKey(e.start) === day).map((e) => e.end!);
-  const start = ends.length ? ends.sort().at(-1)! : atTime(day, '09:00');
+  const start = freeStart(d, day, ms);
   const end = new Date(Date.parse(start) + ms).toISOString();
   return { ...d, entries: [...d.entries, { id: uid(), description: '', ...fields, start, end }] };
 }
@@ -373,4 +427,14 @@ export function weekCopyPlan(d: Data, fromDays: string[], toDays: string[]): { d
 export function toggleWeekDone(d: Data, monday: string): Data {
   const done = d.reviewedWeeks.includes(monday);
   return { ...d, reviewedWeeks: done ? d.reviewedWeeks.filter((w) => w !== monday) : [...d.reviewedWeeks, monday] };
+}
+
+/**
+ * Defaults for a way of working. Clocking in first: the day is started by hand, "Close the day" helps fill it in
+ * afterwards. Tracking live: the first timer clocks you in, and you're asked about time away from the computer.
+ */
+export function workStyleDefaults(style: WorkStyle): Partial<Settings> {
+  return style === 'live'
+    ? { workStyle: style, startDayWithTimer: true, idleMinutes: 10, reviewOnLeave: false }
+    : { workStyle: style, startDayWithTimer: true, reviewOnLeave: true };
 }

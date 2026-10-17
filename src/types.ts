@@ -19,6 +19,9 @@ export type CompanyProfile = {
 /** Hours per weekday (Mon–Sun) from a date on; see src/schedule.ts. */
 export type WorkSchedule = { from: string; hours: number[]; source?: 'personio' };
 
+/** How you like to work: clock in and fill in later, or track live with timers (tour and Settings → Tracking). */
+export type WorkStyle = 'clock' | 'live';
+
 export type ActivityPreset = 'designer' | 'pm' | 'director' | '3d' | 'ux' | 'ui';
 
 export type Project = {
@@ -89,6 +92,8 @@ export type Workday = {
   offSource?: 'float' | 'personio';
   /** Closed by the midnight auto-stop; Gnomon asks for the real leave time until you confirm it. */
   autoClosed?: boolean;
+  /** Made from the day's entries (no clock-in); follows them until you change it by hand (src/fit.ts). */
+  fromEntries?: boolean;
 };
 
 export type Settings = {
@@ -102,6 +107,9 @@ export type Settings = {
   daylightUnlocked?: boolean;
   /** Daylight: sky tint and shadows follow the real sun and moon (src/daylight.ts). */
   daylight?: boolean;
+  workStyle?: WorkStyle;
+  /** Days with entries got a workday once (src/fit.ts, fitAll). */
+  workdaysFitted?: boolean;
   /** The day the daily-target celebration last showed (once per day). */
   celebratedDay?: string;
   /** Highlight colour (see ACCENTS in src/views/Settings.tsx and the [data-accent] rules in styles.css). */

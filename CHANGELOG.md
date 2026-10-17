@@ -3,6 +3,20 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.4 · 2026-10-17
+
+Two ways to work, and clocked-in time that always fits what you tracked.
+
+- **How do you like to work?** The first-start tour asks: *clock in and fill in later*, or *track live with timers*.
+  The answer sets a few defaults and the order of the tour; switch any time under Settings → Tracking.
+- **The workday follows your entries**: a day with entries but no clock-in gets its workday from them, and entries
+  outside your hours move arrival or leaving to cover them. A short note says what moved; changes by hand win.
+- **Week view**: one *Tracked* row, with *"1:30 to assign"* on days where you were clocked in longer than you've
+  filled in. Hours typed into the week go inside your clocked-in time instead of starting at 09:00.
+- **Live tracking**: after a pause between two timers, Gnomon asks *"Were you on a break from 12:05 to 12:50?"*;
+  a forgotten *Leave* is suggested from the end of your last timer.
+- **Phone**: pair by scanning the QR code with the app's own camera scanner.
+
 ## 0.1.3 · 2026-10-17
 
 - **Sync with your phone**: when this Mac is connected to a Gnomon server (Settings → Connections), your times,

@@ -372,28 +372,23 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
         <tfoot>
           <tr className="ts-sum">
             <td className="ts-project">{t('tracked')}</td>
-            {days.map((d) => (
-              <td key={d} className={`ts-cell ${d === today ? 'today' : ''} ${isWeekend(d) ? 'weekend' : ''}`}>
-                {sheet.dayTotal(d) ? fmtHM(sheet.dayTotal(d)) : ''}
-              </td>
-            ))}
-            <td className="ts-total">{fmtHM(weekTracked)}</td>
-            <td />
-          </tr>
-          <tr className="ts-sum">
-            <td className="ts-project">{t('atWork')}</td>
             {days.map((d) => {
+              // Clocked in but not yet assigned to a project: what's left to fill in afterwards.
               const w = data.workdays.find((x) => x.date === d);
-              const ms = w && !w.off ? workdayMs(w, now) : 0;
-              const closed = w?.end && !w.off;
+              const open = w && !w.off ? workdayMs(w, now) - sheet.dayTotal(d) : 0;
               return (
-                <td key={d} className={`ts-cell ${d === today ? 'today' : ''} ${isWeekend(d) ? 'weekend' : ''} ${closed ? (ms >= hoursToMs(targetHoursOn(data, d)) ? 'pos' : 'neg') : ''}`}>
-                  {ms ? fmtHM(ms) : ''}
+                <td key={d} className={`ts-cell ${d === today ? 'today' : ''} ${isWeekend(d) ? 'weekend' : ''}`}>
+                  {sheet.dayTotal(d) ? fmtHM(sheet.dayTotal(d)) : ''}
+                  {open >= 15 * 60_000 && (
+                    <button className="ts-open" onClick={() => openDay(d)} title={t('ts.toAssignHint')}>
+                      {t('ts.toAssign', { duration: fmtHM(open) })}
+                    </button>
+                  )}
                 </td>
               );
             })}
-            <td className="ts-total">{fmtHM(weekAtWork)}</td>
-            <td className="ts-goal small">{t('ts.target', { duration: fmtDuration(weekTarget(data, days)) })}</td>
+            <td className="ts-total">{fmtHM(weekTracked)}</td>
+            <td className="ts-goal small">{t('ts.clockedTarget', { worked: fmtHM(weekAtWork), duration: fmtDuration(weekTarget(data, days)) })}</td>
           </tr>
         </tfoot>
       </table>

@@ -7,6 +7,7 @@ import { goalFor } from '../src/plan';
 import { balanceByMonth } from '../src/balance';
 import { daySummary, weekSummary } from '../src/motion';
 import { daylight, moonPhase, sunMoon } from '../src/daylight';
+import { fitAll, fitWorkdays } from '../src/fit';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
 import type { Data } from '../src/types';
@@ -412,6 +413,53 @@ test('sync: rebase keeps edits made during the sync and is a no-op when nothing 
   assert.equal(byId.get('n1'), 'n1');
   assert.equal(byId.get('x1'), 'x1');
   assert.equal(Sync.rebase(synced, synced, synced), synced);
+});
+
+test('workday follows entries: created from entries, widened to cover them, hand edits win', () => {
+  const e = (id: string, date: string, from: string, to?: string) => ({ id, description: '', start: atTime(date, from), ...(to && { end: atTime(date, to) }) });
+  const now = Date.parse('2026-10-20T12:00:00');
+  // A past day with only entries gets a workday from 09:00 to 17:00 with the 12:00–13:00 gap as a break.
+  let d = base();
+  const prev = d;
+  d = { ...d, entries: [e('a', '2026-10-15', '09:00', '12:00'), e('b', '2026-10-15', '13:00', '17:00')] };
+  let r = fitWorkdays(prev, d, now);
+  const w = r.data.workdays[0];
+  assert.equal(w.start, atTime('2026-10-15', '09:00'));
+  assert.equal(w.end, atTime('2026-10-15', '17:00'));
+  assert.equal(w.breaks.length, 1);
+  assert.equal(w.fromEntries, true);
+  assert.equal(r.notices[0].kind, 'created');
+  // A day clocked in by hand 10:00–16:00 widens to the entries, and says so.
+  d = { ...base(), workdays: [{ date: '2026-10-16', start: atTime('2026-10-16', '10:00'), end: atTime('2026-10-16', '16:00'), breaks: [] }] };
+  const before = d;
+  d = { ...d, entries: [e('c', '2026-10-16', '08:30', '11:00'), e('d', '2026-10-16', '15:00', '18:15')] };
+  r = fitWorkdays(before, d, now);
+  assert.equal(r.data.workdays[0].start, atTime('2026-10-16', '08:30'));
+  assert.equal(r.data.workdays[0].end, atTime('2026-10-16', '18:15'));
+  assert.deepEqual(r.notices.map((n) => n.kind), ['start', 'end']);
+  // Editing a derived day by hand stops it from following the entries.
+  const edited = A.updateWorkday(fitAll({ ...base(), entries: [e('f', '2026-10-15', '09:00', '17:00')] }, now), '2026-10-15', { end: atTime('2026-10-15', '18:00') });
+  assert.equal(edited.workdays[0].fromEntries, undefined);
+  // Days off are left alone.
+  const off = { ...base(), workdays: [{ date: '2026-10-14', start: atTime('2026-10-14', '00:00'), end: atTime('2026-10-14', '00:00'), breaks: [], off: true }] };
+  assert.equal(fitAll({ ...off, entries: [e('g', '2026-10-14', '09:00', '10:00')] }, now).workdays.length, 1);
+});
+
+test('flows: typed hours go inside clocked-in time, a pause before the next timer is offered as a break', () => {
+  // Clocked in 10:00–18:00 with a 12:00–12:30 break and an entry 10:00–12:00: 2 h typed later start at 12:30.
+  let d = { ...base(), workdays: [{ date: '2026-10-16', start: atTime('2026-10-16', '10:00'), end: atTime('2026-10-16', '18:00'), breaks: [{ start: atTime('2026-10-16', '12:00'), end: atTime('2026-10-16', '12:30') }] }] };
+  d = { ...d, entries: [{ id: 'x', description: '', start: atTime('2026-10-16', '10:00'), end: atTime('2026-10-16', '12:00') }] };
+  assert.equal(A.freeStart(d, '2026-10-16', 2 * H), atTime('2026-10-16', '12:30'));
+  assert.equal(A.freeStart({ ...d, entries: [] }, '2026-10-16', H), atTime('2026-10-16', '10:00'), 'empty day: from arrival, not 09:00');
+  assert.equal(A.freeStart(base(), '2026-10-16', H), atTime('2026-10-16', '09:00'), 'no clock-in: 09:00 as before');
+  // Live tracking: timer 09:00–12:05, next one started 12:50 → offer 12:05–12:50 as a break; once added, not again.
+  const today = dayKey(new Date());
+  let live = { ...base(), workdays: [{ date: today, start: atTime(today, '09:00'), breaks: [] }] };
+  live = { ...live, entries: [{ id: 'a', description: '', start: atTime(today, '09:00'), end: atTime(today, '12:05') }, { id: 'b', description: '', start: atTime(today, '12:50') }] };
+  const gap = A.breakBeforeRunning(live)!;
+  assert.deepEqual([gap.start, gap.end], [atTime(today, '12:05'), atTime(today, '12:50')]);
+  assert.equal(A.breakBeforeRunning(A.addBreakBetween(live, today, gap.start, gap.end)), null);
+  assert.equal(A.workStyleDefaults('live').reviewOnLeave, false);
 });
 
 console.log(`\n${passed} passed`);
