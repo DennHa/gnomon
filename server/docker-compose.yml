@@ -14,8 +14,11 @@ services:
       TZ: ${GNOMON_TZ:-Europe/Berlin}
       # The public address, so the server log and gnomon-admin can show pairing QR codes.
       GNOMON_PUBLIC_URL: ${GNOMON_PUBLIC_URL:-}
+      # Optional download page for the Mac app (/latest); see README "Download page". Uncomment with the volume below.
+      # GNOMON_RELEASES_DIR: /releases
     volumes:
       - gnomon-data:/data
+      # - ./releases:/releases:ro
     networks:
       - proxy-net
     read_only: true

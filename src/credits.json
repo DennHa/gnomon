@@ -1,0 +1,65 @@
+[
+  {
+    "name": "electron",
+    "version": "44.8.0",
+    "license": "MIT",
+    "use": "app",
+    "url": "https://github.com/electron/electron"
+  },
+  {
+    "name": "react",
+    "version": "18.3.1",
+    "license": "MIT",
+    "use": "app",
+    "url": "https://reactjs.org/"
+  },
+  {
+    "name": "react-dom",
+    "version": "18.3.1",
+    "license": "MIT",
+    "use": "app",
+    "url": "https://reactjs.org/"
+  },
+  {
+    "name": "Material Symbols",
+    "version": "0.47.5",
+    "license": "Apache-2.0",
+    "use": "app",
+    "url": "https://github.com/marella/material-symbols"
+  },
+  {
+    "name": "qrcode-generator",
+    "version": "1.4.4",
+    "license": "MIT",
+    "use": "app",
+    "url": "https://github.com/kazuhikoarase/qrcode-generator"
+  },
+  {
+    "name": "better-sqlite3",
+    "version": "11.10.0",
+    "license": "MIT",
+    "use": "server",
+    "url": "http://github.com/WiseLibs/better-sqlite3"
+  },
+  {
+    "name": "vite",
+    "version": "6.4.4",
+    "license": "MIT",
+    "use": "build",
+    "url": "https://vite.dev"
+  },
+  {
+    "name": "typescript",
+    "version": "5.6.3",
+    "license": "Apache-2.0",
+    "use": "build",
+    "url": "https://www.typescriptlang.org/"
+  },
+  {
+    "name": "electron-builder",
+    "version": "26.17.0",
+    "license": "MIT",
+    "use": "build",
+    "url": "https://github.com/electron-userland/electron-builder"
+  }
+]

@@ -14,6 +14,7 @@ import Projects from './views/Projects';
 import Settings from './views/Settings';
 import Onboarding from './views/Onboarding';
 import Tour from './views/Tour';
+import About from './views/About';
 import { locale, t, trayStrings, type MsgKey } from './i18n';
 
 const VIEWS = [
@@ -22,6 +23,7 @@ const VIEWS = [
   { id: 'reports', label: 'nav.reports', icon: 'bar_chart', bottom: false },
   { id: 'projects', label: 'nav.projects', icon: 'folder', bottom: true },
   { id: 'settings', label: 'nav.settings', icon: 'settings', bottom: true },
+  { id: 'about', label: 'nav.about', icon: 'info', bottom: true },
 ] as const satisfies readonly { id: string; label: MsgKey; icon: IconName; bottom: boolean }[];
 type View = (typeof VIEWS)[number]['id'];
 
@@ -345,10 +347,6 @@ export default function App() {
         <Attendance onOpenDay={openDay} />
         <nav className="nav-bottom">
           {VIEWS.filter((v) => v.bottom).map(navButton)}
-          <button className="nav-item" onClick={() => window.api.openFeedback()} title={t('nav.feedbackHint')}>
-            <Icon name="feedback" size={20} />
-            {t('nav.feedback')}
-          </button>
         </nav>
       </aside>
       <main className="content">
@@ -357,6 +355,7 @@ export default function App() {
         {view === 'reports' && <Reports onOpenDay={openDay} />}
         {view === 'projects' && <Projects />}
         {view === 'settings' && <Settings />}
+        {view === 'about' && <About />}
       </main>
       {/* First launch: the feature tour. The integrations guide opens only on request (tour's last step or Settings). */}
       {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && !profile?.managed && <Onboarding />}

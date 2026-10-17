@@ -128,6 +128,7 @@ only**, never tokens or passwords. The Entra client ID is public by design; the 
 | `serverUrl` | string | The company server; the app talks only to this one |
 | `managed` | bool | Hides the integrations guide, token fields and own-server pairing (see below) |
 | `entraTenantId`, `entraClientId` | string | Microsoft sign-in |
+| `updateUrl` | string | Where new versions are announced (a `version.json`); defaults to `<serverUrl>/latest/version.json` |
 | `allowLocalApi` | bool | Whether the local REST API (API.md) may be switched on |
 | `allowActivityTrail` | bool | Whether the opt-in activity trail is offered |
 | `dailyTargetHours`, `language` | number, string | Starting values on a fresh install; the person can change them |

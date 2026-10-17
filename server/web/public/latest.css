@@ -1,0 +1,16 @@
+/* The download page (/latest). Same palette as the apps; dark mode follows the system. */
+:root { --bg: #f5f6f8; --surface: #fff; --text: #1f2933; --muted: #6b7785; --accent: #f5b400; --on-accent: #0e1113; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg: #15181c; --surface: #1e2227; --text: #e6e9ec; --muted: #8f9aa6; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+main { max-width: 560px; margin: 0 auto; padding: 48px 20px 64px; text-align: center; }
+main img { border-radius: 22px; }
+h1 { margin: 12px 0 4px; font-size: 34px; }
+h2 { margin: 32px 0 8px; font-size: 18px; text-align: left; }
+.tagline { margin: 0 0 8px; font-size: 18px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.download { display: inline-block; margin: 14px 0 6px; padding: 14px 26px; border-radius: 14px; background: var(--accent); color: var(--on-accent); font-weight: 700; text-decoration: none; }
+ul, ol { text-align: left; padding-left: 22px; background: var(--surface); border-radius: 14px; padding: 14px 18px 14px 36px; margin: 0; }
+li + li { margin-top: 6px; }
+a { color: inherit; }

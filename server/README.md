@@ -125,6 +125,25 @@ offline shell (plain `http://localhost` is fine for testing).
 | `GNOMON_DATA_DIR` | `./data` (`/data` in Docker) | Where `gnomon.db` lives |
 | `TZ` | system | Set by `GNOMON_TZ` in compose |
 
+## Download page for the Mac app (optional)
+
+The server can also hand out the Mac app: **`/latest`** is a short page with the version, what's new, a download
+button and install steps (English or German, following the browser); **`/latest/version.json`** is what the app's
+update check under *Info & feedback* reads; **`/latest/download`** is the `.dmg`.
+
+1. Build the app and its manifest (in the repo root): `npm run dist && npm run release:manifest`. This writes
+   `release/version.json` (version, date, the notes from that version's section in `CHANGELOG.md`, the file name).
+2. Put `release/version.json` and `release/Gnomon-<version>-arm64.dmg` into a folder on the server and point
+   `GNOMON_RELEASES_DIR` at it (in Docker: mount it read-only, see the commented lines in `docker-compose.yml`).
+3. Replacing the two files publishes a new version; no restart needed.
+
+Without `GNOMON_RELEASES_DIR`, `/latest` just says that nothing has been published. **The page and download are
+public**: anyone who can reach the server can download the app (it contains no data or secrets). If that's not
+wanted, keep the folder empty and share the app another way (e.g. a private GitHub Release).
+
+The Mac app looks for updates at `<server>/latest/version.json` of the server it's paired with, or at the `updateUrl`
+or `serverUrl` of a company profile (see `docs/company-setup.md`), so the download can live on any host.
+
 ## API
 
 Everything in [API.md](../API.md) works under `/api/v1` with `Authorization: Bearer <device key>`, same errors and

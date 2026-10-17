@@ -12,6 +12,12 @@ declare global {
       load(): Promise<unknown>;
       profile(): Promise<CompanyProfile | null>;
       setTheme(value: 'system' | 'light' | 'dark'): void;
+      appInfo(): Promise<{ version: string; electron: string; chrome: string; node: string; updateSource: string | null }>;
+      checkUpdate(): Promise<
+        | { ok: true; newer: boolean; latest: { version: string; date?: string; notes: string[]; download?: string; page?: string } }
+        | { ok: false; error: string }
+      >;
+      openLink(url: string): void;
       save(data: unknown): Promise<void>;
       saveSync(data: unknown): boolean;
       updateTray(state: TrayState): void;

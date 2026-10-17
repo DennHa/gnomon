@@ -18,7 +18,8 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
+  // The download page (/latest) is a separate page, never cached as the app shell.
+  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/latest')) return;
   // Network first, so a new deploy shows up right away; the cache is the fallback.
   e.respondWith(
     fetch(e.request)

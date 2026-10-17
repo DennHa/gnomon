@@ -63,6 +63,7 @@ function readCompanyProfile() {
       const p = {};
       if (typeof raw.serverUrl === 'string' && /^https:\/\/[^\s/]+/i.test(raw.serverUrl)) p.serverUrl = new URL(raw.serverUrl).origin;
       if (typeof raw.managed === 'boolean') p.managed = raw.managed;
+      if (typeof raw.updateUrl === 'string' && /^https:\/\/\S+$/i.test(raw.updateUrl)) p.updateUrl = raw.updateUrl;
       if (typeof raw.entraTenantId === 'string' && UUID.test(raw.entraTenantId)) p.entraTenantId = raw.entraTenantId;
       if (typeof raw.entraClientId === 'string' && UUID.test(raw.entraClientId)) p.entraClientId = raw.entraClientId;
       if (typeof raw.allowLocalApi === 'boolean') p.allowLocalApi = raw.allowLocalApi;
@@ -79,6 +80,65 @@ function readCompanyProfile() {
 }
 const companyProfile = readCompanyProfile();
 ipcMain.handle('profile:get', () => companyProfile);
+
+// ---- Info & feedback: version, update check, links -----------------------------------------------
+// Where a newer version is announced (a small version.json, see server/README.md): UPDATE_URL for tests, the company
+// profile's updateUrl, the company server, or the server this Mac is paired with. Not tied to GitHub or one host.
+function updateSource() {
+  if (process.env.UPDATE_URL) return process.env.UPDATE_URL;
+  if (companyProfile?.updateUrl) return companyProfile.updateUrl;
+  // Only the paired server's address, not its key: reading the key could ask for keychain access.
+  let paired = null;
+  try {
+    paired = JSON.parse(fs.readFileSync(serverFile(), 'utf8')).url || null;
+  } catch {
+    /* not paired */
+  }
+  const server = companyProfile?.serverUrl || paired;
+  return server ? `${server}/latest/version.json` : null;
+}
+
+ipcMain.handle('app:info', () => ({
+  version: app.getVersion(),
+  electron: process.versions.electron,
+  chrome: process.versions.chrome,
+  node: process.versions.node,
+  updateSource: updateSource(),
+}));
+
+/** 1.2.10 > 1.2.9; anything after a "-" (pre-release) sorts below the plain version. */
+function newerVersion(a, b) {
+  const parse = (v) => String(v).split('-')[0].split('.').map((n) => Number(n) || 0);
+  const [x, y] = [parse(a), parse(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  return false;
+}
+
+ipcMain.handle('update:check', async () => {
+  const source = updateSource();
+  if (!source) return { ok: false, error: 'no_source' };
+  try {
+    const res = await fetch(source, { signal: AbortSignal.timeout(6000), headers: { Accept: 'application/json' } });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    const v = await res.json();
+    if (typeof v?.version !== 'string') return { ok: false, error: 'invalid' };
+    const https = (u) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : undefined);
+    const base = new URL(source);
+    const abs = (u) => (typeof u === 'string' ? https(new URL(u, base).href) : undefined);
+    return {
+      ok: true,
+      latest: { version: v.version, date: typeof v.date === 'string' ? v.date : undefined, notes: Array.isArray(v.notes) ? v.notes.filter((n) => typeof n === 'string').slice(0, 20) : [], download: abs(v.download), page: abs(v.page) },
+      newer: newerVersion(v.version, app.getVersion()),
+    };
+  } catch (err) {
+    return { ok: false, error: err.name === 'TimeoutError' ? 'timeout' : String(err.message || err) };
+  }
+});
+
+// Links from Info & feedback (credits, download page): https only, opened in the default browser.
+ipcMain.on('link:open', (_e, url) => {
+  if (typeof url === 'string' && /^https:\/\/[^\s]+$/i.test(url)) shell.openExternal(url);
+});
 
 // Appearance from Settings: light, dark or like macOS. Screenshots (CAPTURE_THEME) keep their own.
 ipcMain.on('theme:set', (_e, value) => {

@@ -9,6 +9,8 @@ Clock in and out, track your projects, catch up later, and always know your over
 
 *A gnomon is the pointer on a sundial, the oldest time-tracking tool there is.*
 
+<p align="center"><b><a href="https://github.com/DennHa/gnomon/releases/latest">⬇ Download the latest version</a></b> · <a href="CHANGELOG.md">What's new</a></p>
+
 ## What it does
 
 ### 1. Clock in, clock out
@@ -93,6 +95,16 @@ A macOS desktop app (Electron + React + TypeScript) for:
 - **Settings**: daily target, auto clock-in (when the app opens, or when you start a timer), and whether to show the running time in the menu bar.
 
 Everything stays on your Mac, in `~/Library/Application Support/Gnomon/data.json`.
+
+## Versions and updates
+
+- **Download:** the newest `.dmg` is on the [Releases page](https://github.com/DennHa/gnomon/releases/latest);
+  [CHANGELOG.md](CHANGELOG.md) lists what changed. The app shows both under **Info & feedback**.
+- **Update check:** Gnomon reads a small `version.json` from your Gnomon server (`/latest/version.json`), or from the
+  address a company profile sets. A server can also host the download page itself: see
+  [server/README.md](server/README.md#download-page-for-the-mac-app-optional). Nothing is tied to GitHub or one host.
+- **Making a release:** bump `version` in `package.json`, add a section to `CHANGELOG.md`, then
+  `npm run dist && npm run release:manifest`, and upload the `.dmg` (and `version.json` for a server).
 
 ## Run
 

@@ -9,12 +9,14 @@ import { atTime, dayKey } from '../../src/time';
 import { targetHoursOn } from '../../src/schedule';
 import type { Data, Entry, Workday } from '../../src/types';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
+import { pickLang, readRelease, releasePage } from './releases';
 
 const MB = 1024 * 1024;
 const PAIR_MAX_FAILURES = 10;
 const PAIR_LOCK_MS = 15 * 60_000;
 
-export type AppOptions = { store: Store; webDir?: string };
+/** releasesDir: optional folder with version.json and the .dmg for /latest (see releases.ts). */
+export type AppOptions = { store: Store; webDir?: string; releasesDir?: string };
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -70,7 +72,7 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
   });
 }
 
-export function createApp({ store, webDir }: AppOptions) {
+export function createApp({ store, webDir, releasesDir }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
@@ -333,12 +335,41 @@ export function createApp({ store, webDir }: AppOptions) {
     res.end(req.method === 'HEAD' ? undefined : content);
   }
 
+  /** The Mac app download: /latest (page), /latest/version.json (update check), /latest/download (.dmg). Public. */
+  function serveRelease(req: IncomingMessage, res: ServerResponse, url: URL) {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'method_not_allowed', message: 'GET only' });
+    const release = readRelease(releasesDir);
+    const p = url.pathname.replace(/\/$/, '');
+    if (p === '/latest/version.json') {
+      if (!release) return send(res, 404, { error: 'not_found', message: 'No release published' });
+      res.setHeader('Cache-Control', 'no-cache');
+      return send(res, 200, { version: release.version, date: release.date, notes: release.notes, download: '/latest/download', page: '/latest' });
+    }
+    if (p === '/latest/download') {
+      if (!release) return send(res, 404, { error: 'not_found', message: 'No release published' });
+      res.writeHead(200, {
+        ...SECURITY_HEADERS,
+        'Content-Type': 'application/x-apple-diskimage',
+        'Content-Length': release.size,
+        'Content-Disposition': `attachment; filename="${release.file}"`,
+        'Cache-Control': 'no-cache',
+      });
+      if (req.method === 'HEAD') return res.end();
+      return fs.createReadStream(path.join(releasesDir!, release.file)).pipe(res);
+    }
+    if (p !== '/latest') return send(res, 404, { error: 'not_found', message: 'Not found' });
+    const html = releasePage(release, pickLang(req.headers['accept-language']));
+    res.writeHead(release ? 200 : 404, { ...SECURITY_HEADERS, 'Content-Security-Policy': CSP, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    return res.end(req.method === 'HEAD' ? undefined : html);
+  }
+
   return async function handler(req: IncomingMessage, res: ServerResponse) {
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
       if (url.pathname === '/healthz') return send(res, 200, { ok: true });
       if (url.pathname === '/api/v1' || url.pathname.startsWith('/api/v1/')) return await handleApi(req, res, url);
       if (url.pathname.startsWith('/api/')) return send(res, 404, { error: 'not_found', message: 'Use /api/v1/…' });
+      if (url.pathname === '/latest' || url.pathname.startsWith('/latest/')) return serveRelease(req, res, url);
       return serveStatic(req, res, url);
     } catch (err) {
       if (err instanceof HttpError) return send(res, err.status, { error: err.code, message: err.message });

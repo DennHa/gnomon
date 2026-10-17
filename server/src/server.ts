@@ -12,7 +12,9 @@ const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? '0.0.0.0';
 
 const store = new Store(databaseFile(dataDir));
-const server = http.createServer(createApp({ store, webDir: path.join(here, 'web') }));
+// Optional download page for the Mac app (/latest); see src/releases.ts.
+const releasesDir = process.env.GNOMON_RELEASES_DIR ? path.resolve(process.env.GNOMON_RELEASES_DIR) : undefined;
+const server = http.createServer(createApp({ store, webDir: path.join(here, 'web'), releasesDir }));
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
 server.listen(port, host, () => {

@@ -10,6 +10,8 @@ export type CompanyProfile = {
   entraClientId?: string;
   allowLocalApi?: boolean;
   allowActivityTrail?: boolean;
+  /** Where new versions are announced (a version.json); defaults to <serverUrl>/latest/version.json. */
+  updateUrl?: string;
   dailyTargetHours?: number;
   language?: 'system' | 'en' | 'de';
 };

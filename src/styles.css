@@ -740,3 +740,14 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .accent-swatches { display: inline-flex; gap: 10px; }
 .swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
 .swatch.active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+/* Info & feedback */
+.about-head { display: flex; align-items: center; gap: 16px; margin-bottom: 4px; }
+.about-head h1 { margin: 0; }
+.update-box { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); }
+.update-box ul { margin: 0; padding-left: 18px; }
+.changelog h4 { margin: 0 0 6px; }
+.changelog ul { margin: 6px 0 14px; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.changelog p { margin: 0 0 6px; }
+.credits { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.credit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border: 0; border-radius: 10px; background: var(--field); color: var(--text); text-align: left; cursor: pointer; }
+.credit:disabled { cursor: default; }

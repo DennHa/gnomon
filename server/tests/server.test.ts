@@ -306,3 +306,41 @@ describe('persistence and static files', () => {
     assert.equal((await req('GET', '/healthz', undefined, null)).status, 200);
   });
 });
+
+describe('download page (/latest)', () => {
+  test('page, version.json and the .dmg come from the releases folder; nothing else is served', async () => {
+    const rel = path.join(dir, 'releases');
+    fs.mkdirSync(rel, { recursive: true });
+    const app = http.createServer(createApp({ store, webDir, releasesDir: rel }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    try {
+      // Nothing published yet.
+      assert.equal((await fetch(`${url}/latest/version.json`)).status, 404);
+      assert.match(await (await fetch(`${url}/latest`)).text(), /No version has been published/);
+
+      fs.writeFileSync(path.join(rel, 'Gnomon-9.9.9-arm64.dmg'), Buffer.alloc(1234));
+      fs.writeFileSync(path.join(rel, 'version.json'), JSON.stringify({ version: '9.9.9', date: '2026-10-17', notes: ['Faster <b>timers</b>'], file: 'Gnomon-9.9.9-arm64.dmg' }));
+      const v = await (await fetch(`${url}/latest/version.json`)).json();
+      assert.deepEqual(v, { version: '9.9.9', date: '2026-10-17', notes: ['Faster <b>timers</b>'], download: '/latest/download', page: '/latest' });
+
+      const page = await fetch(`${url}/latest`, { headers: { 'Accept-Language': 'de-DE,de;q=0.9' } });
+      const html = await page.text();
+      assert.match(html, /Version 9\.9\.9/);
+      assert.match(html, /Faster &lt;b&gt;timers&lt;\/b&gt;/, 'notes are escaped');
+      assert.match(html, /Rechtsklick/, 'German for a German browser');
+      assert.ok(page.headers.get('content-security-policy'));
+
+      const dl = await fetch(`${url}/latest/download`);
+      assert.equal(dl.headers.get('content-disposition'), 'attachment; filename="Gnomon-9.9.9-arm64.dmg"');
+      assert.equal((await dl.arrayBuffer()).byteLength, 1234);
+
+      // A version.json pointing outside the folder is ignored.
+      fs.writeFileSync(path.join(rel, 'version.json'), JSON.stringify({ version: '9.9.9', file: '../secret.txt' }));
+      assert.equal((await fetch(`${url}/latest/download`)).status, 404);
+      assert.equal((await fetch(`${url}/latest/../secret.txt`)).status, 404);
+    } finally {
+      await new Promise((r) => app.close(r));
+    }
+  });
+});

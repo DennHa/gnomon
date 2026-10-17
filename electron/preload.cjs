@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('api', {
   /** The company settings profile (Iru), or null. Read-only. */
   profile: () => ipcRenderer.invoke('profile:get'),
   setTheme: (value) => ipcRenderer.send('theme:set', value),
+  appInfo: () => ipcRenderer.invoke('app:info'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  openLink: (url) => ipcRenderer.send('link:open', url),
   save: (data) => ipcRenderer.invoke('data:save', data),
   saveSync: (data) => ipcRenderer.sendSync('data:saveSync', data),
   updateTray: (state) => ipcRenderer.send('tray:update', state),
