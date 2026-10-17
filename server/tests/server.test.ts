@@ -1,0 +1,260 @@
+// End-to-end tests against a real HTTP server with a temporary SQLite file.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { after, before, describe, test } from 'node:test';
+import { createApp } from '../src/app';
+import { Store } from '../src/store';
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gnomon-test-'));
+const dbFile = path.join(dir, 'gnomon.db');
+const webDir = path.join(dir, 'web');
+fs.mkdirSync(webDir);
+fs.writeFileSync(path.join(webDir, 'index.html'), '<!doctype html><title>Gnomon</title>');
+fs.writeFileSync(path.join(dir, 'secret.txt'), 'nope');
+
+let store: Store;
+let server: http.Server;
+let base = '';
+let key = '';
+
+async function start() {
+  store = new Store(dbFile);
+  server = http.createServer(createApp({ store, webDir }));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+async function stop() {
+  await new Promise((r) => server.close(r));
+  store.close();
+}
+
+async function req(method: string, p: string, body?: unknown, k: string | null = key, headers: Record<string, string> = {}) {
+  const res = await fetch(base + p, {
+    method,
+    headers: { ...(k && { Authorization: `Bearer ${k}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }), ...headers },
+    body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = text;
+  }
+  return { status: res.status, body: json, headers: res.headers };
+}
+const api = (method: string, p: string, body?: unknown, k?: string | null) => req(method, `/api/v1${p}`, body, k === undefined ? key : k);
+
+before(start);
+after(async () => {
+  await stop();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+describe('auth and pairing', () => {
+  test('requests without a valid key are rejected', async () => {
+    assert.equal((await api('GET', '/health', undefined, null)).status, 401);
+    assert.equal((await api('GET', '/projects', undefined, 'gnomon_wrong')).status, 401);
+  });
+
+  test('a pairing code works once and yields a device key', async () => {
+    const code = store.createPairCode('Test phone');
+    const r = await api('POST', '/pair', { code: `${code.slice(0, 4)}-${code.slice(4).toLowerCase()}` }, null);
+    assert.equal(r.status, 201);
+    assert.match(r.body.key, /^gnomon_/);
+    assert.equal(r.body.device.name, 'Test phone');
+    key = r.body.key;
+    assert.equal((await api('POST', '/pair', { code }, null)).status, 401, 'second use fails');
+    const health = await api('GET', '/health');
+    assert.equal(health.status, 200);
+    assert.equal(health.body.server, true);
+    assert.equal((await api('GET', '/me')).body.name, 'Test phone');
+  });
+
+  test('a signed-in device can create a pairing code for another one', async () => {
+    assert.equal((await api('POST', '/pair-codes', { name: 'iPad' }, null)).status, 401);
+    const r = await api('POST', '/pair-codes', { name: 'iPad' });
+    assert.equal(r.status, 201);
+    assert.match(r.body.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    const paired = await api('POST', '/pair', { code: r.body.code }, null);
+    assert.equal(paired.status, 201);
+    assert.equal(paired.body.device.name, 'iPad');
+  });
+
+  test('too many wrong codes drop all open codes and lock pairing', async () => {
+    const code = store.createPairCode('Victim');
+    const statuses: number[] = [];
+    for (let i = 0; i < 10; i++) statuses.push((await api('POST', '/pair', { code: 'AAAAAAAA' }, null)).status);
+    assert.ok(statuses.every((s) => s === 401 || s === 429));
+    assert.equal((await api('POST', '/pair', { code }, null)).status, 429, 'locked, even with the right code');
+    assert.equal(store.redeemPairCode(code), undefined, 'open codes were dropped');
+  });
+
+  test('a revoked key stops working', async () => {
+    const { key: other } = store.addDevice('Old laptop');
+    assert.equal((await api('GET', '/me', undefined, other)).status, 200);
+    assert.equal((await api('DELETE', '/me', undefined, other)).status, 200);
+    assert.equal((await api('GET', '/me', undefined, other)).status, 401);
+    assert.ok(store.listDevices().find((d) => d.name === 'Old laptop')?.revokedAt);
+  });
+});
+
+describe('API.md behaviour (shared router)', () => {
+  test('errors: 415 without JSON content type, 400 for broken JSON, 404 for unknown routes', async () => {
+    assert.equal((await req('POST', '/api/v1/projects', '{"name":"x"}', key, { 'Content-Type': 'text/plain' })).status, 415);
+    assert.equal((await req('POST', '/api/v1/projects', '{nope', key)).status, 400);
+    assert.equal((await api('GET', '/nothing')).status, 404);
+    assert.equal((await api('POST', '/entries', { date: '2026-02-30', minutes: 10 })).status, 422);
+  });
+
+  test('projects upsert by externalId', async () => {
+    const a = await api('POST', '/projects', { name: 'Client XYZ', externalId: 'crm-42', dailyGoalHours: 4.5 });
+    assert.equal(a.status, 201);
+    const b = await api('POST', '/projects', { name: 'Client XYZ GmbH', externalId: 'crm-42' });
+    assert.equal(b.status, 200);
+    assert.equal(b.body.id, a.body.id);
+    assert.equal((await api('GET', '/projects/ext:crm-42')).body.name, 'Client XYZ GmbH');
+  });
+
+  test('entries: date + minutes, externalId upsert, PATCH, DELETE', async () => {
+    const e = await api('POST', '/entries', { date: '2026-10-15', minutes: 90, projectExternalId: 'crm-42', description: 'Workshop', activity: 'Call', externalId: 'time-1' });
+    assert.equal(e.status, 201);
+    assert.equal(e.body.minutes, 90);
+    assert.equal(e.body.activity, 'Call');
+    const again = await api('POST', '/entries', { date: '2026-10-15', minutes: 60, projectExternalId: 'crm-42', externalId: 'time-1' });
+    assert.equal(again.body.id, e.body.id);
+    assert.equal(again.body.minutes, 60);
+    assert.equal((await api('GET', '/entries?from=2026-10-15')).body.length, 1);
+    const patched = await api('PATCH', '/entries/ext:time-1', { description: 'Workshop with client' });
+    assert.equal(patched.body.description, 'Workshop with client');
+    assert.equal((await api('DELETE', '/entries/ext:time-1')).status, 200);
+    assert.equal((await api('GET', '/entries?from=2026-10-15')).body.length, 0);
+  });
+
+  test('timer, attendance, break and activity switching', async () => {
+    const started = await api('POST', '/timer/start', { project: 'Phone project', description: 'Mobile', activity: 'Design' });
+    assert.equal(started.status, 201);
+    assert.equal(started.body.running.project, 'Phone project', 'a new project name creates the project');
+    let s = (await api('GET', '/state')).body;
+    assert.equal(s.timer.description, 'Mobile');
+    assert.ok(s.workday?.in, 'starting a timer clocks you in (startDayWithTimer)');
+    const dev = s.activities.find((a: { name: string }) => a.name === 'Development');
+    const switched = await api('POST', '/timer/activity', { activityId: dev.id });
+    assert.equal(switched.body.running.activity, 'Development');
+
+    s = (await api('POST', '/day/break', {})).body;
+    assert.equal(s.onBreak, true);
+    assert.equal(s.timer, null, 'a break stops the timer');
+    s = (await api('POST', '/day/break', {})).body;
+    assert.equal(s.onBreak, false);
+
+    await api('POST', '/timer/start', { description: 'Again' });
+    assert.equal((await api('POST', '/timer/stop', {})).body.stopped.description, 'Again');
+    const left = await api('POST', '/day/leave', {});
+    assert.ok(left.body.out);
+    assert.equal((await api('POST', '/day/break', {})).status, 409);
+  });
+
+  test('server-only: POST /activities upserts by name', async () => {
+    const a = await api('POST', '/activities', { name: 'Workshop' });
+    assert.equal(a.status, 201);
+    assert.equal((await api('POST', '/activities', { name: 'workshop' })).body.id, a.body.id);
+    assert.equal((await api('POST', '/activities', { name: 'x', color: 'red' })).status, 422);
+  });
+});
+
+describe('sync', () => {
+  test('pull returns changes after a cursor, including deletions', async () => {
+    const all = await api('GET', '/sync?since=0');
+    assert.equal(all.status, 200);
+    assert.ok(all.body.changes.some((c: { kind: string }) => c.kind === 'activities'));
+    const cursor = all.body.cursor;
+    assert.equal((await api('GET', `/sync?since=${cursor}`)).body.changes.length, 0);
+
+    const e = await api('POST', '/entries', { date: '2026-10-14', minutes: 30, description: 'Sync me' });
+    await api('DELETE', `/entries/${e.body.id}`);
+    const delta = (await api('GET', `/sync?since=${cursor}`)).body;
+    const mine = delta.changes.filter((c: { id: string }) => c.id === e.body.id);
+    assert.equal(mine.length, 1, 'one row per record, the latest state');
+    assert.equal(mine[0].deleted, true);
+    assert.ok(delta.cursor > cursor);
+  });
+
+  test('pull pages with limit and more', async () => {
+    const r = (await api('GET', '/sync?since=0&limit=2')).body;
+    assert.equal(r.changes.length, 2);
+    assert.equal(r.more, true);
+  });
+
+  test('push applies newer changes, skips older ones and is idempotent', async () => {
+    const id = crypto.randomUUID();
+    const t1 = '2026-10-16T08:00:00.000Z';
+    const entry = { id, description: 'From the Mac', start: '2026-10-16T07:00:00.000Z', end: '2026-10-16T08:00:00.000Z' };
+    const r1 = await api('POST', '/sync', { changes: [{ kind: 'entries', id, updatedAt: t1, data: entry }] });
+    assert.equal(r1.status, 200);
+    assert.equal(r1.body.applied, 1);
+    assert.equal((await api('GET', `/entries/${id}`)).body.description, 'From the Mac');
+
+    // Same batch again: nothing breaks, still one entry.
+    await api('POST', '/sync', { changes: [{ kind: 'entries', id, updatedAt: t1, data: entry }] });
+    assert.equal((await api('GET', '/entries?from=2026-10-16')).body.filter((e: { id: string }) => e.id === id).length, 1);
+
+    // The phone edits it now; an older edit from the Mac loses.
+    await api('PATCH', `/entries/${id}`, { description: 'Edited on the phone' });
+    const r2 = await api('POST', '/sync', { changes: [{ kind: 'entries', id, updatedAt: '2026-10-16T09:00:00.000Z', data: { ...entry, description: 'Stale' } }] });
+    assert.equal(r2.body.skipped[0].reason, 'server_newer');
+    assert.equal((await api('GET', `/entries/${id}`)).body.description, 'Edited on the phone');
+
+    // A newer delete wins.
+    const r3 = await api('POST', '/sync', { changes: [{ kind: 'entries', id, updatedAt: new Date().toISOString(), deleted: true }] });
+    assert.equal(r3.body.applied, 1);
+    assert.equal((await api('GET', `/entries/${id}`)).status, 404);
+  });
+
+  test('push validates records', async () => {
+    assert.equal((await api('POST', '/sync', { changes: [{ kind: 'entries', id: 'a', updatedAt: '2026-10-16T08:00:00Z', data: { id: 'b', start: 'x' } }] })).status, 422);
+    assert.equal((await api('POST', '/sync', { changes: [{ kind: 'plans', id: 'a', updatedAt: '2026-10-16T08:00:00Z', data: {} }] })).status, 422);
+    assert.equal((await api('POST', '/sync', { changes: [{ kind: 'projects', id: 'p', updatedAt: '2099-01-01T00:00:00Z', data: { id: 'p', name: 'Future', color: '#000000' } }] })).status, 422);
+  });
+
+  test('two running timers after a push: the newest keeps running', async () => {
+    await api('POST', '/timer/start', { description: 'Phone timer' });
+    const id = crypto.randomUUID();
+    const start = new Date(Date.now() + 1000).toISOString();
+    await api('POST', '/sync', { changes: [{ kind: 'entries', id, updatedAt: new Date().toISOString(), data: { id, description: 'Mac timer', start } }] });
+    const running = (await api('GET', '/timer')).body.running;
+    assert.equal(running.description, 'Mac timer');
+    const today = (await api('GET', '/entries')).body;
+    assert.equal(today.filter((e: { running: boolean }) => e.running).length, 1);
+    await api('POST', '/timer/stop', {});
+  });
+});
+
+describe('persistence and static files', () => {
+  test('data survives a restart', async () => {
+    const before = (await api('GET', '/projects')).body.length;
+    await stop();
+    await start();
+    assert.equal((await api('GET', '/projects')).body.length, before);
+    assert.equal((await api('GET', '/me')).status, 200, 'device keys survive too');
+    assert.equal((await api('GET', '/activities')).body.filter((a: { name: string }) => a.name === 'Call').length, 1, 'defaults are seeded only once');
+  });
+
+  test('the database file is private', () => {
+    assert.equal(fs.statSync(dbFile).mode & 0o077, 0);
+  });
+
+  test('serves the app with a strict CSP and no path traversal', async () => {
+    const page = await req('GET', '/', undefined, null);
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get('content-security-policy') ?? '', /script-src 'self'/);
+    assert.equal(page.headers.get('x-frame-options'), 'DENY');
+    assert.equal((await req('GET', '/week', undefined, null)).status, 200, 'unknown paths fall back to the app');
+    assert.equal((await req('GET', '/..%2fsecret.txt', undefined, null)).status, 404);
+    assert.equal((await req('GET', '/healthz', undefined, null)).status, 200);
+  });
+});

@@ -1,0 +1,517 @@
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { useStore } from '../store';
+import { FloatConnect, PersonioConnect } from './integrations';
+import { Icon, type IconName } from '../icons';
+import type { Settings as S } from '../types';
+import { dayKey, useNow } from '../time';
+import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel } from '../shortcuts';
+import { LANGUAGE_NAMES, locale, resolveLanguage, t, type MsgKey } from '../i18n';
+import qrcode from 'qrcode-generator';
+
+/** "Recording · 47 minutes today", so you can see the trail is working. */
+function TrailStatus() {
+  const { data } = useStore();
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const tick = useNow(60_000);
+  useEffect(() => {
+    window.api.trailGet(dayKey(new Date())).then((spans) =>
+      setMinutes(spans.reduce((s, x) => s + (Number(x.end.slice(0, 2)) * 60 + Number(x.end.slice(3))) - (Number(x.start.slice(0, 2)) * 60 + Number(x.start.slice(3))) + 1, 0)),
+    );
+  }, [tick]);
+  const clockedIn = data.workdays.some((w) => w.date === dayKey(new Date()) && !w.end && !w.off);
+  return (
+    <p className="small trail-status">
+      <span className={`att-dot-inline ${clockedIn ? 'on' : ''}`} />
+      {minutes ? t('trail.status', { n: minutes }) : clockedIn ? t('trail.status', { n: 0 }) : t('trail.statusOff')}
+    </p>
+  );
+}
+
+/** A field that records a shortcut: click it, press keys. Shows whether macOS let Gnomon register it. */
+function ShortcutField({
+  value,
+  ok,
+  conflict,
+  onChange,
+  modifiersOnly,
+}: {
+  value: string;
+  ok?: boolean;
+  conflict?: boolean;
+  onChange: (accel: string) => void;
+  modifiersOnly?: boolean;
+}) {
+  const [recording, setRecording] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+
+  const stop = () => {
+    setRecording(false);
+    window.api.suspendShortcuts(false);
+  };
+  useEffect(() => () => window.api.suspendShortcuts(false), []);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!recording) return;
+    e.preventDefault();
+    if (e.key === 'Escape') return stop();
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      onChange('');
+      return stop();
+    }
+    const accel = accelFromEvent(e);
+    if (accel === 'needs-modifier') return setHint(t('sc.needModifier'));
+    if (!accel) return;
+    // For "projects 1–9" only the modifiers count; the digit is added per project.
+    onChange(modifiersOnly ? accel.split('+').slice(0, -1).join('+') : accel);
+    setHint(null);
+    stop();
+  };
+
+  const status = !value ? 'off' : conflict ? 'dup' : ok === false ? 'taken' : ok ? 'ok' : '';
+  return (
+    <span className="sc-field">
+      <button
+        className={`sc-key ${recording ? 'recording' : ''}`}
+        onClick={() => {
+          setRecording(true);
+          setHint(null);
+          window.api.suspendShortcuts(true);
+        }}
+        onBlur={stop}
+        onKeyDown={onKeyDown}
+        title={t('sc.record')}
+      >
+        {recording ? t('sc.recording') : value ? (modifiersOnly ? `${prettyAccel(`${value}+1`).slice(0, -1)}1…9` : prettyAccel(value)) : t('sc.off')}
+      </button>
+      {value && !recording && (
+        <button className="icon-btn" title={t('sc.clear')} onClick={() => onChange('')}>
+          <Icon name="close" size={16} />
+        </button>
+      )}
+      <span className={`sc-status ${status}`}>
+        {recording ? hint ?? '' : status === 'ok' ? t('sc.ok') : status === 'taken' ? t('sc.taken') : status === 'dup' ? t('sc.duplicate') : ''}
+      </span>
+    </span>
+  );
+}
+
+function ShortcutEditor() {
+  const { data, update } = useStore();
+  const sc = data.settings.shortcuts;
+  const [status, setStatus] = useState<Record<string, boolean>>({});
+  const set = (patch: Partial<typeof sc>) => update((d) => ({ ...d, settings: { ...d.settings, shortcuts: { ...d.settings.shortcuts, ...patch } } }));
+  // Registration happens in the main process after the next menu-bar update; read the result shortly after.
+  useEffect(() => {
+    const t1 = setTimeout(() => window.api.shortcutStatus().then(setStatus), 1200);
+    return () => clearTimeout(t1);
+  }, [sc]);
+  const used = [sc.quick, sc.stopResume, sc.breakToggle].filter(Boolean);
+  const dup = (a: string) => used.filter((x) => x === a).length > 1;
+  const rows: { key: 'quick' | 'stopResume' | 'breakToggle'; label: string }[] = [
+    { key: 'quick', label: t('set.scQuick') },
+    { key: 'stopResume', label: t('set.scStop') },
+    { key: 'breakToggle', label: t('set.scBreak') },
+  ];
+  return (
+    <div className="sc-editor">
+      {rows.map((r) => (
+        <div key={r.key} className="sc-row">
+          <span>{r.label}</span>
+          <ShortcutField value={sc[r.key]} ok={status[sc[r.key]]} conflict={dup(sc[r.key])} onChange={(v) => set({ [r.key]: v })} />
+        </div>
+      ))}
+      <div className="sc-row">
+        <span>
+          {t('sc.projectsMod')}
+          <span className="muted small field-hint">{t('sc.projectsHint')}</span>
+        </span>
+        <ShortcutField value={sc.projects} ok={sc.projects ? status[`${sc.projects}+1`] : undefined} modifiersOnly onChange={(v) => set({ projects: v })} />
+      </div>
+      <button className="btn ghost small" onClick={() => set({ ...DEFAULT_SHORTCUTS })}>
+        <Icon name="restart_alt" size={16} /> {t('sc.reset')}
+      </button>
+    </div>
+  );
+}
+
+const SERVER_ERRORS = ['bad_url', 'no_code', 'invalid_code', 'unreachable', 'unauthorized', 'not_connected'];
+const serverError = (code: string) => (SERVER_ERRORS.includes(code) ? t(`srv.err.${code}` as MsgKey) : code);
+
+function ServerSettings() {
+  const [status, setStatus] = useState<{ connected: boolean; url?: string; name?: string } | null>(null);
+  const [url, setUrl] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [invite, setInvite] = useState<{ code: string; svg: string; expiresAt: string } | null>(null);
+
+  useEffect(() => {
+    window.api.serverStatus().then(setStatus);
+  }, []);
+
+  const connect = async () => {
+    setBusy(true);
+    const r = await window.api.serverConnect(url, code);
+    setBusy(false);
+    if (!r.ok) return setError(serverError(r.error));
+    setError(null);
+    setCode('');
+    setStatus(r);
+  };
+
+  const disconnect = async () => {
+    if (!confirm(t('srv.disconnectConfirm'))) return;
+    setStatus(await window.api.serverDisconnect());
+    setInvite(null);
+  };
+
+  const connectPhone = async () => {
+    const r = await window.api.serverPairCode('iPhone');
+    if (!r.ok) return setError(serverError(r.error));
+    setError(null);
+    const qr = qrcode(0, 'M');
+    qr.addData(r.link);
+    qr.make();
+    setInvite({ code: r.code, expiresAt: r.expiresAt, svg: qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true }) });
+  };
+
+  if (!status) return null;
+  return (
+    <section className="card">
+      <h3>{t('srv.title')}</h3>
+      <p className="muted small">{t('srv.intro')}</p>
+      {!status.connected ? (
+        <>
+          <label className="field">
+            <span>{t('srv.url')}</span>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://gnomon.example.com" spellCheck={false} />
+          </label>
+          <label className="field">
+            <span>{t('srv.code')}</span>
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="ABCD-EFGH" spellCheck={false} />
+          </label>
+          <p className="muted small">{t('srv.codeHint')}</p>
+          <div className="add-row">
+            <button className="btn" onClick={connect} disabled={busy || !url.trim() || !code.trim()}>
+              <Icon name="sync" size={18} /> {busy ? t('srv.connecting') : t('srv.connect')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="small">{t('srv.connectedAs', { url: status.url ?? '', name: status.name ?? '' })}</p>
+          <p className="muted small">{t('srv.noSyncYet')}</p>
+          {invite && (
+            <div className="server-invite">
+              <div className="qr" dangerouslySetInnerHTML={{ __html: invite.svg }} />
+              <div>
+                <p className="invite-code">{invite.code}</p>
+                <p className="muted small">{t('srv.scan', { time: new Date(invite.expiresAt).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</p>
+              </div>
+            </div>
+          )}
+          <div className="add-row">
+            <button className="btn" onClick={connectPhone}>
+              <Icon name="add" size={18} /> {invite ? t('srv.newCode') : t('srv.connectPhone')}
+            </button>
+            <button className="btn ghost small" onClick={disconnect}>
+              {t('srv.disconnect')}
+            </button>
+          </div>
+        </>
+      )}
+      {error && <p className="error small">{error}</p>}
+    </section>
+  );
+}
+
+function ApiSettings() {
+  const { data, update } = useStore();
+  const s = data.settings;
+  const set = (p: Partial<S>) => update((d) => ({ ...d, settings: { ...d.settings, ...p } }));
+  const [hasKey, setHasKey] = useState(false);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ running: boolean; address: { address: string; port: number } | null }>({ running: false, address: null });
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.api.apiHasKey().then(setHasKey);
+    return window.api.onApiError(setError);
+  }, []);
+  useEffect(() => {
+    setError(null);
+    const t = setTimeout(() => window.api.apiStatus().then(setStatus), 400);
+    return () => clearTimeout(t);
+  }, [s.apiEnabled, s.apiPort, s.apiLan]);
+
+  const generate = async () => {
+    if (hasKey && !confirm(t('api.newKeyConfirm'))) return;
+    setNewKey(await window.api.apiGenerateKey());
+    setHasKey(true);
+  };
+
+  return (
+    <section className="card">
+      <h3>API</h3>
+      <p className="muted small">
+        {t('api.intro')}
+      </p>
+      <label className="check-row">
+        <input type="checkbox" checked={s.apiEnabled} onChange={(e) => set({ apiEnabled: e.target.checked })} />
+        {t('api.enable')}
+      </label>
+      {s.apiEnabled && (
+        <>
+          <label className="field">
+            <span>{t('api.port')}</span>
+            <input type="number" min={1024} max={65535} value={s.apiPort} onChange={(e) => set({ apiPort: Math.min(65535, Math.max(1024, Number(e.target.value) || 7799)) })} />
+          </label>
+          <label className="check-row">
+            <input type="checkbox" checked={s.apiLan} onChange={(e) => set({ apiLan: e.target.checked })} />
+            {t('api.lan')}
+          </label>
+          {s.apiLan && <p className="small neg">{t('api.lanWarning')}</p>}
+          <p className="small">
+            {status.running ? (
+              <>
+                <span className="pos">{t('api.running')}</span>
+                {t('api.at')}
+                <code>http://{s.apiLan ? t('api.thisMacIp') : '127.0.0.1'}:{s.apiPort}/api/v1</code>
+              </>
+            ) : (
+              <span className="muted">{t('api.starting')}</span>
+            )}
+          </p>
+          {error && <p className="error small">{error}</p>}
+          <div className="add-row">
+            <button className="btn" onClick={generate}>
+              <Icon name="sync" size={18} /> {t(hasKey ? 'api.newKey' : 'api.createKey')}
+            </button>
+            {!hasKey && <span className="muted small">{t('api.noKey')}</span>}
+          </div>
+          {newKey && (
+            <div className="key-box">
+              <code>{newKey}</code>
+              <button className="btn small" onClick={() => navigator.clipboard.writeText(newKey)}>
+                {t('api.copy')}
+              </button>
+              <p className="muted small">{t('api.shownOnce')}</p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+type SettingsTab = 'general' | 'tracking' | 'menubar' | 'connections';
+const TABS: { id: SettingsTab; icon: IconName; label: MsgKey }[] = [
+  { id: 'general', icon: 'tune', label: 'set.tab.general' },
+  { id: 'tracking', icon: 'timer', label: 'set.tab.tracking' },
+  { id: 'menubar', icon: 'keyboard', label: 'set.tab.menubar' },
+  { id: 'connections', icon: 'hub', label: 'set.tab.connections' },
+];
+const TAB_KEY = 'gnomon.settingsTab';
+
+/** Opens on "settings@connections" etc. if linked, otherwise on the tab used last (per Mac, best effort). */
+function initialTab(): SettingsTab {
+  const fromHash = window.location.hash.split('@')[1];
+  if (TABS.some((x) => x.id === fromHash)) return fromHash as SettingsTab;
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    if (TABS.some((x) => x.id === saved)) return saved as SettingsTab;
+  } catch {
+    /* storage unavailable: start on General */
+  }
+  return 'general';
+}
+
+export default function Settings() {
+  const { data, update } = useStore();
+  const s = data.settings;
+  const set = (p: Partial<S>) => update((d) => ({ ...d, settings: { ...d.settings, ...p } }));
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
+  const choose = (id: SettingsTab) => {
+    setTab(id);
+    try {
+      localStorage.setItem(TAB_KEY, id);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div className="page narrow settings-page">
+      <nav className="settings-tabs" role="tablist">
+        {TABS.map((x) => (
+          <button key={x.id} role="tab" aria-selected={tab === x.id} className={`settings-tab ${tab === x.id ? 'active' : ''}`} onClick={() => choose(x.id)}>
+            <Icon name={x.icon} size={18} />
+            {t(x.label)}
+          </button>
+        ))}
+      </nav>
+
+      {tab === 'general' && (
+        <>
+          <section className="card">
+            <h3>{t('set.you')}</h3>
+        <label className="field">
+          <span>{t('set.language')}</span>
+          <select value={s.language} onChange={(e) => set({ language: e.target.value as S['language'] })}>
+            <option value="system">{t('set.langSystem', { name: LANGUAGE_NAMES[resolveLanguage('system')] })}</option>
+            <option value="en">{LANGUAGE_NAMES.en}</option>
+            <option value="de">{LANGUAGE_NAMES.de}</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>
+            {t('set.userName')}
+            <span className="muted small field-hint">{t('set.userNameHint')}</span>
+          </span>
+          <input value={s.userName ?? ''} placeholder={t('set.userNamePlaceholder')} onChange={(e) => set({ userName: e.target.value || undefined })} />
+        </label>
+        <label className="field">
+          <span>{t('set.dailyTarget')}</span>
+          <span>
+            <input
+              type="number"
+              min={0}
+              max={24}
+              step={0.25}
+              value={s.dailyTargetHours}
+              onChange={(e) => set({ dailyTargetHours: Math.max(0, Number(e.target.value) || 0) })}
+            />{' '}
+            {t('set.hours')}
+          </span>
+        </label>
+        <label className="field">
+          <span>
+            {t('set.balanceStart')}
+            <span className="muted small field-hint">{t('set.balanceHint')}</span>
+          </span>
+          <span className="balance-fields">
+            <input
+              type="number"
+              step={0.25}
+              value={s.balanceStartHours}
+              onChange={(e) => set({ balanceStartHours: Number(e.target.value) || 0 })}
+              aria-label={t('set.balanceStart')}
+            />
+            {t('set.balanceDate')}
+            <input type="date" value={s.balanceStartDate ?? ''} onChange={(e) => set({ balanceStartDate: e.target.value || undefined })} />
+          </span>
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={s.billableEnabled} onChange={(e) => set({ billableEnabled: e.target.checked })} />
+          {t('set.billable')}
+        </label>
+          </section>
+        </>
+      )}
+
+      {tab === 'tracking' && (
+        <>
+          <section className="card">
+            <h3>{t('set.clockIn')}</h3>
+        <label className="check-row">
+          <input type="checkbox" checked={s.autoStartDay} onChange={(e) => set({ autoStartDay: e.target.checked })} />
+          {t('set.autoStartDay')}
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={s.startDayWithTimer} onChange={(e) => set({ startDayWithTimer: e.target.checked })} />
+          {t('set.startDayWithTimer')}
+        </label>
+          </section>
+          <section className="card">
+            <h3>{t('set.accurate')}</h3>
+        <label className="field">
+          <span>{t('set.idleAsk')}</span>
+          <select value={s.idleMinutes} onChange={(e) => set({ idleMinutes: Number(e.target.value) })}>
+            <option value={0}>{t('set.never')}</option>
+            {[5, 10, 15, 30].map((n) => (
+              <option key={n} value={n}>
+                {t('set.minutes', { n })}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={s.autoStopMidnight} onChange={(e) => set({ autoStopMidnight: e.target.checked })} />
+          {t('set.autoStop')}
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={s.reviewOnLeave} onChange={(e) => set({ reviewOnLeave: e.target.checked })} />
+          {t('set.reviewOnLeave')}
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={s.activityTrail} onChange={(e) => set({ activityTrail: e.target.checked })} />
+          {t('set.trail')}
+        </label>
+        {s.activityTrail && <TrailStatus />}
+        <p className="muted small">
+          {t('set.trailInfo')}{' '}
+          <button className="link" onClick={() => confirm(t('set.deleteTrailConfirm')) && window.api.trailClear()}>
+            {t('set.deleteTrail')}
+          </button>
+        </p>
+          </section>
+        </>
+      )}
+
+      {tab === 'menubar' && (
+        <section className="card">
+        <label className="field">
+          <span>{t('set.nextToIcon')}</span>
+          <select value={s.menuBarLabel} onChange={(e) => set({ menuBarLabel: e.target.value as S['menuBarLabel'] })}>
+            <option value="task">{t('set.labelTask')}</option>
+            <option value="task-time">{t('set.labelTaskTime')}</option>
+            <option value="time">{t('set.labelTime')}</option>
+            <option value="none">{t('set.labelNone')}</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>{t('set.iconColor')}</span>
+          <select value={s.menuBarColor} onChange={(e) => set({ menuBarColor: e.target.value as S['menuBarColor'] })}>
+            <option value="project">{t('set.colorProject')}</option>
+            <option value="activity">{t('set.colorActivity')}</option>
+            <option value="mono">{t('set.colorMono')}</option>
+          </select>
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={s.shortcutsEnabled} onChange={(e) => set({ shortcutsEnabled: e.target.checked })} />
+          {t('set.shortcuts')}
+        </label>
+        {s.shortcutsEnabled && <ShortcutEditor />}
+        <p className="muted small">
+          {t('set.tip')}
+        </p>
+        </section>
+      )}
+
+      {tab === 'connections' && (
+        <>
+      <section className="card onb-entry">
+        <span className="onb-entry-text">
+          <strong>{t('onb.open')}</strong>
+          <span className="muted small">{t('onb.openHint')}</span>
+        </span>
+        <button className="btn" onClick={() => set({ onboardingDone: false })}>
+          <Icon name="waving_hand" size={18} /> {t('onb.open')}
+        </button>
+      </section>
+      <section className="card">
+        <h3>Float</h3>
+        <FloatConnect />
+      </section>
+      <section className="card">
+        <h3>Personio</h3>
+        <PersonioConnect />
+      </section>
+          <ServerSettings />
+          <ApiSettings />
+        </>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,239 @@
+import assert from 'node:assert/strict';
+import * as A from '../src/actions';
+import { parseDuration, dayKey, atTime } from '../src/time';
+import { applyFloatImport, type FloatImport } from '../src/float';
+import { applyPersonioImport, mapPersonioAbsences, periodDays, type PersonioPeriod } from '../src/personio';
+import { goalFor } from '../src/plan';
+import { balanceByMonth } from '../src/balance';
+import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
+import type { Data } from '../src/types';
+import { setLanguage, t, trayStrings } from '../src/i18n';
+
+let passed = 0;
+const test = (name: string, fn: () => void) => { try { fn(); passed++; console.log('✓', name); } catch (e) { console.log('✗', name, '\n  ', (e as Error).message); process.exitCode = 1; } };
+const H = 3_600_000, M = 60_000;
+const today = dayKey(new Date());
+const base = (): Data => ({ version: 1, projects: [{ id: 'p1', name: 'XYZ', color: '#111111' }, { id: 'p2', name: 'Other', color: '#222222' }], activities: [{ id: 'a1', name: 'Call', color: '#333' }, { id: 'a2', name: 'Design', color: '#444' }], entries: [], workdays: [], plan: [], reviewedWeeks: [],
+  settings: { dailyTargetHours: 8, autoStartDay: false, startDayWithTimer: false, shortcutsEnabled: true, idleMinutes: 10, reviewOnLeave: true, menuBarLabel: 'task', menuBarColor: 'project', activityTrail: false } });
+const total = (d: Data, pid: string | undefined, day: string) => d.entries.filter((e) => e.end && e.projectId === pid && dayKey(e.start) === day).reduce((s, e) => s + Date.parse(e.end!) - Date.parse(e.start), 0);
+
+test('parseDuration understands common inputs', () => {
+  assert.equal(parseDuration('2'), 2 * H); assert.equal(parseDuration('2,5'), 2.5 * H); assert.equal(parseDuration('2.25'), 2.25 * H);
+  assert.equal(parseDuration('2:30'), 2.5 * H); assert.equal(parseDuration('1h 30m'), 1.5 * H); assert.equal(parseDuration('90m'), 90 * M);
+  assert.equal(parseDuration(''), 0); assert.equal(parseDuration('abc'), null); assert.equal(parseDuration('2:3x'), null);
+});
+test('appendEntry places time after the day\'s last entry', () => {
+  let d = A.appendEntry(base(), '2026-10-12', 2 * H, { projectId: 'p1' });
+  d = A.appendEntry(d, '2026-10-12', 30 * M, { projectId: 'p2' });
+  assert.equal(d.entries[1].start, d.entries[0].end);
+  assert.equal(d.entries[0].start, atTime('2026-10-12', '09:00'));
+  assert.equal(A.appendEntry(d, '2026-10-12', 30_000, {}).entries.length, 2, 'under a minute is ignored');
+});
+test('setDayTotal grows and shrinks a project\'s day', () => {
+  let d = A.appendEntry(base(), '2026-10-12', 1 * H, { projectId: 'p1' });
+  d = A.appendEntry(d, '2026-10-12', 1 * H, { projectId: 'p1' });
+  d = A.setDayTotal(d, 'p1', '2026-10-12', 3 * H); assert.equal(total(d, 'p1', '2026-10-12'), 3 * H);
+  d = A.setDayTotal(d, 'p1', '2026-10-12', 90 * M); assert.equal(total(d, 'p1', '2026-10-12'), 90 * M);
+  d = A.setDayTotal(d, 'p1', '2026-10-12', 0); assert.equal(total(d, 'p1', '2026-10-12'), 0);
+});
+const withPlan = (): Data => ({ ...base(), plan: [
+  { floatId: 11, projectId: 'p1', name: 'Design', startDate: today, endDate: today, hoursPerDay: 3, days: [today] },
+  { floatId: 12, projectId: 'p1', name: 'Deck', startDate: today, endDate: today, hoursPerDay: 1, days: [today] },
+] });
+test('startTimer picks the task when there is exactly one, not when there are two', () => {
+  const one = { ...withPlan(), plan: withPlan().plan.slice(0, 1) };
+  assert.equal(A.runningEntry(A.startTimer(one, { description: '', projectId: 'p1' }))?.taskId, 11);
+  assert.equal(A.runningEntry(A.startTimer(withPlan(), { description: '', projectId: 'p1' }))?.taskId, undefined);
+});
+test('planGaps per task; untasked time counts toward the first task', () => {
+  let d = A.appendEntry(withPlan(), today, 1 * H, { projectId: 'p1' });           // untasked 1h
+  d = A.appendEntry(d, today, 30 * M, { projectId: 'p1', taskId: 12 });          // Deck 30m
+  const g = A.planGaps(d, today);
+  assert.deepEqual(g.map((x) => [x.taskId, x.ms / M]), [[11, 120], [12, 30]]);
+  d = A.fillGaps(d, today, g);
+  assert.equal(A.planGaps(d, today).length, 0);
+});
+test('goalFor: day off cancels plan; manual goal only on weekdays', () => {
+  const d = withPlan();
+  assert.equal(goalFor(d, 'p1', today), 4 * H);
+  const off = { ...d, workdays: [{ date: today, start: atTime(today, '00:00'), end: atTime(today, '00:00'), breaks: [], off: true }] };
+  assert.equal(goalFor(off, 'p1', today), 0);
+  const manual = { ...base(), projects: [{ id: 'p1', name: 'X', color: '#1', dailyGoalHours: 2 }] };
+  assert.equal(goalFor(manual, 'p1', '2026-10-17'), 0, 'Saturday');
+  assert.equal(goalFor(manual, 'p1', '2026-10-16'), 2 * H, 'Friday');
+});
+test('switchActivity splits and keeps project + task; first pick on a fresh timer just assigns', () => {
+  let d = A.startTimer(base(), { description: '', projectId: 'p1', taskId: 5, taskName: 'T' });
+  d = A.switchActivity(d, 'a1');
+  assert.equal(d.entries.length, 1, 'fresh timer gets the activity');
+  d.entries[0].start = new Date(Date.now() - 10 * M).toISOString();
+  d = A.switchActivity(d, 'a2');
+  assert.equal(d.entries.length, 2);
+  const r = A.runningEntry(d)!;
+  assert.deepEqual([r.projectId, r.taskId, r.activityId], ['p1', 5, 'a2']);
+});
+test('resumeLast continues the last entry', () => {
+  let d = A.startTimer(base(), { description: 'x', projectId: 'p2', taskId: 7, taskName: 'T' });
+  d = A.resumeLast(A.stopTimer(d));
+  assert.equal(d.entries.length, 2);
+  assert.deepEqual([A.runningEntry(d)!.projectId, A.runningEntry(d)!.taskId], ['p2', 7]);
+});
+test('resolveIdle discard/break cut the idle time', () => {
+  const d0 = A.startDay({ ...base(), workdays: [] });
+  let d = A.startTimer(d0, { description: 'x', projectId: 'p1' });
+  d.entries[0].start = new Date(Date.now() - 60 * M).toISOString();
+  const since = new Date(Date.now() - 20 * M).toISOString();
+  const disc = A.resolveIdle(d, since, 'discard');
+  assert.equal(disc.entries[0].end, since); assert.ok(A.runningEntry(disc));
+  const brk = A.resolveIdle(d, since, 'break');
+  assert.equal(A.todayWorkday(brk)!.breaks.at(-1)!.start, since);
+  assert.equal(A.resolveIdle(d, since, 'keep'), d);
+});
+test('Float import twice: no duplicate projects or days off, name-linking works', () => {
+  const imp: FloatImport = { projects: [{ floatId: 900, name: 'xyz', color: '#8E44AD' }, { floatId: 901, name: 'New One', color: '#000000' }],
+    plan: [{ floatId: 1, floatProjectId: 900, name: 'T', startDate: today, endDate: today, hoursPerDay: 2, days: [today] }],
+    daysOff: [{ date: '2026-12-24', reason: 'Holiday' }], range: { from: '2026-09-01', to: '2027-01-31' } };
+  let d = applyFloatImport(base(), imp); d = applyFloatImport(d, imp);
+  assert.equal(d.projects.length, 3); assert.equal(d.projects[0].floatId, 900, 'linked by name');
+  assert.equal(d.plan[0].projectId, 'p1');
+  assert.equal(d.workdays.filter((w) => w.date === '2026-12-24').length, 1);
+  d = applyFloatImport(d, { ...imp, daysOff: [] });
+  assert.equal(d.workdays.length, 0, 'removed Float day off disappears');
+});
+const pp = (id: string, from: string, to: string | null, extra: Partial<PersonioPeriod> = {}): PersonioPeriod =>
+  ({ id, person: { id: '7' }, starts_from: { date_time: `${from}T00:00:00`, type: null }, ends_at: to ? { date_time: `${to}T00:00:00`, type: null } : null, absence_type: { id: 'vac' }, approval: { status: 'APPROVED' }, ...extra });
+const prange = { from: '2026-10-01', to: '2026-12-31' };
+const ptypes = [{ id: 'vac', name: 'Vacation', unit: 'DAY' as const }, { id: 'doc', name: 'Doctor', unit: 'HOUR' as const }];
+test('Personio: periods become weekday days off; 00:00 end on a later day is exclusive; pending ones are skipped', () => {
+  // Fri 16 Oct – Tue 20 Oct: Personio ends it at Wed 21 Oct 00:00. The weekend is skipped.
+  const imp = mapPersonioAbsences([pp('a', '2026-10-16', '2026-10-21'), pp('b', '2026-11-02', null, { approval: { status: 'PENDING' } })], ptypes, new Map(), prange, 8);
+  assert.deepEqual(imp.daysOff.map((x) => x.date), ['2026-10-16', '2026-10-19', '2026-10-20']);
+  assert.equal(imp.daysOff[0].reason, 'Vacation');
+  const inclusive = { ...pp('i', '2026-10-16', null), ends_at: { date_time: '2026-10-20T23:59:59', type: null } };
+  assert.equal(periodDays(inclusive, prange).at(-1)!.date, '2026-10-20', 'an end later in the day includes that day');
+  assert.deepEqual(periodDays(pp('c', '2026-12-31', '2027-01-01'), { from: '2026-12-01', to: '2027-01-31' }).map((x) => x.date), ['2026-12-31'], 'next-day midnight end');
+  assert.equal(periodDays(pp('d', '2026-12-28', null), prange).at(-1)!.date, '2026-12-31', 'ongoing runs to the end of the window');
+});
+test('Personio: half days and hourly absences are skipped (counted), whole days win; breakdowns take precedence', () => {
+  const half = pp('h', '2026-10-21', '2026-10-21', { starts_from: { date_time: '2026-10-21T00:00:00', type: 'SECOND_HALF' } });
+  const hourly = pp('x', '2026-10-22', '2026-10-22', { absence_type: { id: 'doc' } });
+  const imp = mapPersonioAbsences([half, hourly], ptypes, new Map(), prange, 8);
+  assert.equal(imp.daysOff.length, 0);
+  assert.deepEqual(imp.partial.map((x) => x.date), ['2026-10-21', '2026-10-22']);
+  // Breakdowns: a public holiday counts 0 (skipped), 0.5 is partial, 480 minutes with an 8 h target is a whole day.
+  const bd = new Map([['a', [
+    { date: '2026-10-26', effective_duration: { value: 1, unit: 'DAY' as const } },
+    { date: '2026-10-27', effective_duration: { value: 0, unit: 'DAY' as const } },
+    { date: '2026-10-28', effective_duration: { value: 0.5, unit: 'DAY' as const } },
+    { date: '2026-10-29', effective_duration: { value: 480, unit: 'MINUTE' as const } },
+  ]]]);
+  const withBd = mapPersonioAbsences([pp('a', '2026-10-26', '2026-10-30'), pp('z', '2026-10-28', '2026-10-28')], [], bd, prange, 8);
+  assert.deepEqual(withBd.daysOff.map((x) => x.date), ['2026-10-26', '2026-10-28', '2026-10-29'], 'a whole-day period on the same date wins over the half day');
+  assert.equal(withBd.partial.length, 0);
+  assert.equal(withBd.daysOff[0].reason, t('personio.absence'), 'unknown type gets a generic reason');
+});
+test('Personio import twice: no duplicates, own days removed when gone, manual days and other sources respected', () => {
+  const manual = { date: '2026-10-19', start: atTime('2026-10-19', '09:00'), end: atTime('2026-10-19', '17:00'), breaks: [] };
+  const floatOff = { date: '2026-10-20', start: atTime('2026-10-20', '00:00'), end: atTime('2026-10-20', '00:00'), breaks: [], off: true, offReason: 'Time off', offSource: 'float' as const };
+  const start = { ...base(), workdays: [manual, floatOff] };
+  const imp = mapPersonioAbsences([pp('a', '2026-10-16', '2026-10-21')], ptypes, new Map(), prange, 8);
+  let d = applyPersonioImport(applyPersonioImport(start, imp), imp);
+  assert.equal(d.workdays.length, 3);
+  assert.equal(d.workdays.find((w) => w.date === '2026-10-19')!.off, undefined, 'a worked day is never overwritten');
+  assert.equal(d.workdays.find((w) => w.date === '2026-10-20')!.offSource, 'personio', 'Personio takes over Float time off');
+  assert.ok(d.settings.personioLastSync);
+  d = applyPersonioImport(d, { ...imp, daysOff: [] });
+  assert.deepEqual(d.workdays.map((w) => w.date), ['2026-10-19'], 'cancelled absences disappear');
+  d = applyFloatImport({ ...d, workdays: [...d.workdays, { ...floatOff, offSource: 'personio' as const }] }, { projects: [], plan: [], daysOff: [], range: prange });
+  assert.equal(d.workdays.length, 2, 'a Float sync leaves Personio days alone');
+});
+test('closeOvernight closes yesterday at 23:59 and flags it; today stays untouched', () => {
+  const y = dayKey(new Date(Date.now() - 86_400_000));
+  const d: Data = { ...base(),
+    workdays: [{ date: y, start: atTime(y, '08:05'), breaks: [{ start: atTime(y, '12:00') }] }, { date: today, start: atTime(today, '00:10'), breaks: [] }],
+    entries: [{ id: 'r', description: 'late', projectId: 'p1', start: atTime(y, '22:00') }] };
+  assert.ok(A.hasOvernight(d));
+  const n = A.closeOvernight(d);
+  const yw = n.workdays.find((w) => w.date === y)!;
+  assert.equal(yw.autoClosed, true);
+  assert.equal(dayKey(yw.end!), y, 'closed on its own day');
+  assert.ok(yw.breaks.every((b) => b.end), 'open break closed too');
+  assert.equal(n.entries[0].end, yw.end, 'timer stopped at the same moment');
+  assert.equal(n.workdays.find((w) => w.date === today)!.end, undefined, "today's open day is left alone");
+  assert.equal(A.hasOvernight(n), false);
+  const fixed = A.closeWorkday(n, y, atTime(y, '18:30'));
+  assert.equal(fixed.workdays.find((w) => w.date === y)!.autoClosed, undefined, 'setting the real time confirms it');
+});
+test('resolveIdle "leave" clocks out at the moment you left (timer and workday)', () => {
+  let d = A.startTimer(A.startDay(base()), { description: 'x', projectId: 'p1' });
+  d.entries[0].start = new Date(Date.now() - 8 * H).toISOString();
+  d.workdays[0].start = new Date(Date.now() - 9 * H).toISOString();
+  const since = new Date(Date.now() - 7 * H).toISOString();
+  const n = A.resolveIdle(d, since, 'leave');
+  assert.equal(n.entries[0].end, since);
+  assert.equal(n.workdays[0].end, since);
+  assert.equal(A.runningEntry(n), undefined);
+});
+
+test('lastDayEntries + copyEntriesTo repeat the last day of a project', () => {
+  let d = A.appendEntry(base(), '2026-10-13', 1 * H, { projectId: 'p1', description: 'Old' });
+  d = A.appendEntry(d, '2026-10-15', 45 * M, { projectId: 'p1', description: 'Sync', activityId: 'a1' });
+  d = A.appendEntry(d, '2026-10-15', 30 * M, { projectId: 'p2', description: 'Other project' });
+  const last = A.lastDayEntries(d, 'p1', '2026-10-16')!;
+  assert.equal(last.day, '2026-10-15');
+  assert.deepEqual(last.entries.map((e) => e.description), ['Sync']);
+  d = A.copyEntriesTo(d, '2026-10-16', last.entries);
+  const copy = d.entries.find((e) => dayKey(e.start) === '2026-10-16')!;
+  assert.deepEqual([copy.description, copy.activityId, Date.parse(copy.end!) - Date.parse(copy.start)], ['Sync', 'a1', 45 * M]);
+});
+test('weekCopyPlan copies only into empty project-days, never onto days off or the future', () => {
+  const from = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'];
+  const to = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18'];
+  let d = A.appendEntry(base(), '2026-10-05', 2 * H, { projectId: 'p1' });
+  d = A.appendEntry(d, '2026-10-06', 2 * H, { projectId: 'p1' });
+  d = A.appendEntry(d, '2026-10-07', 1 * H, { projectId: 'p1' });
+  d = A.appendEntry(d, '2026-10-13', 1 * H, { projectId: 'p1' }); // Tuesday already has p1 time
+  d = A.markDayOff(d, '2026-10-14'); // Wednesday off
+  const plan = A.weekCopyPlan(d, from, to);
+  assert.deepEqual(plan.map((x) => x.day), ['2026-10-12']);
+});
+test('i18n: German plurals, variables and tray templates follow the language setting', () => {
+  setLanguage('de');
+  assert.equal(t('count.entries', { n: 1 }), '1 Eintrag');
+  assert.equal(t('count.entries', { n: 2 }), '2 Einträge');
+  assert.equal(t('day.daysUnder', { n: 3, hours: 8 }), '3 Tage unter 8 h');
+  assert.equal(trayStrings().idleLeave, 'Feierabend um {time}');
+  setLanguage('en');
+  assert.equal(t('count.entries', { n: 1 }), '1 entry');
+  assert.equal(t('ts.weekNo', { n: 42 }), 'Week 42');
+  assert.equal(trayStrings().clockOut, 'Clock out');
+});
+
+test('overtime balance: worked − target; vacation neutral, overtime-off uses it, open days wait', () => {
+  const day = (date: string, from: string, to?: string) => ({ date, start: atTime(date, from), end: to ? atTime(date, to) : undefined, breaks: [] });
+  let d: Data = { ...base(), workdays: [day('2026-09-29', '08:00', '17:00'), day('2026-10-01', '08:00', '18:00'), day('2026-10-02', '09:00', '15:00')] };
+  d = A.markDayOff(d, '2026-10-05');              // vacation: neutral
+  d = A.markDayOff(d, '2026-10-06', 'overtime');  // overtime off: −8h
+  d = { ...d, workdays: [...d.workdays, day('2026-10-07', '08:00')] }; // still open: not counted
+  const b = balanceByMonth(d);
+  assert.deepEqual(b.months.map((m) => [m.month, m.diff / H]), [['2026-09', 1], ['2026-10', 2 - 2 - 8]]);
+  assert.equal(b.total / H, -7);
+  const withStart = balanceByMonth({ ...d, settings: { ...d.settings, balanceStartHours: 12.5, balanceStartDate: '2026-10-01' } });
+  assert.equal(withStart.total / H, 12.5 - 8, 'starting balance replaces everything before its date');
+});
+
+test('shortcuts: key presses become accelerators, shown with Mac symbols', () => {
+  const ev = (code: string, mods: Partial<Record<'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey', boolean>> = {}) =>
+    ({ code, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...mods }) as unknown as KeyboardEvent;
+  assert.equal(accelFromEvent(ev('KeyP', { ctrlKey: true, altKey: true })), 'Control+Alt+P', '⌥ changes e.key, e.code is used');
+  assert.equal(accelFromEvent(ev('Digit3', { metaKey: true, shiftKey: true })), 'Shift+Command+3');
+  assert.equal(accelFromEvent(ev('KeyT')), 'needs-modifier');
+  assert.equal(accelFromEvent(ev('ShiftLeft', { shiftKey: true })), null);
+  assert.equal(accelFromEvent(ev('F5')), 'F5', 'function keys alone are fine');
+  assert.equal(prettyAccel('Control+Alt+P'), '⌃⌥P');
+  assert.equal(prettyAccel('Control+Alt+Space'), '⌃⌥ Space');
+  assert.equal(projectAccel('Control+Alt', 0), 'Control+Alt+1');
+  assert.equal(projectAccel('', 0), '');
+});
+
+console.log(`\n${passed} passed`);

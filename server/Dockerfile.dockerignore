@@ -1,0 +1,10 @@
+# Only src/ and server/ are needed; keep everything else (and all secrets/data) out of the image.
+*
+!src/**
+!server/**
+server/node_modules
+server/dist
+server/dist-test
+server/.data
+server/.env
+**/.DS_Store

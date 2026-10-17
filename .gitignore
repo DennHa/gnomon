@@ -1,0 +1,26 @@
+node_modules/
+dist/
+release/
+.DS_Store
+dist-test/
+
+# Never publish personal data, secrets or build output
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.db
+*.sqlite
+*.sqlite3
+.data/
+data.json
+trail.json
+api-key.json
+float-token.json
+personio-credentials.json
+*.dmg
+*.log
+.vscode/
+.idea/
+.private-patterns

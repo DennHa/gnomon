@@ -1,0 +1,37 @@
+# Gnomon server behind a Cloudflare Tunnel: the container joins the shared `proxy-net`, where `cloudflared`
+# reaches it as http://gnomon:8080. No host port is published.
+# Other setups (LAN only, Tailscale, a reverse proxy): see README.md → "Hosting it yourself".
+services:
+  gnomon:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: gnomon-server:local
+    container_name: gnomon
+    restart: unless-stopped
+    environment:
+      # "Which day" an entry belongs to is decided in this time zone.
+      TZ: ${GNOMON_TZ:-Europe/Berlin}
+    volumes:
+      - gnomon-data:/data
+    networks:
+      - proxy-net
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
+
+networks:
+  proxy-net:
+    external: true
+
+volumes:
+  gnomon-data:

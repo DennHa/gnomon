@@ -1,0 +1,33 @@
+{
+  "name": "gnomon-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gnomon server: the Gnomon REST API with SQLite storage and a mobile web app, for self-hosting (e.g. on a Raspberry Pi).",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node dist/server.mjs",
+    "dev": "node scripts/build.mjs && GNOMON_DATA_DIR=./.data PORT=8787 node dist/server.mjs",
+    "admin": "node dist/admin.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/build.mjs && node scripts/build.mjs --tests && node --test dist-test/"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "@material-symbols/svg-400": "^0.47.5",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.17.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "esbuild": "^0.25.0",
+    "qrcode-generator": "^1.4.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

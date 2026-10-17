@@ -1,0 +1,133 @@
+<p align="center"><img src="docs/icon.png" width="96" alt="Gnomon icon"></p>
+
+<h1 align="center">Gnomon</h1>
+
+<p align="center"><b>A calm work-hour tracker for your Mac.</b><br>
+Clock in and out, track your projects, catch up later, and always know your overtime balance.</p>
+
+<p align="center"><img src="docs/screenshots/track.png" width="820" alt="Gnomon: the Track page with a running timer, today's plan and entries"></p>
+
+*A gnomon is the pointer on a sundial, the oldest time-tracking tool there is.*
+
+## What it does
+
+### 1. Clock in, clock out
+
+Your workday in two clicks. Press **Start day** when you sit down, take a **Break**, and **Leave** when you're done:
+from the sidebar, the menu bar or a keyboard shortcut. Forgot to clock out? Gnomon closes the day at midnight and asks
+the next morning when you actually left.
+
+<img src="docs/screenshots/morning.png" width="820" alt="Morning: not clocked in yet, Start day button and today's plan">
+
+### 2. Track the projects you're on
+
+Your plan from **Float** becomes today's list: start a timer on a planned project with one click, or press **⌃⌥P** in
+any app and type a few letters. Switch the activity (Design, Call, Workshop…) without stopping the clock, and see how far
+each project is against its plan. Weblog support follows once its API is available.
+
+<img src="docs/screenshots/quick-switcher.png" width="520" alt="Quick switcher: start or switch a timer from any app">
+
+### 3. Catch up later
+
+Not a live tracker? No problem. Fill in a whole week afterwards: type hours straight into the timesheet, **repeat**
+yesterday, **copy last week**, or **fill from plan** to turn your Float plan into entries. Each day shows what's still
+open against your plan.
+
+<img src="docs/screenshots/week.png" width="820" alt="Week timesheet: hours per project and day, planned hours in grey">
+
+<img src="docs/screenshots/week-day.png" width="820" alt="A day in detail: in/out, breaks, entries, and what's still open against the plan">
+
+### 4. Always know your balance
+
+Gnomon counts every workday against your daily target and keeps a running **overtime balance**, month by month.
+Vacation and sick days from **Personio** don't count against you; *overtime off* days use the balance. One number tells
+you where you stand.
+
+<img src="docs/screenshots/reports.png" width="820" alt="Reports: overtime balance per month and tracked time per day">
+
+### On your phone too
+
+A small web app on your own server (see [server/README.md](server/README.md)): clock in on the way in, start or switch a
+timer, and check your week. Pair a phone by scanning a QR code from the Mac app.
+
+<p>
+<img src="docs/screenshots/phone-today.png" width="260" alt="Phone: today with a running timer">
+&nbsp;
+<img src="docs/screenshots/phone-week.png" width="260" alt="Phone: this week in dark mode">
+</p>
+
+<sub>Screenshots use made-up demo data (`scripts/demo-data.cjs`); retake them with `sh scripts/screenshots.sh`.</sub>
+
+## All features
+
+A macOS desktop app (Electron + React + TypeScript) for:
+
+- **Clocking in and out**: *Start day* in the morning, *Break*, and *Leave* in the evening. These controls are always in the sidebar and in the menu bar. If you forgot to clock out yesterday, the app asks when you left.
+- **Projects and activities**: a project is *who* the work is for (Client XYZ); an activity is *what kind* of work it is (Call, Design, Presentation). While a timer runs, clicking an activity chip switches to it and keeps the project. Entries can be marked billable (€).
+- **Day view**: ‹ › or a date picker to go back in time, and *Jump to today*. Past days are fully editable (in/out, breaks, entries); you can add a forgotten workday or mark a day off. A list shows the days that ended below your daily target.
+- **Week view**: a timesheet with one row per project and one column per day, plus planned hours and week goals.
+- **Float import** (Settings → Float): your allocations become the daily plan per project (task, from–to, hours per day, time window), Float projects land in Projects, and time off and public holidays become days off. Read-only; it syncs once a day in the morning or via *Sync now*. The API token (Float → Account Settings → Integrations, owner/admin only) is stored encrypted in the keychain.
+- **Personio import** (Settings → Personio): approved vacation, sick days and other absences become days off, so the overtime balance stays right. Read-only (API v2); a Personio admin creates API credentials (client ID + secret) with read access to absences and employees. Syncs once a day in the morning or via *Sync now*; half days are not imported (enter them yourself). Credentials are stored encrypted in the keychain.
+- **First-launch guide**: on first start a short guide walks through Float, Personio and Weblog (Weblog is a placeholder until its API is available). Every step is skippable; reopen it from Settings → *Set up integrations*.
+- **Menu bar**: start day / break / leave, *Start project*, *Switch activity*, *Continue recent*.
+- **Reports**: week or month view, tracked time per day stacked by project, breakdowns by project and by activity, billable hours, an attendance table, balance against your daily target, and CSV export.
+- **Settings**: daily target, auto clock-in (when the app opens, or when you start a timer), and whether to show the running time in the menu bar.
+
+Everything stays on your Mac, in `~/Library/Application Support/Gnomon/data.json`.
+
+## Run
+
+```bash
+npm install
+npm run dev     # Vite + Electron with hot reload
+npm start       # production build, then launch
+npm run dist    # build Gnomon.app and a .dmg into release/
+npm run icon    # app, phone and menu bar icons from build/*.svg
+sh scripts/screenshots.sh   # README screenshots (after npm run build)
+```
+
+## Installing the app
+
+`npm run dist` creates `release/Gnomon-<version>-arm64.dmg`. Open it, drag **Gnomon** into **Applications**, and start it from there.
+To have it ready every morning, add it under System Settings → General → Login Items.
+
+The app is ad-hoc signed (see `scripts/adhoc-sign.cjs`), not signed with an Apple Developer ID. That's fine on the Mac
+that built it. If you copy the .dmg to another Mac, the first launch needs right-click → **Open** (or System Settings →
+Privacy & Security → *Open Anyway*). Signing for distribution requires a paid Apple Developer account.
+
+Updating: build a new .dmg and drag the new Gnomon over the old one. Your data stays in
+`~/Library/Application Support/Gnomon/` and isn't touched.
+
+## Where it lives
+
+Keep the project outside synced folders such as Nextcloud: Nextcloud strips the execute
+permission from files in `node_modules` (e.g. esbuild), which breaks builds with `EACCES`.
+Back it up with git instead of the sync folder.
+
+## Where your data lives
+
+Everything stays on your Mac, in `~/Library/Application Support/Gnomon/` (folder and files readable only by your user):
+
+| File | What | Notes |
+|---|---|---|
+| `data.json` | Entries, workdays, projects, activities, settings, imported Float plan | Plain JSON, written atomically. Back it up or copy it to another Mac. |
+| `float-token.json` | Float API token | Encrypted with a key held in the macOS keychain (Electron `safeStorage`); never sent to the window. |
+| `personio-credentials.json` | Personio client ID + secret | Encrypted the same way; never sent to the window. |
+| `trail.json` | Activity trail (only if enabled) |
+| `api-key.json` | Local API key (encrypted, only if created) | App names and times only, never window titles; about two months are kept. "Delete trail" in Settings removes it. |
+
+Nothing is sent anywhere except to `api.float.com` and `api.personio.de`, and only after you connect them (read-only requests; Personio additionally gets one token request with your client credentials).
+There's no analytics, tracking or auto-update.
+
+## Security notes
+
+- Windows run sandboxed with context isolation and no Node.js access; the page talks to the system only through a small preload API.
+- The production build has a strict Content-Security-Policy (no remote scripts), and windows can't navigate away or open new windows.
+- Float and Personio requests go through the main process with a fixed base URL and read-only endpoints, so the page never sees the token or credentials.
+- To test against mocks: `FLOAT_API_BASE=…` and `PERSONIO_API_BASE=http://127.0.0.1:7811` (run `node tests/personio-mock.cjs`; client ID `demo-id`, secret `demo-secret`, email `alex@example.com`).
+- The activity trail reads the frontmost app's name with `lsappinfo` (no shell, fixed arguments, no extra permissions).
+- Keep Electron current: `npm audit` lists build-tool advisories (electron-builder, vite's dev server) that don't ship in the app.
+
+Run the logic tests with `npm test`.
+
+See also [API.md](API.md) (local REST API) and [FINDINGS.md](FINDINGS.md) (decisions, psychology, security, next steps).
