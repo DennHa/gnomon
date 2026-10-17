@@ -61,6 +61,8 @@ timer, and check your week. Pair a phone by scanning a QR code from the Mac app.
 | <img src="docs/screenshots/reports.png" alt="Reports with the overtime balance"> | <img src="docs/screenshots/quick-switcher.png" alt="Quick switcher (⌃⌥P from any app)"> |
 
 <p>
+<img src="docs/screenshots/phone-clock.png" width="260" alt="Phone: the time clock (Stempeln) with Correct today">
+&nbsp;
 <img src="docs/screenshots/phone-today.png" width="260" alt="Phone: today with a running timer">
 &nbsp;
 <img src="docs/screenshots/phone-week.png" width="260" alt="Phone: this week in dark mode">

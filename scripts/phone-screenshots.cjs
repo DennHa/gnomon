@@ -9,7 +9,7 @@ const os = require('os');
 const path = require('path');
 
 // English UI, whatever the Mac's language.
-app.commandLine.appendSwitch('lang', 'en-US');
+app.commandLine.appendSwitch('lang', 'en-GB'); // English with 24-hour times
 
 const NOW = '2026-10-14T14:35:00';
 const PORT = 8799;
@@ -111,9 +111,11 @@ app.whenReady().then(async () => {
     await seed(global.deviceKey);
     fs.mkdirSync(out, { recursive: true });
     const win = await openPhone();
-    await shoot(win, 'phone-today.png', 'light', 0);
-    await shoot(win, 'phone-week.png', 'dark', 1);
-    await shoot(win, 'phone-today-dark.png', 'dark', 0);
+    // Tabs in order: Stempeln (time clock), Timer, Week, Device.
+    await shoot(win, 'phone-today.png', 'light', 1);
+    await shoot(win, 'phone-week.png', 'dark', 2);
+    await shoot(win, 'phone-today-dark.png', 'dark', 1);
+    await shoot(win, 'phone-clock.png', 'light', 0);
     win.destroy();
   } catch (err) {
     console.error(err);
