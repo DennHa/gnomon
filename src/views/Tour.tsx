@@ -28,7 +28,7 @@ const initialStep = () => {
 };
 
 export default function Tour() {
-  const { data, update } = useStore();
+  const { data, update, profile } = useStore();
   const [step, setStep] = useState(initialStep);
   const last = step === STEPS.length - 1;
   const finish = (openGuide = false) =>
@@ -66,7 +66,7 @@ export default function Tour() {
 
         <div className="onb-body">
           <p>{t(s.text, { key: prettyAccel(data.settings.shortcuts.quick) || '⌃⌥P' })}</p>
-          {last && (
+          {last && !profile?.managed && (
             <div className="tour-connect">
               <span className="muted small">{t('tour.connectHint')}</span>
               <button className="btn" onClick={() => finish(true)}>

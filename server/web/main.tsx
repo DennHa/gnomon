@@ -47,15 +47,15 @@ const isStandalone = () => window.matchMedia('(display-mode: standalone)').match
 
 type Tab = 'today' | 'clock' | 'week' | 'device';
 const TABS: [Tab, IconName, string][] = [
-  ['today', 'timer', t('timerTab')],
   ['clock', 'schedule', t('clockTab')],
+  ['today', 'timer', t('timerTab')],
   ['week', 'calendar_view_week', t('week')],
   ['device', 'devices', t('device')],
 ];
 
 function App() {
   const [key, setKeyState] = useState(getKey);
-  const [tab, setTab] = useState<Tab>('today');
+  const [tab, setTab] = useState<Tab>('clock');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 

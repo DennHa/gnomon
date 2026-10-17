@@ -14,11 +14,11 @@ server, a small VPS) and reach it over HTTPS.
 
 What the phone can do:
 
+- **Time clock (Stempeln, the first tab):** start day, break and leave with big buttons, today's worked time against the daily
+  target, and **Correct today**: change when you came or left and edit, add or delete breaks (for a misclick).
 - **Timer:** a big start/stop timer; project and activity chips (tapping an activity while the timer runs switches
   to it); "Continue" for recent work; today's entries, which you tap to edit or delete. A line at the top shows
   whether you're clocked in and opens the time clock.
-- **Time clock (Stempeln):** start day, break and leave with big buttons, today's worked time against the daily
-  target, and **Correct today**: change when you came or left and edit, add or delete breaks (for a misclick).
 - **Week:** hours per day as bars coloured by project, plus totals per project. ‹ › for earlier weeks. Tap a day to
   enter time after the fact (description, project, activity and a duration like `1:30`, `1,5` or `90m`), edit or
   delete its entries, and set its attendance (in, out, break).

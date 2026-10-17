@@ -252,7 +252,7 @@ function useApiBridge() {
 }
 
 export default function App() {
-  const { data, update, runFloatSync, runPersonioSync } = useStore();
+  const { data, update, runFloatSync, runPersonioSync, profile } = useStore();
   const [view, setView] = useState<View>(initialView);
   const [day, setDay] = useState(initialDay);
   const [dayModal, setDayModal] = useState<string | null>(() => (hashParts()[2] === 'day' ? initialDay() : null));
@@ -353,7 +353,7 @@ export default function App() {
         {view === 'settings' && <Settings />}
       </main>
       {/* First launch: the feature tour. The integrations guide opens only on request (tour's last step or Settings). */}
-      {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && <Onboarding />}
+      {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && !profile?.managed && <Onboarding />}
     </div>
   );
 }

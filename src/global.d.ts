@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import type { TrayAction, TrayState } from './types';
+import type { CompanyProfile, TrayAction, TrayState } from './types';
 
 type ServerStatus = { connected: boolean; url?: string; name?: string };
 type ServerResult<T> = ({ ok: true } & T) | { ok: false; error: string; status?: number };
@@ -10,6 +10,7 @@ declare global {
   interface Window {
     api: {
       load(): Promise<unknown>;
+      profile(): Promise<CompanyProfile | null>;
       save(data: unknown): Promise<void>;
       saveSync(data: unknown): boolean;
       updateTray(state: TrayState): void;

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Activity, Data, Entry } from './types';
+import type { Activity, Data, Entry, CompanyProfile } from './types';
 import { DEFAULT_SHORTCUTS } from './shortcuts';
 import { applyFloatImport, fetchFloatPlan } from './float';
 import { applyPersonioImport, fetchPersonioAbsences } from './personio';
@@ -63,12 +63,15 @@ type Store = {
   /** Synchronous read/write for the API bridge, which needs the result of a change right away. */
   getData: () => Data;
   commit: (next: Data) => void;
+  /** The company settings profile (Iru), or null on a personal Mac. */
+  profile: CompanyProfile | null;
 };
 
 const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Data | null>(null);
+  const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const dataRef = useRef<Data | null>(null);
   dataRef.current = data;
   const [floatSync, setFloatSync] = useState<SyncState>({ busy: false });
@@ -77,7 +80,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const personioBusy = useRef(false);
 
   useEffect(() => {
-    window.api.load().then((raw) => setData(normalize(raw)));
+    Promise.all([window.api.load(), window.api.profile().catch(() => null)]).then(([raw, p]) => {
+      let d = normalize(raw);
+      // On a fresh install, the company's defaults are the starting values; the person can change them later.
+      if (!raw && p) d = { ...d, settings: { ...d.settings, ...(p.dailyTargetHours && { dailyTargetHours: p.dailyTargetHours }), ...(p.language && { language: p.language }) } };
+      setProfile(p);
+      setData(d);
+    });
   }, []);
 
   // Debounced save, plus a synchronous flush when the window unloads (e.g. on quit).
@@ -139,7 +148,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (!data) return <div className="loading">{t('loading')}</div>;
-  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, getData, commit }}>{children}</StoreContext.Provider>;
+  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, getData, commit, profile }}>{children}</StoreContext.Provider>;
 }
 
 export function useStore(): Store {

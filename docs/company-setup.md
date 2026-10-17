@@ -1,6 +1,7 @@
 # Gnomon in a company: plan
 
-> **Status: planned, not built yet.** Today every person connects Float and Personio themselves, with tokens
+> **Status: partly built.** The Mac app reads the settings profile and has a managed mode (steps 1–2 below); the
+> server side is planned. Today every person connects Float and Personio themselves, with tokens
 > stored in their own Mac's keychain. This document describes how a company-wide setup would work and what's
 > still to build.
 
@@ -129,7 +130,11 @@ only**, never tokens or passwords. The Entra client ID is public by design; the 
 | `entraTenantId`, `entraClientId` | string | Microsoft sign-in |
 | `allowLocalApi` | bool | Whether the local REST API (API.md) may be switched on |
 | `allowActivityTrail` | bool | Whether the opt-in activity trail is offered |
-| `dailyTargetHours`, `language` | number, string | Starting values; the person can change them |
+| `dailyTargetHours`, `language` | number, string | Starting values on a fresh install; the person can change them |
+
+The app reads `/Library/Managed Preferences/<user>/app.gnomon.timetracker.plist`, then
+`/Library/Managed Preferences/app.gnomon.timetracker.plist`. Unknown or badly typed keys are ignored. To try a profile
+without Iru, start the app with `PROFILE_FILE=/path/to/profile.plist` (or a `.json` with the same keys).
 
 ## What the employee sees
 
@@ -161,8 +166,8 @@ Settings → Connections then shows "Managed by your company" with the server ad
 
 | Step | What | Size |
 |---|---|---|
-| 1 | Mac app reads the settings profile (`serverUrl`, `managed`, rules, defaults) | small |
-| 2 | Managed mode hides the integration guide, token fields and pairing | small |
+| 1 | ✅ Mac app reads the settings profile (`serverUrl`, `managed`, rules, defaults) | done |
+| 2 | ✅ Managed mode hides the integration guide, token fields and pairing; the profile's rules switch off the local API and the activity trail | done |
 | 3 | Server: first-start setup link, the wizard (screens 1–8) and the Admin page, secrets encrypted at rest | medium |
 | 4 | Sign in with Microsoft Entra (server and Mac app), replacing pairing codes for company use | medium |
 | 5 | Server becomes multi-user; Float and Personio sync on the server per person | large |

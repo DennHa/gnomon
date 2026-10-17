@@ -42,6 +42,44 @@ function readData() {
   }
 }
 
+// ---- Company profile (Iru or another Mac management tool) --------------------------------------
+// IT can push a settings profile for the domain app.gnomon.timetracker (see docs/company-setup.md). macOS writes it
+// to /Library/Managed Preferences, per user or for the whole Mac. It holds addresses, IDs and switches only, never
+// secrets. Read once at start; unknown or badly typed keys are ignored. PROFILE_FILE (a .plist or .json) fakes one for
+// tests and screenshots.
+const PROFILE_DOMAIN = 'app.gnomon.timetracker';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function readCompanyProfile() {
+  const os = require('os');
+  const files = process.env.PROFILE_FILE
+    ? [process.env.PROFILE_FILE]
+    : [path.join('/Library/Managed Preferences', os.userInfo().username, `${PROFILE_DOMAIN}.plist`), path.join('/Library/Managed Preferences', `${PROFILE_DOMAIN}.plist`)];
+  for (const file of files) {
+    if (!fs.existsSync(file)) continue;
+    try {
+      const raw = file.endsWith('.json')
+        ? JSON.parse(fs.readFileSync(file, 'utf8'))
+        : JSON.parse(require('child_process').execFileSync('/usr/bin/plutil', ['-convert', 'json', '-o', '-', file], { timeout: 3000 }).toString());
+      const p = {};
+      if (typeof raw.serverUrl === 'string' && /^https:\/\/[^\s/]+/i.test(raw.serverUrl)) p.serverUrl = new URL(raw.serverUrl).origin;
+      if (typeof raw.managed === 'boolean') p.managed = raw.managed;
+      if (typeof raw.entraTenantId === 'string' && UUID.test(raw.entraTenantId)) p.entraTenantId = raw.entraTenantId;
+      if (typeof raw.entraClientId === 'string' && UUID.test(raw.entraClientId)) p.entraClientId = raw.entraClientId;
+      if (typeof raw.allowLocalApi === 'boolean') p.allowLocalApi = raw.allowLocalApi;
+      if (typeof raw.allowActivityTrail === 'boolean') p.allowActivityTrail = raw.allowActivityTrail;
+      if (typeof raw.dailyTargetHours === 'number' && raw.dailyTargetHours > 0 && raw.dailyTargetHours <= 24) p.dailyTargetHours = raw.dailyTargetHours;
+      if (['system', 'en', 'de'].includes(raw.language)) p.language = raw.language;
+      console.log(`[profile] ${file}: ${Object.keys(p).join(', ') || 'no usable keys'}`);
+      return p;
+    } catch (err) {
+      console.warn(`[profile] couldn't read ${file}: ${err.message}`);
+    }
+  }
+  return null;
+}
+const companyProfile = readCompanyProfile();
+ipcMain.handle('profile:get', () => companyProfile);
+
 // The Float API token is encrypted with the macOS keychain and never handed back to the renderer.
 // It's decrypted once per launch and kept in memory: every decrypt can trigger a keychain password prompt.
 let floatTokenCache;
@@ -664,6 +702,7 @@ function frontmostApp() {
 
 async function sampleTrail() {
   const s = lastState;
+  if (companyProfile?.allowActivityTrail === false) return; // switched off by the company profile
   if (!s?.trailEnabled || !s.dayActive || s.onBreak || powerMonitor.getSystemIdleTime() > 120) return;
   const appName = await frontmostApp();
   if (!appName || IGNORED_APPS.has(appName)) return;
@@ -781,7 +820,8 @@ ipcMain.handle('api:generateKey', () => generateApiKey());
 ipcMain.handle('api:status', () => ({ running: Boolean(apiServer?.listening), address: apiServer?.address() ?? null }));
 
 function syncApiServer(s) {
-  const config = s.apiEnabled ? `${s.apiPort}|${s.apiLan}` : '';
+  // The company profile can forbid the local API; then it stays off whatever the setting says.
+  const config = s.apiEnabled && companyProfile?.allowLocalApi !== false ? `${s.apiPort}|${s.apiLan}` : '';
   if (config === apiConfigKey) return;
   apiConfigKey = config;
   if (apiServer) {

@@ -347,7 +347,7 @@ function initialTab(): SettingsTab {
 }
 
 export default function Settings() {
-  const { data, update } = useStore();
+  const { data, update, profile } = useStore();
   const s = data.settings;
   const set = (p: Partial<S>) => update((d) => ({ ...d, settings: { ...d.settings, ...p } }));
   const [tab, setTab] = useState<SettingsTab>(initialTab);
@@ -472,11 +472,17 @@ export default function Settings() {
           <input type="checkbox" checked={s.reviewOnLeave} onChange={(e) => set({ reviewOnLeave: e.target.checked })} />
           {t('set.reviewOnLeave')}
         </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.activityTrail} onChange={(e) => set({ activityTrail: e.target.checked })} />
-          {t('set.trail')}
-        </label>
-        {s.activityTrail && <TrailStatus />}
+        {profile?.allowActivityTrail === false ? (
+          <p className="muted small">{t('managed.trailOff')}</p>
+        ) : (
+          <>
+            <label className="check-row">
+              <input type="checkbox" checked={s.activityTrail} onChange={(e) => set({ activityTrail: e.target.checked })} />
+              {t('set.trail')}
+            </label>
+            {s.activityTrail && <TrailStatus />}
+          </>
+        )}
         <p className="muted small">
           {t('set.trailInfo')}{' '}
           <button className="link" onClick={() => confirm(t('set.deleteTrailConfirm')) && window.api.trailClear()}>
@@ -521,7 +527,27 @@ export default function Settings() {
         </section>
       )}
 
-      {tab === 'connections' && (
+      {tab === 'connections' && profile?.managed && (
+        <>
+          <section className="card managed-card">
+            <span className="onb-icon">
+              <Icon name="hub" size={26} />
+            </span>
+            <span className="onb-entry-text">
+              <strong>{t('managed.title')}</strong>
+              <span className="muted small">{t('managed.text')}</span>
+              {profile.serverUrl && (
+                <span className="small">
+                  {t('managed.server')}: <code>{profile.serverUrl}</code>
+                </span>
+              )}
+            </span>
+          </section>
+          {profile.allowLocalApi === false ? <p className="muted small">{t('managed.apiOff')}</p> : <ApiSettings />}
+        </>
+      )}
+
+      {tab === 'connections' && !profile?.managed && (
         <>
       <section className="card onb-entry">
         <span className="onb-entry-text">
@@ -541,7 +567,7 @@ export default function Settings() {
         <PersonioConnect />
       </section>
           <ServerSettings />
-          <ApiSettings />
+          {profile?.allowLocalApi === false ? <p className="muted small">{t('managed.apiOff')}</p> : <ApiSettings />}
         </>
       )}
     </div>

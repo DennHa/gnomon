@@ -708,3 +708,5 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .tour .onb-body { min-height: 96px; }
 .sc-off { opacity: 0.45; pointer-events: none; }
 .sc-off-note { margin: 0 0 4px 30px; }
+.managed-card { display: flex; align-items: flex-start; gap: 14px; }
+.managed-card code { font-size: 12px; padding: 1px 6px; border-radius: 6px; background: var(--field); }

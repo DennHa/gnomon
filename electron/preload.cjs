@@ -23,6 +23,8 @@ if (fakeNow) {
 
 contextBridge.exposeInMainWorld('api', {
   load: () => ipcRenderer.invoke('data:load'),
+  /** The company settings profile (Iru), or null. Read-only. */
+  profile: () => ipcRenderer.invoke('profile:get'),
   save: (data) => ipcRenderer.invoke('data:save', data),
   saveSync: (data) => ipcRenderer.sendSync('data:saveSync', data),
   updateTray: (state) => ipcRenderer.send('tray:update', state),

@@ -1,6 +1,19 @@
 import type { ShortcutConfig } from './shortcuts';
 
 /** Ready-made activity sets per role (names in i18n: preset.<id>). */
+/** Settings pushed by the company's Mac management (Iru), read-only. See docs/company-setup.md. */
+export type CompanyProfile = {
+  serverUrl?: string;
+  /** Hide what the company handles: the integrations guide, token fields and own-server pairing. */
+  managed?: boolean;
+  entraTenantId?: string;
+  entraClientId?: string;
+  allowLocalApi?: boolean;
+  allowActivityTrail?: boolean;
+  dailyTargetHours?: number;
+  language?: 'system' | 'en' | 'de';
+};
+
 export type ActivityPreset = 'designer' | 'pm' | 'director' | '3d' | 'ux' | 'ui';
 
 export type Project = {
