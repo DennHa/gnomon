@@ -116,6 +116,7 @@ app.whenReady().then(async () => {
     await shoot(win, 'phone-week.png', 'dark', 2);
     await shoot(win, 'phone-today-dark.png', 'dark', 1);
     await shoot(win, 'phone-clock.png', 'light', 0);
+    await shoot(win, 'phone-clock-dark.png', 'dark', 0);
     win.destroy();
   } catch (err) {
     console.error(err);

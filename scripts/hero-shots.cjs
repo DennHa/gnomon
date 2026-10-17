@@ -50,9 +50,9 @@ function macHtml(s) {
   </div></div><div class="vignette"></div></body></html>`;
 }
 
-// Two phones: today in front and sharp, the week behind and out of focus.
+// Two phones: the time clock (Stempeln) in front and sharp, the week behind and out of focus.
 function phoneHtml() {
-  const a = `file://${path.join(shots, 'phone-today-dark.png')}`;
+  const a = `file://${path.join(shots, 'phone-clock-dark.png')}`;
   const b = `file://${path.join(shots, 'phone-week.png')}`;
   const phone = (src, cls) => `<div class="phone ${cls}"><img src="${src}"></div>`;
   return `<!doctype html><html><head><style>

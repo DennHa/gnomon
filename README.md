@@ -47,10 +47,10 @@ you where you stand.
 
 ### On your phone too
 
-A small web app on your own server (see [server/README.md](server/README.md)): clock in on the way in, start or switch a
-timer, and check your week. Pair a phone by scanning a QR code from the Mac app.
+A small web app on your own server (see [server/README.md](server/README.md)): clock in on the way in, correct today's
+times, start or switch a timer, and check your week. Pair a phone by scanning a QR code from the Mac app.
 
-<img src="docs/hero/hero-phone.jpg" width="880" alt="The phone web app: today and this week">
+<img src="docs/hero/hero-phone.jpg" width="880" alt="The phone web app: the time clock with Correct today, and the week behind it">
 
 ## Screenshots
 
