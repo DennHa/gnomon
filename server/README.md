@@ -14,9 +14,11 @@ server, a small VPS) and reach it over HTTPS.
 
 What the phone can do:
 
-- **Today:** start day / break / leave with a progress bar toward the daily target; a big start/stop timer; project
-  and activity chips (tapping an activity while the timer runs switches to it); "Continue" for recent work; today's
-  entries, which you tap to edit or delete.
+- **Timer:** a big start/stop timer; project and activity chips (tapping an activity while the timer runs switches
+  to it); "Continue" for recent work; today's entries, which you tap to edit or delete. A line at the top shows
+  whether you're clocked in and opens the time clock.
+- **Time clock (Stempeln):** start day, break and leave with big buttons, today's worked time against the daily
+  target, and **Correct today**: change when you came or left and edit, add or delete breaks (for a misclick).
 - **Week:** hours per day as bars coloured by project, plus totals per project. ‹ › for earlier weeks. Tap a day to
   enter time after the fact (description, project, activity and a duration like `1:30`, `1,5` or `90m`), edit or
   delete its entries, and set its attendance (in, out, break).
@@ -53,8 +55,9 @@ In the Mac app, Settings → **Phone (Gnomon server)**: enter the server address
 (`gnomon-admin pair "MacBook"`), then **Connect a phone** shows a QR code. Scanning it with the phone's camera opens
 `https://gnomon.example.com/#pair=ABCD-EFGH`; the web app connects by itself and removes the code from the address bar.
 The code is also shown as text, for typing it into the app instead. The phone's Device tab can do the same for a
-third device. On iPhone, the home-screen app may keep its own storage separate from Safari: if it asks for a code
-after you added it to the home screen, create a new one and type it in.
+third device. On iPhone, the home-screen app has its own storage, separate from Safari. So once Safari is connected, the page
+prepares a fresh one-time code (valid 60 minutes) and puts it into the address the home-screen app opens first; the
+app then connects by itself. If it still asks for a code, create a new one and type it in.
 
 After 10 wrong pairing codes in a row, all open codes are dropped and pairing is locked for 15 minutes.
 
@@ -130,7 +133,8 @@ limits. In addition, the server has:
 | Method & path | What it does |
 |---|---|
 | `POST /pair` | `{ "code": "ABCD-EFGH" }` → `{ key, device }`. No key needed. |
-| `POST /pair-codes` | `{ name }` → `{ code, name, expiresAt }`: a signed-in device invites another one (QR code). |
+| `POST /pair-codes` | `{ name, minutes? }` → `{ code, name, expiresAt }`: a signed-in device invites another one (QR code); `minutes` 1–60, default 10. |
+| `PATCH /workdays/:date` | `{ in?: "08:15", out?: "17:05" \| null, breaks?: [{ start, end }] }`: correct a day without replacing it. Returns the same as `GET /state`. |
 | `GET /me`, `DELETE /me` | This device; `DELETE` revokes its own key. |
 | `GET /state` | Everything the Today screen needs: running timer, today's workday, `onBreak`, projects, activities, daily target, server time. |
 | `POST /activities` | `{ name, color? }`, creates an activity or returns the one with that name. |

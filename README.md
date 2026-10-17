@@ -74,7 +74,8 @@ Float and Personio only issue company-wide admin tokens, so employees can't conn
 tokens shouldn't sit on every Mac. The plan: the company runs the Gnomon server, which holds the tokens and hands
 each person only their own plan and absences. People sign in with their Microsoft company account (Entra ID), and
 Iru (Mac management) installs Gnomon with the server address preconfigured. In that managed mode the setup guide
-and token fields are hidden. Details and what's still to build: [docs/company-setup.md](docs/company-setup.md).
+and token fields are hidden. An admin sets everything up once in a guided web wizard on the server, which also
+produces the Iru settings profile. Details and what's still to build: [docs/company-setup.md](docs/company-setup.md).
 
 ## All features
 
