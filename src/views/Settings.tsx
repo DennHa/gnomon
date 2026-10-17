@@ -5,7 +5,7 @@ import { FloatConnect, PersonioConnect } from './integrations';
 import { Icon, type IconName } from '../icons';
 import type { Settings as S } from '../types';
 import { dayKey, useNow } from '../time';
-import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel } from '../shortcuts';
+import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel, type LayoutMap } from '../shortcuts';
 import { LANGUAGE_NAMES, locale, resolveLanguage, t, type MsgKey } from '../i18n';
 import qrcode from 'qrcode-generator';
 
@@ -27,6 +27,13 @@ function TrailStatus() {
     </p>
   );
 }
+
+// The keyboard layout (German QWERTZ, US…), so a recorded key is the one printed on it. Chromium only.
+let layoutMap: LayoutMap | undefined;
+(navigator as Navigator & { keyboard?: { getLayoutMap(): Promise<LayoutMap> } }).keyboard
+  ?.getLayoutMap()
+  .then((m) => (layoutMap = m))
+  .catch(() => {});
 
 /** A field that records a shortcut: click it, press keys. Shows whether macOS let Gnomon register it. */
 function ShortcutField({
@@ -59,8 +66,9 @@ function ShortcutField({
       onChange('');
       return stop();
     }
-    const accel = accelFromEvent(e);
+    const accel = accelFromEvent(e, layoutMap);
     if (accel === 'needs-modifier') return setHint(t('sc.needModifier'));
+    if (accel === 'unsupported') return setHint(t('sc.unsupported'));
     if (!accel) return;
     // For "projects 1–9" only the modifiers count; the digit is added per project.
     onChange(modifiersOnly ? accel.split('+').slice(0, -1).join('+') : accel);
@@ -150,9 +158,20 @@ function ServerSettings() {
     window.api.serverStatus().then(setStatus);
   }, []);
 
+  // A pasted pairing link (https://…/#pair=ABCD-EFGH, from the server log or a phone) carries both address and code.
+  const link = (() => {
+    try {
+      const u = new URL(code.trim());
+      const c = u.hash.match(/pair=([A-Za-z0-9-]{8,10})/)?.[1];
+      return c ? { url: u.origin, code: c } : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const connect = async () => {
     setBusy(true);
-    const r = await window.api.serverConnect(url, code);
+    const r = await window.api.serverConnect(link?.url ?? url, link?.code ?? code);
     setBusy(false);
     if (!r.ok) return setError(serverError(r.error));
     setError(null);
@@ -193,7 +212,7 @@ function ServerSettings() {
           </label>
           <p className="muted small">{t('srv.codeHint')}</p>
           <div className="add-row">
-            <button className="btn" onClick={connect} disabled={busy || !url.trim() || !code.trim()}>
+            <button className="btn" onClick={connect} disabled={busy || !code.trim() || (!link && !url.trim())}>
               <Icon name="sync" size={18} /> {busy ? t('srv.connecting') : t('srv.connect')}
             </button>
           </div>
@@ -491,7 +510,11 @@ export default function Settings() {
           <input type="checkbox" checked={s.shortcutsEnabled} onChange={(e) => set({ shortcutsEnabled: e.target.checked })} />
           {t('set.shortcuts')}
         </label>
-        {s.shortcutsEnabled && <ShortcutEditor />}
+        {/* Always visible, so you can see and change them; dimmed while switched off. */}
+        {!s.shortcutsEnabled && <p className="muted small sc-off-note">{t('sc.offNote')}</p>}
+        <div className={s.shortcutsEnabled ? undefined : 'sc-off'}>
+          <ShortcutEditor />
+        </div>
         <p className="muted small">
           {t('set.tip')}
         </p>

@@ -22,6 +22,8 @@ export type State = {
   timer: Entry | null;
   workday: Workday | null;
   onBreak: boolean;
+  /** Today's single breaks (ISO times). */
+  breaks: { start: string; end: string | null }[];
   dailyTargetHours: number;
   projects: Project[];
   activities: Activity[];
@@ -90,9 +92,10 @@ export const api = {
   leave: () => call('POST', '/day/leave', {}),
   toggleBreak: () => call('POST', '/day/break', {}),
   addEntry: (b: Record<string, unknown>) => call<Entry>('POST', '/entries', b),
+  patchWorkday: (date: string, b: { in?: string; out?: string | null; breaks?: { start: string; end?: string | null }[] }) => call<State>('PATCH', `/workdays/${date}`, b),
   putWorkday: (date: string, b: Record<string, unknown>) => call<Workday>('PUT', `/workdays/${date}`, b),
   deleteWorkday: (date: string) => call('DELETE', `/workdays/${date}`),
-  pairCode: (name: string) => call<{ code: string; expiresAt: string }>('POST', '/pair-codes', { name }),
+  pairCode: (name: string, minutes = 10) => call<{ code: string; expiresAt: string }>('POST', '/pair-codes', { name, minutes }),
   patchEntry: (id: string, b: Record<string, unknown>) => call<Entry>('PATCH', `/entries/${encodeURIComponent(id)}`, b),
   deleteEntry: (id: string) => call('DELETE', `/entries/${encodeURIComponent(id)}`),
 };

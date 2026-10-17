@@ -2,10 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { printPairing } from './qr-terminal';
-import { Store } from './store';
+import { databaseFile, Store } from './store';
 
 const [cmd, ...args] = process.argv.slice(2);
-const store = new Store(path.join(path.resolve(process.env.GNOMON_DATA_DIR ?? './data'), 'gnomon.db'));
+const store = new Store(databaseFile(path.resolve(process.env.GNOMON_DATA_DIR ?? './data')));
 
 const usage = `Usage:
   pair <device name>     One-time code (valid 10 minutes) to sign in a phone or browser

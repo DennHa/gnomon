@@ -10,6 +10,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Activity, Data, Entry, Project, Settings, Workday } from '../../src/types';
 
+/**
+ * Where the database lives in a data folder. Servers set up before the rename to Gnomon used punch.db; it is
+ * taken over once (with its WAL files) so an update keeps all data and device keys.
+ */
+export function databaseFile(dataDir: string): string {
+  const file = path.join(dataDir, 'gnomon.db');
+  const legacy = path.join(dataDir, 'punch.db');
+  if (!fs.existsSync(file) && fs.existsSync(legacy)) {
+    for (const suffix of ['', '-wal', '-shm']) if (fs.existsSync(legacy + suffix)) fs.renameSync(legacy + suffix, file + suffix);
+    console.log(`Took over the database from ${legacy}`);
+  }
+  return file;
+}
+
 export const KINDS = ['projects', 'activities', 'entries', 'workdays'] as const;
 export type Kind = (typeof KINDS)[number];
 type AnyRecord = Project | Activity | Entry | Workday;

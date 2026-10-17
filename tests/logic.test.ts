@@ -234,6 +234,14 @@ test('shortcuts: key presses become accelerators, shown with Mac symbols', () =>
   assert.equal(prettyAccel('Control+Alt+Space'), '⌃⌥ Space');
   assert.equal(projectAccel('Control+Alt', 0), 'Control+Alt+1');
   assert.equal(projectAccel('', 0), '');
+  // German QWERTZ: the layout decides which letter a key is.
+  const de = new Map([['KeyZ', 'y'], ['KeyY', 'z'], ['KeyP', 'p'], ['BracketRight', '+'], ['Semicolon', 'ö'], ['Minus', 'ß'], ['Digit1', '1']]);
+  assert.equal(accelFromEvent(ev('KeyY', { ctrlKey: true, altKey: true }), de), 'Control+Alt+Z', 'the key labelled Z on QWERTZ');
+  assert.equal(accelFromEvent(ev('KeyP', { ctrlKey: true, altKey: true }), de), 'Control+Alt+P');
+  assert.equal(accelFromEvent(ev('BracketRight', { ctrlKey: true, altKey: true }), de), 'Control+Alt+Plus');
+  assert.equal(accelFromEvent(ev('Semicolon', { ctrlKey: true, altKey: true }), de), 'unsupported', 'ö');
+  assert.equal(accelFromEvent(ev('Digit1', { ctrlKey: true, altKey: true }), de), 'Control+Alt+1');
+  assert.equal(prettyAccel('Control+Alt+Plus'), '⌃⌥+');
 });
 
 test('activity presets: role set replaces the list, used activities stay, edits make it custom', () => {

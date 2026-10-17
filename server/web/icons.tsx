@@ -15,8 +15,9 @@ import history from '@material-symbols/svg-400/rounded/history.svg';
 import add from '@material-symbols/svg-400/rounded/add.svg';
 import cloud_off from '@material-symbols/svg-400/rounded/cloud_off.svg';
 import timer from '@material-symbols/svg-400/rounded/timer.svg';
+import schedule from '@material-symbols/svg-400/rounded/schedule.svg';
 
-const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer };
+const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule };
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {

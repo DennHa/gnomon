@@ -24,7 +24,7 @@ ssh "${PI_HOST}" "docker network inspect proxy-net >/dev/null" || {
 echo "[2/5] Sync to ${PI_HOST}:${TARGET_DIR}"
 ssh "${PI_HOST}" "mkdir -p '${TARGET_DIR}'"
 rsync -az --delete \
-  --exclude 'node_modules' --exclude 'dist' --exclude 'dist-test' --exclude '.data' --exclude '.env' --exclude '.DS_Store' \
+  --exclude 'node_modules' --exclude 'dist' --exclude 'dist-test' --exclude '.data' --exclude '.env' --exclude 'docker-compose.override.yml' --exclude '.DS_Store' \
   "${REPO_DIR}/src" "${REPO_DIR}/server" "${PI_HOST}:${TARGET_DIR}/"
 
 echo "[3/5] Build and start (the first build on a Pi takes a few minutes)"

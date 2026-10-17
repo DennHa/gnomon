@@ -42,11 +42,13 @@ const PAIR_FROM_LINK = (() => {
   return m?.[1] ?? null;
 })();
 let pairLinkUsed = false;
+let handoverPrepared = false;
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as { standalone?: boolean }).standalone);
 
-type Tab = 'today' | 'week' | 'device';
+type Tab = 'today' | 'clock' | 'week' | 'device';
 const TABS: [Tab, IconName, string][] = [
-  ['today', 'today', t('today')],
+  ['today', 'timer', t('timerTab')],
+  ['clock', 'schedule', t('clockTab')],
   ['week', 'calendar_view_week', t('week')],
   ['device', 'devices', t('device')],
 ];
@@ -63,6 +65,21 @@ function App() {
       setKeyState(null);
     });
   }, []);
+
+  // In Safari (not the home-screen app): prepare the hand-over to the home-screen app, which on iPhone gets its own
+  // storage and would otherwise start unpaired. A fresh one-time code goes into the start address of the app.
+  useEffect(() => {
+    if (!key || isStandalone() || handoverPrepared) return;
+    handoverPrepared = true;
+    const name = /iPad/.test(navigator.userAgent) ? 'iPad' : /iPhone/.test(navigator.userAgent) ? 'iPhone' : 'Home screen';
+    api.pairCode(`${name} (Home screen)`, 60).then(
+      ({ code }) => {
+        document.querySelector('link[rel="manifest"]')?.setAttribute('href', `/manifest.webmanifest?pair=${code}`);
+        history.replaceState(null, '', `/#pair=${code}`);
+      },
+      () => {},
+    );
+  }, [key]);
 
   /** Run an action and show what went wrong instead of throwing. */
   const run = useCallback(async (fn: () => Promise<unknown>) => {
@@ -100,7 +117,8 @@ function App() {
         </button>
       )}
       <main>
-        {tab === 'today' && <Today run={run} />}
+        {tab === 'today' && <Today run={run} onOpenClock={() => setTab('clock')} />}
+        {tab === 'clock' && <TimeClock run={run} />}
         {tab === 'week' && <Week run={run} />}
         {tab === 'device' && <DeviceView onSignOut={() => (setKey(null), setKeyState(null))} />}
       </main>
@@ -184,7 +202,7 @@ function Pair({ onPaired }: { onPaired: (key: string) => void }) {
 type Run = (fn: () => Promise<unknown>) => Promise<boolean>;
 type Draft = { description: string; projectId?: string; activityId?: string };
 
-function Today({ run }: { run: Run }) {
+function Today({ run, onOpenClock }: { run: Run; onOpenClock: () => void }) {
   const [state, setState] = useState<State | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [recent, setRecent] = useState<Entry[]>([]);
@@ -211,7 +229,7 @@ function Today({ run }: { run: Run }) {
       <header className="page-head">
         <h1>{fmtDay(today, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
       </header>
-      <Attendance state={state} act={act} />
+      <ClockLine state={state} onClick={onOpenClock} />
       <TimerCard state={state} recent={recent} act={act} />
       <section className="card">
         <div className="card-head">
@@ -239,50 +257,153 @@ function Today({ run }: { run: Run }) {
   );
 }
 
-function Attendance({ state, act }: { state: State; act: (fn: () => Promise<unknown>) => void }) {
-  const now = useNow(30_000);
+/** Attendance status and worked time, counting on between refreshes while you're at work. */
+function useAttendance(state: State) {
+  const now = useNow(1000);
   const w = state.workday;
-  const active = w && !w.off && w.in && !w.out;
+  const active = Boolean(w && !w.off && w.in && !w.out);
   let status = t('notClockedIn');
   if (w?.off) status = w.offReason || t('dayOff');
   else if (active && state.onBreak) status = t('onBreak');
-  else if (active) status = t('atWorkSince', { t: fmtTime(w.in!) });
+  else if (active) status = t('atWorkSince', { t: fmtTime(w!.in!) });
   else if (w?.out) status = t('leftAt', { t: fmtTime(w.out) });
-  // workedMinutes is as of the last refresh; add the time since then while at work and not on a break.
   const worked = w && !w.off ? w.workedMinutes * 60_000 + (active && !state.onBreak ? Math.max(0, now - Date.parse(state.serverTime)) : 0) : 0;
-  const target = state.dailyTargetHours * 3_600_000;
+  const tone = active ? (state.onBreak ? 'warn' : 'ok') : '';
+  return { w, active, status, worked, tone, target: state.dailyTargetHours * 3_600_000 };
+}
+
+/** One line on the Timer page; tap it to open the time clock. */
+function ClockLine({ state, onClick }: { state: State; onClick: () => void }) {
+  const { w, status, worked, tone } = useAttendance(state);
+  return (
+    <button className="clock-line" onClick={onClick}>
+      <span className={`pill ${tone}`}>{status}</span>
+      {w && !w.off && w.in && <span className="muted num">{fmtHM(worked)}</span>}
+      <Icon name="chevron_right" size={18} />
+    </button>
+  );
+}
+
+// ---- Time clock ------------------------------------------------------------------------------------
+
+function TimeClock({ run }: { run: Run }) {
+  const [state, setState] = useState<State | null>(null);
+  const today = dayKey();
+  const load = useCallback(() => {
+    void run(async () => setState(await api.state()));
+  }, [run]);
+  useRefresh(load);
+  const act = (fn: () => Promise<unknown>) => run(fn).then(load);
+
+  if (!state) return <div className="loading muted">…</div>;
+  return <TimeClockView state={state} act={act} today={today} />;
+}
+
+function TimeClockView({ state, act, today }: { state: State; act: (fn: () => Promise<unknown>) => Promise<unknown>; today: string }) {
+  const { w, active, status, worked, tone, target } = useAttendance(state);
+  const hasDay = Boolean(w && !w.off && w.in);
+  return (
+    <>
+      <header className="page-head">
+        <h1>{fmtDay(today, { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+      </header>
+      <section className="card clock-card">
+        <span className={`pill ${tone}`}>{status}</span>
+        <div className="clock">{fmtClock(worked)}</div>
+        <p className="muted small center">
+          {t('workedToday')} · {fmtHM(target)}
+        </p>
+        {hasDay && (
+          <div className="progress">
+            <div style={{ width: `${Math.min(100, (worked / target) * 100)}%` }} />
+          </div>
+        )}
+        {!active ? (
+          <button className="primary big" onClick={() => act(api.startDay)}>
+            <Icon name="login" size={26} /> {w?.out ? t('resumeDay') : t('startDay')}
+          </button>
+        ) : (
+          <div className="row">
+            <button className={`soft big grow ${state.onBreak ? 'on' : ''}`} onClick={() => act(api.toggleBreak)}>
+              <Icon name="coffee" size={26} /> {state.onBreak ? t('endBreak') : t('break')}
+            </button>
+            <button className="stop big grow" onClick={() => act(api.leave)}>
+              <Icon name="logout" size={26} /> {t('leave')}
+            </button>
+          </div>
+        )}
+      </section>
+      {hasDay && (
+        // Re-created when the server's times change (after saving or a change on another device).
+        <CorrectDay key={JSON.stringify([w!.in, w!.out, state.breaks])} state={state} act={act} today={today} />
+      )}
+    </>
+  );
+}
+
+type BreakDraft = { start: string; end: string };
+
+function CorrectDay({ state, act, today }: { state: State; act: (fn: () => Promise<unknown>) => Promise<unknown>; today: string }) {
+  const w = state.workday!;
+  const [tin, setTin] = useState(toTimeInput(w.in!));
+  const [tout, setTout] = useState(w.out ? toTimeInput(w.out) : '');
+  const [breaks, setBreaks] = useState<BreakDraft[]>(state.breaks.map((b) => ({ start: toTimeInput(b.start), end: b.end ? toTimeInput(b.end) : '' })));
+  const [saved, setSaved] = useState(false);
+  const original = JSON.stringify([toTimeInput(w.in!), w.out ? toTimeInput(w.out) : '', state.breaks.map((b) => [toTimeInput(b.start), b.end ? toTimeInput(b.end) : ''])]);
+  const changed = JSON.stringify([tin, tout, breaks.map((b) => [b.start, b.end])]) !== original;
+  const setBreak = (i: number, patch: Partial<BreakDraft>) => setBreaks(breaks.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+
+  function addBreak() {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const now = new Date();
+    const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    // Lunch at 12:00–12:30 when that fits the day; otherwise a break starting now (still running while at work).
+    const lunch = tin <= '12:00' && hhmm >= '12:30' && (!tout || tout >= '12:30') && !breaks.some((b) => b.start === '12:00');
+    setBreaks([...breaks, lunch ? { start: '12:00', end: '12:30' } : { start: hhmm, end: '' }]);
+  }
+
+  async function save() {
+    await act(() => api.patchWorkday(today, { in: tin, ...(w.out ? { out: tout } : {}), breaks: breaks.map((b) => ({ start: b.start, end: b.end || null })) }));
+    setSaved(true);
+  }
 
   return (
-    <section className="card attendance">
-      <div className="att-status">
-        <span className={`pill ${active ? (state.onBreak ? 'warn' : 'ok') : ''}`}>{status}</span>
-        {w && !w.off && w.in && (
-          <span className="muted">
-            {fmtHM(worked)} / {fmtHM(target)}
-          </span>
-        )}
-      </div>
-      {w && !w.off && w.in && (
-        <div className="progress">
-          <div style={{ width: `${Math.min(100, (worked / target) * 100)}%` }} />
-        </div>
-      )}
+    <section className="card correct">
+      <h2>{t('correctDay')}</h2>
+      <p className="muted small">{t('correctHint')}</p>
       <div className="row">
-        {!active && (
-          <button className="soft grow" onClick={() => act(api.startDay)}>
-            <Icon name="login" /> {w?.out ? t('resumeDay') : t('startDay')}
+        <label className="grow">
+          {t('in')}
+          <input type="time" value={tin} onChange={(e) => setTin(e.target.value)} />
+        </label>
+        <label className="grow">
+          {t('out')}
+          {w.out ? <input type="time" value={tout} onChange={(e) => setTout(e.target.value)} /> : <span className="still">{t('stillHere')}</span>}
+        </label>
+      </div>
+      <h3 className="small muted">{t('breaks')}</h3>
+      {!breaks.length && <p className="muted small">{t('noBreaks')}</p>}
+      {breaks.map((b, i) => (
+        <div className="row" key={i}>
+          <input className="grow" type="time" value={b.start} onChange={(e) => setBreak(i, { start: e.target.value })} aria-label={`${t('break')} ${i + 1} ${t('from')}`} />
+          <span className="muted">–</span>
+          {b.end || w.out ? (
+            <input className="grow" type="time" value={b.end} onChange={(e) => setBreak(i, { end: e.target.value })} aria-label={`${t('break')} ${i + 1} ${t('to')}`} />
+          ) : (
+            <span className="still grow">{t('openBreak')}</span>
+          )}
+          <button className="icon-btn" onClick={() => setBreaks(breaks.filter((_, j) => j !== i))} aria-label={t('delete')}>
+            <Icon name="delete" />
           </button>
-        )}
-        {active && (
-          <>
-            <button className={`soft grow ${state.onBreak ? 'on' : ''}`} onClick={() => act(api.toggleBreak)}>
-              <Icon name="coffee" /> {state.onBreak ? t('endBreak') : t('break')}
-            </button>
-            <button className="soft grow" onClick={() => act(api.leave)}>
-              <Icon name="logout" /> {t('leave')}
-            </button>
-          </>
-        )}
+        </div>
+      ))}
+      <div className="row">
+        <button className="soft" onClick={addBreak}>
+          <Icon name="add" /> {t('addBreak')}
+        </button>
+        <button className="primary grow" disabled={!changed || !tin} onClick={save}>
+          {saved && !changed ? t('saved') : t('save')}
+        </button>
       </div>
     </section>
   );
@@ -746,6 +867,9 @@ function DeviceView({ onSignOut }: { onSignOut: () => void }) {
           <>
             <div className="qr" dangerouslySetInnerHTML={{ __html: invite.svg }} />
             <p className="code-text">{invite.code}</p>
+            <button className="soft" onClick={() => navigator.clipboard?.writeText(`${location.origin}/#pair=${invite.code}`)}>
+              {t('copyLink')}
+            </button>
             <p className="muted small">{t('connectHelp')}</p>
           </>
         ) : null}

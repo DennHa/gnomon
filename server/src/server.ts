@@ -4,14 +4,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app';
 import { printPairing } from './qr-terminal';
-import { Store } from './store';
+import { databaseFile, Store } from './store';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.GNOMON_DATA_DIR ?? './data');
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? '0.0.0.0';
 
-const store = new Store(path.join(dataDir, 'gnomon.db'));
+const store = new Store(databaseFile(dataDir));
 const server = http.createServer(createApp({ store, webDir: path.join(here, 'web') }));
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;

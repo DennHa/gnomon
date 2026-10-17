@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { createApp } from '../src/app';
-import { Store } from '../src/store';
+import { databaseFile, Store } from '../src/store';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gnomon-test-'));
 const dbFile = path.join(dir, 'gnomon.db');
@@ -85,6 +85,17 @@ describe('auth and pairing', () => {
     assert.equal(paired.body.device.name, 'iPad');
   });
 
+  test('pairing codes for the home-screen hand-over last up to 60 minutes, and the manifest carries them', async () => {
+    const r = await api('POST', '/pair-codes', { name: 'Home screen', minutes: 500 });
+    const minutes = Math.round((Date.parse(r.body.expiresAt) - Date.now()) / 60_000);
+    assert.equal(minutes, 60);
+    fs.writeFileSync(path.join(webDir, 'manifest.webmanifest'), JSON.stringify({ name: 'Gnomon', start_url: '/' }));
+    const m = await req('GET', `/manifest.webmanifest?pair=${r.body.code}`, undefined, null);
+    assert.equal(JSON.parse(m.body.start_url ? JSON.stringify(m.body) : m.body).start_url, `/#pair=${r.body.code}`);
+    const plain = await req('GET', '/manifest.webmanifest?pair=<script>', undefined, null);
+    assert.equal(plain.body.start_url, '/');
+  });
+
   test('too many wrong codes drop all open codes and lock pairing', async () => {
     const code = store.createPairCode('Victim');
     const statuses: number[] = [];
@@ -157,6 +168,27 @@ describe('API.md behaviour (shared router)', () => {
     const left = await api('POST', '/day/leave', {});
     assert.ok(left.body.out);
     assert.equal((await api('POST', '/day/break', {})).status, 409);
+  });
+
+  test('PATCH /workdays corrects in, out and breaks of a day', async () => {
+    await api('PUT', '/workdays/2026-10-14', { in: '08:00', out: '16:30', breakMinutes: 30 });
+    assert.equal((await api('PATCH', '/workdays/2026-10-13', { in: '08:00' })).status, 404, 'no attendance that day');
+    const r = await api('PATCH', '/workdays/2026-10-14', { in: '08:15', breaks: [{ start: '12:00', end: '12:45' }, { start: '15:00', end: '15:15' }] });
+    assert.equal(r.status, 200);
+    const w = (await api('GET', '/workdays?from=2026-10-14')).body[0];
+    assert.equal(w.breakMinutes, 60);
+    assert.equal(w.workedMinutes, 8 * 60 + 15 - 60, 'in moved to 08:15, out kept at 16:30, breaks replaced (60 min)');
+    assert.equal((await api('PATCH', '/workdays/2026-10-14', { out: '07:00' })).status, 422, 'out before in');
+    assert.equal((await api('PATCH', '/workdays/2026-10-14', { out: null })).status, 422, 'only today can stay open');
+    assert.equal((await api('PATCH', '/workdays/2026-10-14', { breaks: [{ start: '17:00', end: '17:30' }] })).status, 422, 'break after leaving');
+    assert.equal((await api('PATCH', '/workdays/2026-10-14', { in: '8:15' })).status, 422);
+  });
+
+  test('a misclicked start of the day can be moved; /state lists the breaks', async () => {
+    await api('POST', '/day/start', {});
+    const s = (await api('PATCH', `/workdays/${new Date().toLocaleDateString('sv')}`, { in: '00:05' })).body;
+    assert.match(s.workday.in, /T/);
+    assert.ok(Array.isArray(s.breaks));
   });
 
   test('server-only: POST /activities upserts by name', async () => {
@@ -242,6 +274,22 @@ describe('persistence and static files', () => {
     assert.equal((await api('GET', '/projects')).body.length, before);
     assert.equal((await api('GET', '/me')).status, 200, 'device keys survive too');
     assert.equal((await api('GET', '/activities')).body.filter((a: { name: string }) => a.name === 'Call').length, 1, 'defaults are seeded only once');
+  });
+
+  test('a pre-rename punch.db is taken over with its data', async () => {
+    const legacyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gnomon-legacy-'));
+    const old = new Store(path.join(legacyDir, 'punch.db'));
+    old.commit({ ...old.get(), projects: [{ id: 'p1', name: 'Kept', color: '#03A9F4' }] });
+    const { key: oldKey } = old.addDevice('Old phone');
+    old.close();
+    const file = databaseFile(legacyDir);
+    assert.equal(path.basename(file), 'gnomon.db');
+    assert.ok(!fs.existsSync(path.join(legacyDir, 'punch.db')));
+    const taken = new Store(file);
+    assert.equal(taken.get().projects[0]?.name, 'Kept');
+    assert.ok(taken.authenticate(oldKey), 'device keys survive the takeover');
+    taken.close();
+    fs.rmSync(legacyDir, { recursive: true, force: true });
   });
 
   test('the database file is private', () => {

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { handleApiRequest, type ApiRequest, type ApiResponse } from '../../src/api';
-import { isOnBreak, runningEntry, switchActivity, todayWorkday, toggleBreak } from '../../src/actions';
+import { isOnBreak, runningEntry, switchActivity, todayWorkday, toggleBreak, updateWorkday } from '../../src/actions';
+import { atTime, dayKey } from '../../src/time';
 import type { Data, Entry, Workday } from '../../src/types';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
 
@@ -92,6 +93,8 @@ export function createApp({ store, webDir }: AppOptions) {
       timer: (ok(api('GET', '/timer')) as { running: unknown }).running,
       workday: today[0] ?? null,
       onBreak: isOnBreak(todayWorkday(d)),
+      // The single breaks of today, so the phone can correct them (the API.md workday only has breakMinutes).
+      breaks: todayWorkday(d)?.breaks.map((b) => ({ start: b.start, end: b.end ?? null })) ?? [],
       dailyTargetHours: d.settings.dailyTargetHours,
       projects: ok(api('GET', '/projects')),
       activities: ok(api('GET', '/activities')),
@@ -185,6 +188,42 @@ export function createApp({ store, webDir }: AppOptions) {
     };
   }
 
+  /**
+   * Correct a day's attendance without replacing it: { in: "08:12", out: "17:05" | null, breaks: [{ start, end }] }.
+   * Only the fields you send change; out: null means you're still at work. Times are HH:MM on that day.
+   */
+  function patchWorkday(date: string, body: unknown, device: Device) {
+    if (!isObj(body)) throw bad('Body must be a JSON object');
+    const d = store.get();
+    const w = d.workdays.find((x) => x.date === date);
+    if (!w || w.off) throw new HttpError(404, 'not_found', 'No attendance on this day. Start the day first, or use PUT /workdays/:date.');
+    const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const time = (v: unknown, field: string) => {
+      if (typeof v !== 'string' || !TIME.test(v)) throw bad(`${field} must be a time like 08:30`);
+      return atTime(date, v);
+    };
+    const start = body.in !== undefined ? time(body.in, 'in') : w.start;
+    const end = body.out === null ? undefined : body.out !== undefined ? time(body.out, 'out') : w.end;
+    if (end && end <= start) throw bad('out must be after in');
+    if (!end && date !== dayKey(new Date())) throw bad('Only today can stay open (out: null)');
+    let breaks = w.breaks;
+    if (body.breaks !== undefined) {
+      if (!Array.isArray(body.breaks) || body.breaks.length > 20) throw bad('breaks must be a list (at most 20)');
+      breaks = body.breaks.map((b: unknown, i: number) => {
+        if (!isObj(b)) throw bad(`breaks[${i}] must be an object`);
+        const bs = time(b.start, `breaks[${i}].start`);
+        const be = b.end === null || b.end === undefined ? undefined : time(b.end, `breaks[${i}].end`);
+        if (be && be <= bs) throw bad(`breaks[${i}]: end must be after start`);
+        if (bs < start || (end && (be ?? bs) > end)) throw bad(`breaks[${i}] must be between in and out`);
+        if (!be && end) throw bad(`breaks[${i}] needs an end once you've left`);
+        return { start: bs, ...(be && { end: be }) };
+      });
+      if (breaks.filter((b) => !b.end).length > 1) throw bad('Only one break can be open');
+    }
+    store.commit(updateWorkday(d, date, { start, end, breaks }));
+    return state(device);
+  }
+
   function serverRoute(method: string, p: string, query: Record<string, string>, body: unknown, device: Device): ApiResponse | undefined {
     if (method === 'GET' && p === '/me') return { status: 200, body: { id: device.id, name: device.name } };
     if (method === 'DELETE' && p === '/me') {
@@ -195,10 +234,14 @@ export function createApp({ store, webDir }: AppOptions) {
     if (method === 'POST' && p === '/pair-codes') {
       // A signed-in device (the Mac, or a phone) invites another one, e.g. by showing this code as a QR code.
       const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : 'Phone';
-      const code = store.createPairCode(name);
-      return { status: 201, body: { code: `${code.slice(0, 4)}-${code.slice(4)}`, name, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() } };
+      // Up to 60 minutes, for handing the connection over to the home-screen app (added a bit later).
+      const ttl = isObj(body) && typeof body.minutes === 'number' ? Math.min(60, Math.max(1, Math.round(body.minutes))) : 10;
+      const code = store.createPairCode(name, ttl);
+      return { status: 201, body: { code: `${code.slice(0, 4)}-${code.slice(4)}`, name, expiresAt: new Date(Date.now() + ttl * 60_000).toISOString() } };
     }
     if (method === 'POST' && p === '/activities') return addActivity(body);
+    const wd = p.match(/^\/workdays\/(\d{4}-\d{2}-\d{2})$/);
+    if (method === 'PATCH' && wd) return { status: 200, body: patchWorkday(wd[1], body, device) };
     if (method === 'POST' && p === '/day/break') {
       const d = store.get();
       const w: Workday | undefined = todayWorkday(d);
@@ -271,7 +314,11 @@ export function createApp({ store, webDir }: AppOptions) {
     if (rel === '/' || !path.extname(rel)) rel = '/index.html'; // the app has no server-side routes
     const file = path.resolve(webDir, `.${rel}`);
     if (!file.startsWith(path.resolve(webDir) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { error: 'not_found', message: 'Not found' });
-    const content = fs.readFileSync(file);
+    let content = fs.readFileSync(file);
+    // iOS gives a home-screen app its own storage, so a paired Safari tab hands over a fresh one-time code:
+    // the app's first launch opens /#pair=CODE and connects by itself (see web/main.tsx).
+    const handover = rel === '/manifest.webmanifest' ? url.searchParams.get('pair') : null;
+    if (handover && /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(handover)) content = Buffer.from(JSON.stringify({ ...JSON.parse(content.toString('utf8')), start_url: `/#pair=${handover}` }));
     res.writeHead(200, {
       ...SECURITY_HEADERS,
       'Content-Security-Policy': CSP,
