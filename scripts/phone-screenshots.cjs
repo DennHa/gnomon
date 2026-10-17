@@ -82,8 +82,9 @@ async function openPhone() {
   const loaded = new Promise((r) => win.webContents.once('did-finish-load', r));
   win.webContents.reload();
   await loaded;
+  await sleep(500);
   // Wait until the signed-in app (with its tab bar) is on screen.
-  for (let i = 0; i < 50 && !(await win.webContents.executeJavaScript("!!document.querySelector('.tabs button')")); i++) await sleep(200);
+  for (let i = 0; i < 50 && !(await win.webContents.executeJavaScript("!!document.querySelector('.tabs button')").catch(() => false)); i++) await sleep(200);
   await sleep(800);
   return win;
 }
@@ -112,6 +113,7 @@ app.whenReady().then(async () => {
     const win = await openPhone();
     await shoot(win, 'phone-today.png', 'light', 0);
     await shoot(win, 'phone-week.png', 'dark', 1);
+    await shoot(win, 'phone-today-dark.png', 'dark', 0);
     win.destroy();
   } catch (err) {
     console.error(err);

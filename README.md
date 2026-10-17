@@ -5,7 +5,7 @@
 <p align="center"><b>A calm work-hour tracker for your Mac.</b><br>
 Clock in and out, track your projects, catch up later, and always know your overtime balance.</p>
 
-<p align="center"><img src="docs/screenshots/track.png" width="820" alt="Gnomon: the Track page with a running timer, today's plan and entries"></p>
+<p align="center"><img src="docs/hero/hero-timer.jpg" width="880" alt="Gnomon: a running timer, close up"></p>
 
 *A gnomon is the pointer on a sundial, the oldest time-tracking tool there is.*
 
@@ -17,7 +17,7 @@ Your workday in two clicks. Press **Start day** when you sit down, take a **Brea
 from the sidebar, the menu bar or a keyboard shortcut. Forgot to clock out? Gnomon closes the day at midnight and asks
 the next morning when you actually left.
 
-<img src="docs/screenshots/morning.png" width="820" alt="Morning: not clocked in yet, Start day button and today's plan">
+<img src="docs/hero/hero-start-day.jpg" width="880" alt="Start day button in the sidebar">
 
 ### 2. Track the projects you're on
 
@@ -25,7 +25,7 @@ Your plan from **Float** becomes today's list: start a timer on a planned projec
 any app and type a few letters. Switch the activity (Design, Call, Workshop…) without stopping the clock, and see how far
 each project is against its plan. Weblog support follows once its API is available.
 
-<img src="docs/screenshots/quick-switcher.png" width="520" alt="Quick switcher: start or switch a timer from any app">
+<img src="docs/screenshots/quick-switcher.png" width="560" alt="Quick switcher: start or switch a timer from any app">
 
 ### 3. Catch up later
 
@@ -33,9 +33,7 @@ Not a live tracker? No problem. Fill in a whole week afterwards: type hours stra
 yesterday, **copy last week**, or **fill from plan** to turn your Float plan into entries. Each day shows what's still
 open against your plan.
 
-<img src="docs/screenshots/week.png" width="820" alt="Week timesheet: hours per project and day, planned hours in grey">
-
-<img src="docs/screenshots/week-day.png" width="820" alt="A day in detail: in/out, breaks, entries, and what's still open against the plan">
+<img src="docs/hero/hero-week.jpg" width="880" alt="Week timesheet with copy last week and fill from plan">
 
 ### 4. Always know your balance
 
@@ -43,12 +41,22 @@ Gnomon counts every workday against your daily target and keeps a running **over
 Vacation and sick days from **Personio** don't count against you; *overtime off* days use the balance. One number tells
 you where you stand.
 
-<img src="docs/screenshots/reports.png" width="820" alt="Reports: overtime balance per month and tracked time per day">
+<img src="docs/hero/hero-balance.jpg" width="880" alt="Overtime balance per month">
 
 ### On your phone too
 
 A small web app on your own server (see [server/README.md](server/README.md)): clock in on the way in, start or switch a
 timer, and check your week. Pair a phone by scanning a QR code from the Mac app.
+
+<img src="docs/hero/hero-phone.jpg" width="880" alt="The phone web app: today and this week">
+
+## Screenshots
+
+| | |
+|---|---|
+| <img src="docs/screenshots/track.png" alt="Track: running timer, today's plan and entries"> | <img src="docs/screenshots/morning.png" alt="Morning: not clocked in yet"> |
+| <img src="docs/screenshots/week.png" alt="Week timesheet"> | <img src="docs/screenshots/week-day.png" alt="A day in detail, with what's still open against the plan"> |
+| <img src="docs/screenshots/reports.png" alt="Reports with the overtime balance"> | <img src="docs/screenshots/quick-switcher.png" alt="Quick switcher (⌃⌥P from any app)"> |
 
 <p>
 <img src="docs/screenshots/phone-today.png" width="260" alt="Phone: today with a running timer">
@@ -56,7 +64,9 @@ timer, and check your week. Pair a phone by scanning a QR code from the Mac app.
 <img src="docs/screenshots/phone-week.png" width="260" alt="Phone: this week in dark mode">
 </p>
 
-<sub>Screenshots use made-up demo data (`scripts/demo-data.cjs`); retake them with `sh scripts/screenshots.sh`.</sub>
+<sub>All pictures use made-up demo data (`scripts/demo-data.cjs`). Retake them with `sh scripts/screenshots.sh` and
+`node node_modules/electron/cli.js scripts/phone-screenshots.cjs`, then render the close-ups with
+`node node_modules/electron/cli.js scripts/hero-shots.cjs`.</sub>
 
 ## All features
 

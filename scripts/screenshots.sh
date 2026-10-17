@@ -25,6 +25,9 @@ shot track.png today 2026-10-14T14:35:00 dark
 shot week.png timesheet@2026-10-14 2026-10-14T14:35:00 light
 shot week-day.png timesheet@2026-10-13@day 2026-10-14T14:35:00 dark
 shot reports.png reports 2026-10-14T14:35:00 dark
+# Dark versions for the hero shots (scripts/hero-shots.cjs)
+shot morning-dark.png today 2026-10-14T08:05:00 dark
+shot week-dark.png timesheet@2026-10-14 2026-10-14T14:35:00 dark
 shot switcher.png today 2026-10-14T14:35:00 dark CAPTURE_QUICK=switch
 mv "$OUT/switcher-quick.png" "$OUT/quick-switcher.png"
 rm -f "$OUT/switcher.png"
