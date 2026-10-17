@@ -2,6 +2,7 @@
 // depth-of-field blur that keeps only the focus area sharp. Output: docs/hero/*.jpg
 // Usage: sh scripts/screenshots.sh (and the phone script) first, then
 //        node node_modules/electron/cli.js scripts/hero-shots.cjs
+// The first-launch tour uses smaller copies in src/assets/tour/ (sips -Z 1200); refresh them after re-rendering.
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const os = require('os');

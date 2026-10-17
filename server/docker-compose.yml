@@ -12,6 +12,8 @@ services:
     environment:
       # "Which day" an entry belongs to is decided in this time zone.
       TZ: ${GNOMON_TZ:-Europe/Berlin}
+      # The public address, so the server log and gnomon-admin can show pairing QR codes.
+      GNOMON_PUBLIC_URL: ${GNOMON_PUBLIC_URL:-}
     volumes:
       - gnomon-data:/data
     networks:

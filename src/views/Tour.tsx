@@ -6,13 +6,19 @@ import { useStore } from '../store';
 import { Icon, type IconName } from '../icons';
 import { t, type MsgKey } from '../i18n';
 import { prettyAccel } from '../shortcuts';
+// Close-ups rendered from the demo screenshots (scripts/hero-shots.cjs), scaled down for the app.
+import imgTimer from '../assets/tour/timer.jpg';
+import imgStartDay from '../assets/tour/start-day.jpg';
+import imgSwitcher from '../assets/tour/switcher.png';
+import imgWeek from '../assets/tour/week.jpg';
+import imgBalance from '../assets/tour/balance.jpg';
 
-const STEPS: { icon: IconName; title: MsgKey; text: MsgKey }[] = [
-  { icon: 'waving_hand', title: 'tour.welcomeTitle', text: 'tour.welcomeText' },
-  { icon: 'login', title: 'tour.dayTitle', text: 'tour.dayText' },
-  { icon: 'timer', title: 'tour.trackTitle', text: 'tour.trackText' },
-  { icon: 'calendar_view_week', title: 'tour.laterTitle', text: 'tour.laterText' },
-  { icon: 'savings', title: 'tour.balanceTitle', text: 'tour.balanceText' },
+const STEPS: { icon: IconName; title: MsgKey; text: MsgKey; img: string }[] = [
+  { icon: 'waving_hand', title: 'tour.welcomeTitle', text: 'tour.welcomeText', img: imgTimer },
+  { icon: 'login', title: 'tour.dayTitle', text: 'tour.dayText', img: imgStartDay },
+  { icon: 'timer', title: 'tour.trackTitle', text: 'tour.trackText', img: imgSwitcher },
+  { icon: 'calendar_view_week', title: 'tour.laterTitle', text: 'tour.laterText', img: imgWeek },
+  { icon: 'savings', title: 'tour.balanceTitle', text: 'tour.balanceText', img: imgBalance },
 ];
 
 /** The step to open with, e.g. "#tour@3" for screenshots. */
@@ -55,6 +61,8 @@ export default function Tour() {
           </span>
           <h2 id="tour-title">{t(s.title)}</h2>
         </div>
+
+        <img className="tour-img" src={s.img} alt="" />
 
         <div className="onb-body">
           <p>{t(s.text, { key: prettyAccel(data.settings.shortcuts.quick) || '⌃⌥P' })}</p>

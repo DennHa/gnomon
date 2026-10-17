@@ -1,6 +1,7 @@
 // Device management on the server: `gnomon-admin <command>` (or `npm run admin -- <command>`).
 import fs from 'node:fs';
 import path from 'node:path';
+import { printPairing } from './qr-terminal';
 import { Store } from './store';
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -15,8 +16,7 @@ const usage = `Usage:
 
 try {
   if (cmd === 'pair' && args.length) {
-    const code = store.createPairCode(args.join(' '));
-    console.log(`Pairing code for "${args.join(' ')}": ${code.slice(0, 4)}-${code.slice(4)}\nOpen Gnomon on the device and enter it within 10 minutes. It works once.`);
+    printPairing(store.createPairCode(args.join(' ')), args.join(' '), 10);
   } else if (cmd === 'add-key' && args.length) {
     const { device, key } = store.addDevice(args.join(' '));
     console.log(`Device "${device.name}" (${device.id.slice(0, 8)})\nKey (shown only now): ${key}`);

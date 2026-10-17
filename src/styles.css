@@ -703,3 +703,6 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .tour .onb-body p { font-size: 15px; line-height: 1.55; }
 .tour-connect { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--field); }
 .tour-connect .btn { background: var(--surface); }
+.tour-img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 14px; margin: 4px 0 14px; background: #0d0f12; }
+.tour-img[src*="switcher"] { object-fit: contain; }
+.tour .onb-body { min-height: 96px; }

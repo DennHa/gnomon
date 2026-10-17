@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app';
+import { printPairing } from './qr-terminal';
 import { Store } from './store';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -17,7 +18,13 @@ server.headersTimeout = 10_000;
 server.listen(port, host, () => {
   const devices = store.listDevices().filter((d) => !d.revokedAt).length;
   console.log(`Gnomon server on http://${host}:${port} (data: ${dataDir}, timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}, devices: ${devices})`);
-  if (!devices) console.log('No devices yet. Create a pairing code: npm run admin -- pair "iPhone"  (in Docker: docker compose exec gnomon gnomon-admin pair "iPhone")');
+  if (!devices) {
+    // First start: show a setup code right here, so the first device needs no server command. It's only
+    // printed to this log (which only the server's owner sees) and expires; a restart makes a new one.
+    console.log('No devices yet. Connect your first device with this code:');
+    printPairing(store.createPairCode('First device', 60), 'First device', 60);
+    console.log('More codes later: gnomon-admin pair "iPhone"  (Docker: docker exec gnomon gnomon-admin pair "iPhone")');
+  }
 });
 
 function shutdown() {
