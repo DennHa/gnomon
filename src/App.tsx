@@ -8,7 +8,7 @@ import { Burst, daySummary, weekSummary } from './motion';
 import { toAssign, weekReminderDue } from './reminders';
 import { daylight } from './daylight';
 import { DaylightRuler } from './daylight-ruler';
-import type { Data, QuickStart, TrayAction } from './types';
+import type { Data, QuickStart, TrayAction, WorkStyle } from './types';
 import Today from './views/Today';
 import Timesheet from './views/Timesheet';
 import { Icon, iconSvg, type IconName } from './icons';
@@ -34,10 +34,15 @@ type View = (typeof VIEWS)[number]['id'];
 
 // The hash is "view", "timesheet@YYYY-MM-DD" or "timesheet@YYYY-MM-DD@day" (day modal open), so a reload keeps your place.
 const hashParts = () => window.location.hash.slice(1).split('@');
-function initialView(): View {
+/** Where the app opens: the link in the address, else the page that fits how you work (Week when you clock in first). */
+function initialView(style?: WorkStyle): View {
   const h = hashParts()[0];
-  return VIEWS.some((v) => v.id === h) ? (h as View) : 'today';
+  return VIEWS.some((v) => v.id === h) ? (h as View) : style === 'clock' ? 'timesheet' : 'today';
 }
+const topViews = (style?: WorkStyle) => {
+  const top = VIEWS.filter((v) => !v.bottom);
+  return style === 'clock' ? [...top.filter((v) => v.id === 'timesheet'), ...top.filter((v) => v.id !== 'timesheet')] : top;
+};
 function initialDay(): string {
   const d = hashParts()[1];
   return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : dayKey(new Date());
@@ -401,7 +406,7 @@ function useApiBridge() {
 
 export default function App() {
   const { data, update, runFloatSync, runPersonioSync, profile } = useStore();
-  const [view, setView] = useState<View>(initialView);
+  const [view, setView] = useState<View>(() => initialView(data.settings.workStyle));
   const [day, setDay] = useState(initialDay);
   const [dayModal, setDayModal] = useState<string | null>(() => (hashParts()[2] === 'day' ? initialDay() : null));
   const started = useRef(false);
@@ -503,7 +508,8 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="titlebar-space" />
-        <nav>{VIEWS.filter((v) => !v.bottom).map(navButton)}</nav>
+        {/* Clocking in first: Week, where you fill in your hours, comes first; live tracking: Track first. */}
+        <nav>{topViews(data.settings.workStyle).map(navButton)}</nav>
         <span className="spacer" />
         <Attendance onOpenDay={openDay} />
         <nav className="nav-bottom">
