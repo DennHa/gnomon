@@ -3,6 +3,11 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.2 · 2026-10-17
+
+- **Daylight ruler**: with Daylight on, hour marks appear along the top. Drag along them, swipe sideways on the
+  trackpad or use the arrow keys to move the light through the day; it glides back to now when you let go.
+
 ## 0.1.1 · 2026-10-17
 
 Small moments and a few things you asked for.

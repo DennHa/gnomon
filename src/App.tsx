@@ -6,6 +6,7 @@ import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, ho
 import { targetHoursOn } from './schedule';
 import { Burst, daySummary, weekSummary } from './motion';
 import { daylight } from './daylight';
+import { DaylightRuler } from './daylight-ruler';
 import type { Data, QuickStart, TrayAction } from './types';
 import Today from './views/Today';
 import Timesheet from './views/Timesheet';
@@ -166,7 +167,7 @@ function useTrayBridge(onShowReview: () => void) {
 
 /** Clock in / break / leave, always visible in the sidebar. Click the status to open today in the timesheet. */
 /** Puts the Daylight look into CSS variables on <html> (see .daylight rules in styles.css). */
-function useDaylight(on: boolean) {
+function useDaylight(on: boolean, previewAt: number | null) {
   const now = useNow(60_000);
   const [dark, setDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
   useEffect(() => {
@@ -179,11 +180,11 @@ function useDaylight(on: boolean) {
     const root = document.documentElement;
     root.classList.toggle('daylight', on);
     if (!on) return;
-    const look = daylight(new Date(now), dark);
+    const look = daylight(new Date(previewAt ?? now), dark);
     root.style.setProperty('--daylight-sky', look.sky);
     root.style.setProperty('--daylight-shadow', look.shadow);
     root.style.setProperty('--daylight-text-shadow', look.textShadow);
-  }, [on, now, dark]);
+  }, [on, now, dark, previewAt]);
 }
 
 function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
@@ -364,7 +365,10 @@ export default function App() {
 
   // Midnight auto-stop: close a workday/timer left open on an earlier day (checked every minute and at launch).
   // Daylight (Easter egg): sky tint and shadows from the real sun and moon, once a minute.
-  useDaylight(Boolean(data.settings.daylight && data.settings.daylightUnlocked));
+  const daylightOn = Boolean(data.settings.daylight && data.settings.daylightUnlocked);
+  // A time picked on the Daylight ruler, while scrubbing; null = now.
+  const [daylightAt, setDaylightAt] = useState<number | null>(null);
+  useDaylight(daylightOn, daylightOn ? daylightAt : null);
 
   // Appearance and highlight colour from Settings.
   useEffect(() => window.api.setTheme(data.settings.appearance ?? 'system'), [data.settings.appearance]);
@@ -447,6 +451,7 @@ export default function App() {
         </nav>
       </aside>
       <main className="content">
+        {daylightOn && <DaylightRuler preview={daylightAt} onPreview={setDaylightAt} />}
         {view === 'today' && <Today onOpenDay={openDay} />}
         {view === 'timesheet' && <Timesheet day={day} setDay={setDay} dayModal={dayModal} setDayModal={setDayModal} />}
         {view === 'reports' && <Reports onOpenDay={openDay} />}

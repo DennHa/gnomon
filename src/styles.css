@@ -802,3 +802,11 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .about-icon { position: relative; border: 0; padding: 0; background: none; cursor: default; line-height: 0; border-radius: 16px; }
 .about-icon:active img { transform: scale(0.96); }
 .egg { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); animation: m-toast 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* Daylight ruler: hour marks at the top of the content; drag or swipe sideways to scrub the light. */
+.daylight-ruler { position: sticky; top: 0; z-index: 6; height: 22px; margin: 0 24px -22px; cursor: ew-resize; opacity: 0.35; transition: opacity 0.25s; touch-action: none; outline: none; }
+.daylight-ruler:hover, .daylight-ruler.scrubbing, .daylight-ruler:focus-visible { opacity: 1; }
+.daylight-ruler i { position: absolute; top: 6px; width: 1px; height: 6px; background: var(--muted); transform: translateX(-0.5px); }
+.daylight-ruler i.major { top: 4px; height: 10px; }
+.daylight-ruler .now { position: absolute; top: 6px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--accent); }
+.daylight-ruler .scrub { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text); }
+.daylight-ruler .scrub em { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); white-space: nowrap; }
