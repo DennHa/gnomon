@@ -5,6 +5,8 @@ import { applyFloatImport, type FloatImport } from '../src/float';
 import { applyPersonioImport, mapPersonioAbsences, periodDays, type PersonioPeriod } from '../src/personio';
 import { goalFor } from '../src/plan';
 import { balanceByMonth } from '../src/balance';
+import { daySummary, weekSummary } from '../src/motion';
+import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
 import type { Data } from '../src/types';
@@ -279,6 +281,31 @@ test('work schedule: hours per weekday, periods from a date, balance with and wi
   assert.equal(balanceByMonth(d, now).total, 3 * H, 'recorded days only: +1 h on Monday, +2 h on the free Friday');
   d.settings.countAllScheduledDays = true;
   assert.equal(balanceByMonth(d, now).total, 3 * H - 3 * 8 * H, 'Tue, Wed, Thu without a record each miss 8 h');
+});
+
+test('moments: day and week summaries, and whether leaving starts the weekend', () => {
+  const d = base();
+  const day = (date: string, from: string, to: string) => ({ date, start: atTime(date, from), end: atTime(date, to), breaks: [] });
+  d.workdays.push(day('2026-10-12', '08:00', '17:00'), day('2026-10-16', '08:00', '15:00'));
+  const now = Date.parse('2026-10-16T18:00:00');
+  assert.deepEqual(daySummary(d, '2026-10-16', now), { worked: 7 * H, target: 8 * H, diff: -1 * H });
+  const week = weekSummary(d, '2026-10-16', now);
+  assert.equal(week.worked, 16 * H);
+  assert.equal(week.diff, 0, 'Mon +1 h, Fri −1 h');
+  assert.equal(week.lastWorkday, true, 'Friday is the last scheduled workday');
+  assert.equal(weekSummary(d, '2026-10-12', now).lastWorkday, false);
+});
+
+test('daylight: sun height by time and season, moon phase, and a shade that never switches off', () => {
+  // Tests run in the machine's time zone; these checks hold for any zone (solar noon ≈ 12:00 standard time).
+  const noonJune = sunMoon(new Date(2026, 5, 21, 12 + (new Date(2026, 5, 21).getTimezoneOffset() < new Date(2026, 0, 1).getTimezoneOffset() ? 1 : 0), 0));
+  assert.ok(noonJune.sun.elevation > 60 && noonJune.sun.elevation < 70, `midsummer noon ~65°, got ${noonJune.sun.elevation}`);
+  assert.ok(sunMoon(new Date(2026, 11, 21, 0, 0)).sun.elevation < -40, 'midwinter midnight is deep night');
+  assert.ok(Math.abs(moonPhase(new Date(Date.UTC(2026, 9, 26, 4))) - 0.5) < 0.03, 'full moon on 26 Oct 2026');
+  for (const h of [0, 6, 7, 12, 17, 18, 23]) {
+    const look = daylight(new Date(2026, 9, 26, h, 30), true);
+    assert.ok(look.shadow.startsWith('0 '), `ambient shade at ${h}:30`);
+  }
 });
 
 console.log(`\n${passed} passed`);

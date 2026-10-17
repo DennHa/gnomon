@@ -97,7 +97,8 @@ function FeedRow({ entry, mode, showProject, readOnly }: { entry: Entry; mode: '
   const running = !entry.end;
 
   return (
-    <div className={`feed-row ${running ? 'running' : ''}`}>
+    // Slides in when it was just started or stopped (not on every render of older rows).
+    <div className={`feed-row ${running ? 'running' : ''} ${now - Date.parse(entry.end ?? entry.start) < 3000 ? 'fresh' : ''}`}>
       <input className="feed-desc" value={entry.description} placeholder={t('feed.whatDidYouDo')} disabled={readOnly} onChange={(e) => set({ description: e.target.value })} />
       <div className="feed-meta">
         {showProject && <ProjectSelect value={entry.projectId} onChange={(projectId) => set({ projectId, taskId: undefined, taskName: undefined })} />}

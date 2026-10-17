@@ -279,6 +279,9 @@ input[type='color'] { width: 30px; height: 30px; padding: 0; border: 0; backgrou
 }
 .activity-chip:hover { background: color-mix(in srgb, var(--chip) 22%, transparent); }
 .activity-chip.active { background: var(--chip); border-color: var(--chip); color: #fff; }
+/* The chosen chip fills with its colour from the left. */
+.activity-chip { background: linear-gradient(var(--chip), var(--chip)) left / 0% 100% no-repeat, color-mix(in srgb, var(--chip) 10%, transparent); transition: background-size 0.35s ease, color 0.3s; }
+.activity-chip.active { background: linear-gradient(var(--chip), var(--chip)) left / 100% 100% no-repeat, var(--chip); }
 .activity-select { display: inline-flex; border-radius: 999px; color: var(--muted); }
 .activity-select select {
   border-color: transparent !important; background: none !important; color: inherit; cursor: pointer;
@@ -751,3 +754,51 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .credits { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 10px; }
 .credit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border: 0; border-radius: 10px; background: var(--field); color: var(--text); text-align: left; cursor: pointer; }
 .credit:disabled { cursor: default; }
+
+/* Moments (see src/motion.tsx). Short, once, and off with macOS "Reduce motion". */
+.att-dot { position: relative; }
+.att-dot.pop { animation: m-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.att-dot.pop::after { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--ok); animation: m-ripple 0.7s ease-out forwards; }
+.attendance.break .att-dot { animation: m-breathe 2.6s ease-in-out infinite; }
+.att-bar { position: relative; height: 4px; margin: 8px 4px 2px; border-radius: 99px; background: var(--field); }
+.att-fill { display: block; height: 100%; border-radius: 99px; background: var(--ok); position: relative; overflow: hidden; transform-origin: left; transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.att-fill.grow { animation: m-grow 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.att-fill.shine::after { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -40%; background: rgba(255, 255, 255, 0.55); transform: skewX(-20deg); animation: m-shine 0.9s ease-out 0.1s forwards; }
+.att-reached { color: var(--accent-strong); font-weight: 600; }
+.att-toast { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--field); font-size: 13px; animation: m-toast 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.hero-clock { transition: opacity 0.4s; }
+.hero-clock.resting { opacity: 0.5; }
+.hero-btn .icon.morph { animation: m-morph 0.3s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.feed-row.fresh { animation: m-slide 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.week-done { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+.week-done.pop-in { animation: m-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.burst { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.burst i { position: absolute; left: -1.5px; top: -1.5px; width: 3px; height: 9px; border-radius: 2px; background: var(--accent); opacity: 0; transform-origin: 1.5px 1.5px; animation: m-ray 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+/* Shorter rays next to text (week done). */
+.week-done .burst i { animation-name: m-ray-small; }
+@keyframes m-ray-small { 0% { opacity: 0; transform: rotate(var(--a)) translateY(-4px) scaleY(0.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-15px) scaleY(0.7); } }
+.att-toast .pos, .att-toast .neg { white-space: nowrap; }
+@keyframes m-pop { from { transform: scale(0.3); } to { transform: scale(1); } }
+@keyframes m-ripple { from { transform: scale(1); opacity: 0.8; } to { transform: scale(2.6); opacity: 0; } }
+@keyframes m-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.8); opacity: 0.5; } }
+@keyframes m-grow { from { transform: scaleX(0); } }
+@keyframes m-shine { to { left: 110%; } }
+@keyframes m-toast { from { opacity: 0; transform: translateY(6px); } }
+@keyframes m-morph { from { transform: rotate(-90deg) scale(0.4); opacity: 0; } }
+@keyframes m-slide { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes m-ray { 0% { opacity: 0; transform: rotate(var(--a)) translateY(-5px) scaleY(0.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-26px) scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .att-dot, .att-dot::after, .att-fill, .att-fill::after, .att-toast, .hero-btn .icon, .feed-row, .week-done, .burst i, .activity-chip, .hero-clock {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Daylight (Easter egg, src/daylight.ts): the sky stays at the top of the content while it scrolls. */
+html.daylight .content { background-image: var(--daylight-sky); background-repeat: no-repeat; background-size: 100% 260px; }
+html.daylight .card, html.daylight .hero-btn { box-shadow: var(--daylight-shadow); }
+html.daylight .hero.running { box-shadow: var(--daylight-shadow), inset 4px 0 0 var(--accent-live, var(--accent)); }
+html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
+.about-icon { position: relative; border: 0; padding: 0; background: none; cursor: default; line-height: 0; border-radius: 16px; }
+.about-icon:active img { transform: scale(0.96); }
+.egg { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); animation: m-toast 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }

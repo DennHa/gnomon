@@ -7,6 +7,7 @@ import { Icon } from '../icons';
 import { DayReview, MissingHours, StaleBanner, WorkdayEditor, shiftDay } from './day';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
+import { Burst } from '../motion';
 import { addDays, dayKey, entryMs, fmtDate, fmtDayLabel, fmtDayLong, fmtDuration, fmtHM, fmtTime, hoursToMs, startOfWeek, useNow, workdayMs } from '../time';
 import { goalFor } from '../plan';
 import { t } from '../i18n';
@@ -173,6 +174,8 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
   const [showFillHelp, setShowFillHelp] = useState(false);
   const [cell, setCell] = useState<CellRef | null>(null);
   const done = data.reviewedWeeks.includes(days[0]);
+  const [weekBurst, setWeekBurst] = useState(0);
+  useEffect(() => setWeekBurst(0), [days[0]]);
   const fillable = useMemo(
     () => days.filter((d) => d <= dayKey(new Date())).flatMap((d) => planGaps(data, d).map((g) => ({ ...g, day: d }))),
     [data, days],
@@ -252,8 +255,9 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
     <section className={`card week ${done ? 'done' : ''}`}>
       <div className="week-bar">
         {done ? (
-          <span className="pos">
+          <span className={`pos week-done ${weekBurst ? 'pop-in' : ''}`}>
             <Icon name="done_all" size={18} /> {t('ts.weekDone')}
+            <Burst trigger={weekBurst} rays={12} style={{ left: 10, top: '50%' }} />
           </span>
         ) : (
           <span className="muted small">{t('ts.hint')}</span>
@@ -274,7 +278,14 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
             </button>
           </>
         )}
-        <button className={`btn small ${done ? '' : 'primary'}`} onClick={() => update((d) => toggleWeekDone(d, days[0]))}>
+        <button
+          className={`btn small ${done ? '' : 'primary'}`}
+          onClick={() => {
+            // Marking a week as done is a small celebration; reopening it isn't.
+            setWeekBurst(done ? 0 : Date.now());
+            update((d) => toggleWeekDone(d, days[0]));
+          }}
+        >
           <Icon name={done ? 'restart_alt' : 'done_all'} size={18} /> {t(done ? 'ts.reopenWeek' : 'ts.markDone')}
         </button>
       </div>

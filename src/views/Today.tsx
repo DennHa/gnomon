@@ -1,7 +1,7 @@
 // Today: live tracking. The timer comes first; today's plan and entries follow; "Close the day" appears after you leave.
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { addEntry, runningEntry, startTimer, stopTimer, switchActivity, todayWorkday, updateEntry, type TimerInput } from '../actions';
+import { addEntry, isOnBreak, runningEntry, startTimer, stopTimer, switchActivity, todayWorkday, updateEntry, type TimerInput } from '../actions';
 import { ActivityChips, BillableToggle, ProjectSelect, TrailSummary } from '../components';
 import { EntryFeed, TaskPicker } from '../feed';
 import { Icon } from '../icons';
@@ -60,9 +60,10 @@ function TimerHero() {
             <BillableToggle value={current.billable} onChange={(billable) => edit({ billable })} />
           </div>
         </div>
-        <span className="hero-clock">{fmtClock(running ? entryMs(running, now) : 0)}</span>
+        <span className={`hero-clock ${isOnBreak(todayWorkday(data)) ? 'resting' : ''}`}>{fmtClock(running ? entryMs(running, now) : 0)}</span>
         <button className={`hero-btn ${running ? 'stop' : 'start'}`} onClick={toggle} title={t(running ? 'today.stop' : 'today.start', { key: prettyAccel(data.settings.shortcuts.stopResume) })}>
-          <Icon name={running ? 'stop' : 'play_arrow'} size={30} />
+          {/* Keyed, so the icon re-enters with a small turn when play becomes stop and back. */}
+          <Icon key={running ? 'stop' : 'play'} name={running ? 'stop' : 'play_arrow'} size={30} className="morph" />
         </button>
       </div>
       <div className="hero-activities">

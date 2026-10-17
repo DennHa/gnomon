@@ -98,6 +98,12 @@ export type Settings = {
   dailyTargetHours: number;
   /** Light or dark, or follow macOS (default). */
   appearance?: 'system' | 'light' | 'dark';
+  /** Easter egg (Info & feedback: click the app icon five times): unlocks the Daylight switch under Appearance. */
+  daylightUnlocked?: boolean;
+  /** Daylight: sky tint and shadows follow the real sun and moon (src/daylight.ts). */
+  daylight?: boolean;
+  /** The day the daily-target celebration last showed (once per day). */
+  celebratedDay?: string;
   /** Highlight colour (see ACCENTS in src/views/Settings.tsx and the [data-accent] rules in styles.css). */
   accent?: 'sun' | 'blue' | 'green' | 'purple' | 'coral';
   /** Work schedule periods (hours per weekday, each from a date on). */

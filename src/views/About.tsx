@@ -1,5 +1,7 @@
 // Info & feedback: version, update check, feedback, what's new (CHANGELOG.md) and the open-source projects used.
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useStore } from '../store';
+import { Burst } from '../motion';
 import { Icon } from '../icons';
 import { t } from '../i18n';
 import changelog from '../../CHANGELOG.md?raw';
@@ -96,7 +98,18 @@ function Updates({ info }: { info: Info }) {
 }
 
 export default function About() {
+  const { data, update } = useStore();
   const [info, setInfo] = useState<Info | null>(null);
+  // Easter egg: five clicks on the icon within three seconds unlock Daylight (and switch it on).
+  const clicks = useRef<number[]>([]);
+  const [unlocked, setUnlocked] = useState(0);
+  const tapIcon = () => {
+    const now = Date.now();
+    clicks.current = [...clicks.current.filter((c) => now - c < 3000), now];
+    if (clicks.current.length < 5 || data.settings.daylightUnlocked) return;
+    update((d) => ({ ...d, settings: { ...d.settings, daylightUnlocked: true, daylight: true } }));
+    setUnlocked(now);
+  };
   useEffect(() => {
     window.api.appInfo().then(setInfo);
   }, []);
@@ -104,12 +117,21 @@ export default function About() {
   return (
     <div className="page narrow about">
       <header className="about-head">
-        <img src={appIcon} alt="" width={64} height={64} />
+        <button className="about-icon" onClick={tapIcon} aria-label="Gnomon">
+          <img src={appIcon} alt="" width={64} height={64} />
+          <Burst trigger={unlocked} rays={14} style={{ left: 32, top: 32 }} />
+        </button>
         <div>
           <h1>Gnomon</h1>
           <span className="muted">{info ? t('about.version', { version: info.version }) : ' '}</span>
         </div>
       </header>
+
+      {unlocked > 0 && (
+        <p className="egg" role="status">
+          <strong>{t('egg.title')}</strong> {t('egg.text')}
+        </p>
+      )}
 
       <section className="card">
         <h3>{t('about.updates')}</h3>

@@ -485,6 +485,15 @@ export default function Settings() {
             <option value="dark">{t('set.appearance.dark')}</option>
           </select>
         </label>
+        {s.daylightUnlocked && (
+          <label className="check-row">
+            <input type="checkbox" checked={Boolean(s.daylight)} onChange={(e) => set({ daylight: e.target.checked })} />
+            <span>
+              {t('set.daylight')}
+              <span className="muted small field-hint">{t('set.daylightHint')}</span>
+            </span>
+          </label>
+        )}
         <div className="field">
           <span>{t('set.accent')}</span>
           <span className="accent-swatches" role="radiogroup" aria-label={t('set.accent')}>

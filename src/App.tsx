@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store';
 import { closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
 import { planItemsOn } from './plan';
-import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, useNow, workdayMs } from './time';
+import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from './time';
+import { targetHoursOn } from './schedule';
+import { Burst, daySummary, weekSummary } from './motion';
+import { daylight } from './daylight';
 import type { Data, QuickStart, TrayAction } from './types';
 import Today from './views/Today';
 import Timesheet from './views/Timesheet';
@@ -162,6 +165,27 @@ function useTrayBridge(onShowReview: () => void) {
 }
 
 /** Clock in / break / leave, always visible in the sidebar. Click the status to open today in the timesheet. */
+/** Puts the Daylight look into CSS variables on <html> (see .daylight rules in styles.css). */
+function useDaylight(on: boolean) {
+  const now = useNow(60_000);
+  const [dark, setDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('daylight', on);
+    if (!on) return;
+    const look = daylight(new Date(now), dark);
+    root.style.setProperty('--daylight-sky', look.sky);
+    root.style.setProperty('--daylight-shadow', look.shadow);
+    root.style.setProperty('--daylight-text-shadow', look.textShadow);
+  }, [on, now, dark]);
+}
+
 function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const { data, update } = useStore();
   const now = useNow();
@@ -174,6 +198,49 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const onBreak = isOnBreak(wd);
   const state = !wd ? 'off' : wd.off ? 'dayoff' : wd.end ? 'done' : onBreak ? 'break' : 'on';
   const label = t(({ off: 'status.notClockedIn', dayoff: 'dayOff', done: 'status.dayDone', break: 'status.onBreak', on: 'status.atWork' } as const)[state]);
+  const target = hoursToMs(targetHoursOn(data, today));
+  // Never below zero: right after clocking in, `now` can lag the start time by a fraction of a second.
+  const worked = wd && !wd.off ? Math.max(0, workdayMs(wd, now)) : 0;
+  const progress = target > 0 ? Math.min(1, worked / target) : 0;
+
+  // Moments: starting the day, leaving (a summary; the weekend on the last workday), reaching the daily target.
+  const prev = useRef(state);
+  const [starting, setStarting] = useState(false);
+  const [reached, setReached] = useState(false);
+  const [burst, setBurst] = useState(0);
+  const [summary, setSummary] = useState<{ weekend: boolean; worked: number; diff: number } | null>(null);
+  useEffect(() => {
+    const was = prev.current;
+    prev.current = state;
+    if ((was === 'off' || was === 'done') && state === 'on') {
+      setSummary(null);
+      setStarting(true);
+      const t = setTimeout(() => setStarting(false), 900);
+      return () => clearTimeout(t);
+    }
+    if ((was === 'on' || was === 'break') && state === 'done') {
+      const week = weekSummary(data, today);
+      const day = daySummary(data, today);
+      setSummary(week.lastWorkday ? { weekend: true, worked: week.worked, diff: week.diff } : { weekend: false, worked: day.worked, diff: day.diff });
+      if (week.lastWorkday) setBurst(Date.now());
+    }
+  }, [state]);
+  useEffect(() => {
+    if (!summary) return;
+    const t = setTimeout(() => setSummary(null), 6500);
+    return () => clearTimeout(t);
+  }, [summary]);
+  const targetReached = state === 'on' && target > 0 && worked >= target;
+  useEffect(() => {
+    if (!targetReached || data.settings.celebratedDay === today) return;
+    update((d) => ({ ...d, settings: { ...d.settings, celebratedDay: today } }));
+    setReached(true);
+    setBurst(Date.now());
+    const t = setTimeout(() => setReached(false), 6000);
+    return () => clearTimeout(t);
+  }, [targetReached, today]);
+  const signed = (ms: number) => `${ms < 0 ? '−' : '+'}${fmtDuration(Math.abs(ms))}`;
+
   return (
     <div className={`attendance ${state}`}>
       {needsFix && (
@@ -186,16 +253,43 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
         </button>
       )}
       <button className="att-status" onClick={() => onOpenDay(today)} title={t('att.openToday')}>
-        <span className="att-dot" />
+        <span className={`att-dot ${starting ? 'pop' : ''}`} />
         <span className="att-text">
           <strong>{label}</strong>
-          {wd && !wd.off && (
-            <span className="muted small">
-              {t('durationSince', { duration: fmtDuration(workdayMs(wd, now)), time: fmtTime(wd.start) })}
-            </span>
+          {reached ? (
+            <span className="small att-reached">{t('moment.target')}</span>
+          ) : (
+            wd &&
+            !wd.off && (
+              <span className="muted small">
+                {t('durationSince', { duration: fmtDuration(worked), time: fmtTime(wd.start) })}
+              </span>
+            )
           )}
         </span>
       </button>
+      {wd && !wd.off && target > 0 && (
+        <div className="att-bar">
+          <span className={`att-fill ${starting ? 'grow' : ''} ${reached ? 'shine' : ''}`} style={{ width: `${progress * 100}%` }} />
+          <Burst trigger={burst} style={{ left: `${progress * 100}%`, top: '50%' }} />
+        </div>
+      )}
+      {summary && (
+        <div className="att-toast" role="status">
+          {summary.weekend ? (
+            <>
+              <strong className="att-reached">{t('moment.weekend')}</strong>
+              <span className="muted">
+                {t('moment.week', { duration: fmtDuration(summary.worked) })} · <span className={summary.diff >= 0 ? 'pos' : 'neg'}>{signed(summary.diff)}</span>
+              </span>
+            </>
+          ) : (
+            <span>
+              <strong>{t('moment.today', { duration: fmtDuration(summary.worked) })}</strong> <span className={summary.diff >= 0 ? 'pos' : 'neg'}>{signed(summary.diff)}</span>
+            </span>
+          )}
+        </div>
+      )}
       <div className="att-actions">
         {state === 'on' || state === 'break' ? (
           <>
@@ -269,6 +363,9 @@ export default function App() {
   useApiBridge();
 
   // Midnight auto-stop: close a workday/timer left open on an earlier day (checked every minute and at launch).
+  // Daylight (Easter egg): sky tint and shadows from the real sun and moon, once a minute.
+  useDaylight(Boolean(data.settings.daylight && data.settings.daylightUnlocked));
+
   // Appearance and highlight colour from Settings.
   useEffect(() => window.api.setTheme(data.settings.appearance ?? 'system'), [data.settings.appearance]);
   useEffect(() => {
