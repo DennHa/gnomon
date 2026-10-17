@@ -13,6 +13,7 @@ import Reports from './views/Reports';
 import Projects from './views/Projects';
 import Settings from './views/Settings';
 import Onboarding from './views/Onboarding';
+import Tour from './views/Tour';
 import { locale, t, trayStrings, type MsgKey } from './i18n';
 
 const VIEWS = [
@@ -351,7 +352,8 @@ export default function App() {
         {view === 'projects' && <Projects />}
         {view === 'settings' && <Settings />}
       </main>
-      {!data.settings.onboardingDone && <Onboarding />}
+      {/* First launch: the feature tour. The integrations guide opens only on request (tour's last step or Settings). */}
+      {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && <Onboarding />}
     </div>
   );
 }

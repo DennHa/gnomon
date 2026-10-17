@@ -91,6 +91,8 @@ export type Settings = {
   personioLastSync?: string;
   /** The first-launch setup guide (Float, Personio, Weblog) was finished or skipped. */
   onboardingDone?: boolean;
+  /** The first-launch feature tour was finished or closed. */
+  tourDone?: boolean;
   shortcutsEnabled: boolean;
   /** Global shortcuts as Electron accelerators (see src/shortcuts.ts). */
   shortcuts: ShortcutConfig;

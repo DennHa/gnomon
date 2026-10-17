@@ -126,6 +126,7 @@ const data = {
     apiPort: 7799,
     apiLan: false,
     onboardingDone: true,
+    tourDone: true,
     floatPersonId: 1,
     floatPersonName: 'Alex Miller',
     floatLastSync: at(today, 8, 2),

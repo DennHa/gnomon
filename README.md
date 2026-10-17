@@ -68,6 +68,14 @@ timer, and check your week. Pair a phone by scanning a QR code from the Mac app.
 `node node_modules/electron/cli.js scripts/phone-screenshots.cjs`, then render the close-ups with
 `node node_modules/electron/cli.js scripts/hero-shots.cjs`.</sub>
 
+## For companies (planned)
+
+Float and Personio only issue company-wide admin tokens, so employees can't connect them themselves, and those
+tokens shouldn't sit on every Mac. The plan: the company runs the Gnomon server, which holds the tokens and hands
+each person only their own plan and absences. People sign in with their Microsoft company account (Entra ID), and
+Iru (Mac management) installs Gnomon with the server address preconfigured. In that managed mode the setup guide
+and token fields are hidden. Details and what's still to build: [docs/company-setup.md](docs/company-setup.md).
+
 ## All features
 
 A macOS desktop app (Electron + React + TypeScript) for:
@@ -78,7 +86,7 @@ A macOS desktop app (Electron + React + TypeScript) for:
 - **Week view**: a timesheet with one row per project and one column per day, plus planned hours and week goals.
 - **Float import** (Settings → Float): your allocations become the daily plan per project (task, from–to, hours per day, time window), Float projects land in Projects, and time off and public holidays become days off. Read-only; it syncs once a day in the morning or via *Sync now*. The API token (Float → Account Settings → Integrations, owner/admin only) is stored encrypted in the keychain.
 - **Personio import** (Settings → Personio): approved vacation, sick days and other absences become days off, so the overtime balance stays right. Read-only (API v2); a Personio admin creates API credentials (client ID + secret) with read access to absences and employees. Syncs once a day in the morning or via *Sync now*; half days are not imported (enter them yourself). Credentials are stored encrypted in the keychain.
-- **First-launch guide**: on first start a short guide walks through Float, Personio and Weblog (Weblog is a placeholder until its API is available). Every step is skippable; reopen it from Settings → *Set up integrations*.
+- **First-launch tour**: on first start a short tour explains the key features (clock in/out, tracking projects, catching up later, the overtime balance); reopen it from Settings → General. Connecting Float, Personio and Weblog is a separate step-by-step guide, offered at the end of the tour and in Settings → Connections (Weblog is a placeholder until its API is available).
 - **Menu bar**: start day / break / leave, *Start project*, *Switch activity*, *Continue recent*.
 - **Reports**: week or month view, tracked time per day stacked by project, breakdowns by project and by activity, billable hours, an attendance table, balance against your daily target, and CSV export.
 - **Settings**: daily target, auto clock-in (when the app opens, or when you start a timer), and whether to show the running time in the menu bar.

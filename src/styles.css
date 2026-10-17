@@ -700,3 +700,6 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .settings-tabs { flex-direction: row; }
 .role-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
 .role-picker label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.tour .onb-body p { font-size: 15px; line-height: 1.55; }
+.tour-connect { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--field); }
+.tour-connect .btn { background: var(--surface); }

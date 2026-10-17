@@ -407,6 +407,15 @@ export default function Settings() {
           {t('set.billable')}
         </label>
           </section>
+          <section className="card onb-entry">
+            <span className="onb-entry-text">
+              <strong>{t('tour.open')}</strong>
+              <span className="muted small">{t('tour.openHint')}</span>
+            </span>
+            <button className="btn" onClick={() => set({ tourDone: false })}>
+              <Icon name="waving_hand" size={18} /> {t('tour.open')}
+            </button>
+          </section>
         </>
       )}
 

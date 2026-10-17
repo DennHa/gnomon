@@ -1,5 +1,5 @@
 // First-launch guide (desktop only): Float, Personio and Weblog, one step each, every step skippable.
-// Shown while settings.onboardingDone is unset; Settings → "Set up integrations" clears the flag to reopen it.
+// Opened on request: from the tour's last step or Settings → "Set up integrations" (both set onboardingDone to false).
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { Icon, type IconName } from '../icons';
