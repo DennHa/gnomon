@@ -6,6 +6,7 @@ import path from 'node:path';
 import { handleApiRequest, type ApiRequest, type ApiResponse } from '../../src/api';
 import { isOnBreak, runningEntry, switchActivity, todayWorkday, toggleBreak, updateWorkday } from '../../src/actions';
 import { atTime, dayKey } from '../../src/time';
+import { targetHoursOn } from '../../src/schedule';
 import type { Data, Entry, Workday } from '../../src/types';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
 
@@ -95,7 +96,8 @@ export function createApp({ store, webDir }: AppOptions) {
       onBreak: isOnBreak(todayWorkday(d)),
       // The single breaks of today, so the phone can correct them (the API.md workday only has breakMinutes).
       breaks: todayWorkday(d)?.breaks.map((b) => ({ start: b.start, end: b.end ?? null })) ?? [],
-      dailyTargetHours: d.settings.dailyTargetHours,
+      // Today's target from the work schedule (the phone shows progress toward it).
+      dailyTargetHours: targetHoursOn(d, dayKey(new Date())),
       projects: ok(api('GET', '/projects')),
       activities: ok(api('GET', '/activities')),
       cursor: store.cursor(),

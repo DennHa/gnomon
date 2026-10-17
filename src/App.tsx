@@ -267,6 +267,12 @@ export default function App() {
   useApiBridge();
 
   // Midnight auto-stop: close a workday/timer left open on an earlier day (checked every minute and at launch).
+  // Appearance and highlight colour from Settings.
+  useEffect(() => window.api.setTheme(data.settings.appearance ?? 'system'), [data.settings.appearance]);
+  useEffect(() => {
+    document.documentElement.dataset.accent = data.settings.accent ?? 'sun';
+  }, [data.settings.accent]);
+
   useEffect(() => {
     if (data.settings.autoStopMidnight && hasOvernight(data)) update(closeOvernight);
   }, [now, data, update]);

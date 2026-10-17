@@ -14,6 +14,9 @@ export type CompanyProfile = {
   language?: 'system' | 'en' | 'de';
 };
 
+/** Hours per weekday (Mon–Sun) from a date on; see src/schedule.ts. */
+export type WorkSchedule = { from: string; hours: number[]; source?: 'personio' };
+
 export type ActivityPreset = 'designer' | 'pm' | 'director' | '3d' | 'ux' | 'ui';
 
 export type Project = {
@@ -89,7 +92,17 @@ export type Workday = {
 export type Settings = {
   /** UI language; 'system' follows macOS. */
   language: 'system' | 'en' | 'de';
+  /** The single daily target from before work schedules; still the fallback when no schedule is set. */
   dailyTargetHours: number;
+  /** Light or dark, or follow macOS (default). */
+  appearance?: 'system' | 'light' | 'dark';
+  /** Highlight colour (see ACCENTS in src/views/Settings.tsx and the [data-accent] rules in styles.css). */
+  accent?: 'sun' | 'blue' | 'green' | 'purple' | 'coral';
+  /** Work schedule periods (hours per weekday, each from a date on). */
+  schedules?: WorkSchedule[];
+  /** Overtime balance: false (default) counts only days you recorded; true counts every scheduled workday, so a day
+   * without a record is missing time. Needs days off and holidays to be complete (Float, Personio). */
+  countAllScheduledDays?: boolean;
   autoStartDay: boolean;
   startDayWithTimer: boolean;
   floatPersonId?: number;

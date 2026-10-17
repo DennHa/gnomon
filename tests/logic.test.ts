@@ -5,6 +5,7 @@ import { applyFloatImport, type FloatImport } from '../src/float';
 import { applyPersonioImport, mapPersonioAbsences, periodDays, type PersonioPeriod } from '../src/personio';
 import { goalFor } from '../src/plan';
 import { balanceByMonth } from '../src/balance';
+import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
 import type { Data } from '../src/types';
 import { setLanguage, t, trayStrings } from '../src/i18n';
@@ -201,7 +202,7 @@ test('i18n: German plurals, variables and tray templates follow the language set
   setLanguage('de');
   assert.equal(t('count.entries', { n: 1 }), '1 Eintrag');
   assert.equal(t('count.entries', { n: 2 }), '2 Einträge');
-  assert.equal(t('day.daysUnder', { n: 3, hours: 8 }), '3 Tage unter 8 h');
+  assert.equal(t('day.daysUnder', { n: 3 }), '3 Tage unter Soll');
   assert.equal(trayStrings().idleLeave, 'Feierabend um {time}');
   setLanguage('en');
   assert.equal(t('count.entries', { n: 1 }), '1 entry');
@@ -259,6 +260,25 @@ test('activity presets: role set replaces the list, used activities stay, edits 
     for (const p of A.ACTIVITY_PRESETS) assert.equal(t(`preset.${p}`).split('|').length, 6, `${lang} ${p}`);
   }
   setLanguage('en');
+});
+
+test('work schedule: hours per weekday, periods from a date, balance with and without every scheduled day', () => {
+  let d = base();
+  assert.equal(targetHoursOn(d, '2026-06-01'), 8, 'no schedule yet: Mon–Fri at the daily target');
+  assert.equal(targetHoursOn(d, '2026-06-06'), 0, 'Saturday is free');
+  d = setSchedule(d, '2026-07-01', [8, 8, 8, 8, 0, 0, 0]);
+  assert.equal(targetHoursOn(d, '2026-06-26'), 8, 'a Friday before the change keeps 8 h');
+  assert.equal(targetHoursOn(d, '2026-07-03'), 0, 'a Friday after it is free');
+  assert.equal(weekTotal(schedulesOf(d)[1].hours), 32);
+  assert.equal(schedulesOf(removeSchedule(d, '2026-07-01')).length, 1);
+  assert.equal(schedulesOf(removeSchedule(removeSchedule(d, '2026-07-01'), schedulesOf(d)[0].from)).length, 1, 'the first period always stays');
+  // Mon 6 Jul: 9 h worked; Tue 7 Jul: nothing recorded; Fri 10 Jul: 2 h on a free day.
+  const day = (date: string, from: string, to: string) => ({ date, start: atTime(date, from), end: atTime(date, to), breaks: [] });
+  d.workdays.push(day('2026-07-06', '08:00', '17:00'), day('2026-07-10', '10:00', '12:00'));
+  const now = Date.parse('2026-07-11T12:00:00');
+  assert.equal(balanceByMonth(d, now).total, 3 * H, 'recorded days only: +1 h on Monday, +2 h on the free Friday');
+  d.settings.countAllScheduledDays = true;
+  assert.equal(balanceByMonth(d, now).total, 3 * H - 3 * 8 * H, 'Tue, Wed, Thu without a record each miss 8 h');
 });
 
 console.log(`\n${passed} passed`);

@@ -77,6 +77,7 @@ export default function Quick() {
   const refresh = () =>
     window.api.load().then((d) => {
       setLanguage((d as Data | null)?.settings?.language);
+      document.documentElement.dataset.accent = (d as Data | null)?.settings?.accent ?? 'sun';
       setData(d as Data);
     });
   useEffect(() => {

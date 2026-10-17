@@ -22,6 +22,7 @@ import { TimeField, TrailSummary } from '../components';
 import { Icon } from '../icons';
 import { goalFor, planItemsOn, timeWindow } from '../plan';
 import type { Data } from '../types';
+import { targetHoursOn } from '../schedule';
 import { addDays, atTime, breakMs, dayKey, entryMs, fmtDayLabel, fmtDuration, fmtTime, hoursToMs, useNow, workdayMs } from '../time';
 import { t } from '../i18n';
 
@@ -83,10 +84,8 @@ export function ProjectGoals({ day }: { day: string }) {
   );
 }
 
-/** Days in the recent past that ended below the daily target (weekdays without any record count too). */
+/** Days in the recent past that ended below their scheduled target (scheduled days without any record count too). */
 function missingDays(data: Data, now: number): { date: string; worked: number; missing: number }[] {
-  const target = hoursToMs(data.settings.dailyTargetHours);
-  if (target <= 0) return [];
   const today = dayKey(now);
   // Don't count days from before you started using Gnomon.
   const first = data.workdays.reduce((min, w) => (w.date < min ? w.date : min), today);
@@ -95,8 +94,8 @@ function missingDays(data: Data, now: number): { date: string; worked: number; m
     const date = shiftDay(today, -i);
     if (date < first) break;
     const wd = data.workdays.find((w) => w.date === date);
-    const weekday = new Date(`${date}T12:00`).getDay();
-    if (wd?.off || (!wd && (weekday === 0 || weekday === 6)) || (wd && !wd.end)) continue;
+    const target = hoursToMs(targetHoursOn(data, date));
+    if (wd?.off || target <= 0 || (wd && !wd.end)) continue;
     const worked = wd ? workdayMs(wd, now) : 0;
     if (worked < target) out.push({ date, worked, missing: target - worked });
   }
@@ -113,7 +112,7 @@ export function MissingHours({ onOpenDay }: { onOpenDay: (d: string) => void }) 
   if (!days.length) {
     return (
       <div className="banner ok">
-        <Icon name="check" size={18} /> {t('day.allReached', { n: MISSING_LOOKBACK_DAYS, hours: data.settings.dailyTargetHours })}
+        <Icon name="check" size={18} /> {t('day.allReached', { n: MISSING_LOOKBACK_DAYS })}
       </div>
     );
   }
@@ -121,7 +120,7 @@ export function MissingHours({ onOpenDay }: { onOpenDay: (d: string) => void }) 
     <section className="card missing">
       <button className="missing-head" onClick={() => setOpen(!open)}>
         <span>
-          <strong>{t('day.daysUnder', { n: days.length, hours: data.settings.dailyTargetHours })}</strong>{' '}
+          <strong>{t('day.daysUnder', { n: days.length })}</strong>{' '}
           <span className="muted">{t('day.missingDetail', { n: MISSING_LOOKBACK_DAYS, duration: fmtDuration(total) })}</span>
         </span>
         <span className="muted">{t(open ? 'hide' : 'show')}</span>
@@ -181,7 +180,7 @@ export function WorkdayEditor({ day }: { day: string }) {
   const now = useNow(30_000);
   const wd = data.workdays.find((w) => w.date === day);
   const isToday = day === dayKey(now);
-  const target = hoursToMs(data.settings.dailyTargetHours);
+  const target = hoursToMs(targetHoursOn(data, day));
   const [inTime, setIn] = useState('08:00');
   const [outTime, setOut] = useState('16:30');
 

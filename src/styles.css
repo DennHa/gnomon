@@ -710,3 +710,33 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .sc-off-note { margin: 0 0 4px 30px; }
 .managed-card { display: flex; align-items: flex-start; gap: 14px; }
 .managed-card code { font-size: 12px; padding: 1px 6px; border-radius: 6px; background: var(--field); }
+/* Work schedule */
+.sched-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.sched { padding: 12px 14px; border-radius: 12px; background: var(--field); }
+.sched.current { box-shadow: inset 3px 0 0 var(--accent); }
+.sched-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.sched-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.sched-days label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); text-align: center; }
+.sched-days input { width: 100%; text-align: center; background: var(--surface); }
+.sched-days label.free input { color: var(--muted); }
+.sched-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip-btn { border: 0; border-radius: 999px; padding: 4px 10px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.chip-btn.active { background: var(--accent-soft); color: var(--accent-strong); }
+.sched-add { align-items: center; }
+.sched-count { margin-top: 12px; align-items: flex-start; }
+.sched-days input[type='number'] { width: 100% !important; text-align: center; background: var(--surface) !important; border: 0; border-radius: 8px; padding: 7px 4px; font-variant-numeric: tabular-nums; }
+
+/* Highlight colours (Settings → General). "sun" is the default palette in :root above. */
+:root[data-accent='blue'] { --accent: #03a9f4; --accent-strong: #0277bd; --accent-soft: #e1f5fe; --on-accent: #fff; --on-accent-icon: #fff; }
+:root[data-accent='green'] { --accent: #2e9e5b; --accent-strong: #1e7a43; --accent-soft: #e3f5ea; --on-accent: #fff; --on-accent-icon: #fff; }
+:root[data-accent='purple'] { --accent: #6d4aff; --accent-strong: #5134d6; --accent-soft: #ece8ff; --on-accent: #fff; --on-accent-icon: #fff; }
+:root[data-accent='coral'] { --accent: #e8572e; --accent-strong: #b23d1a; --accent-soft: #ffe9e2; --on-accent: #fff; --on-accent-icon: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root[data-accent='blue'] { --accent: #29b6f6; --accent-strong: #4fc3f7; --accent-soft: #10303f; --on-accent: #0e1113; --on-accent-icon: #0e1113; }
+  :root[data-accent='green'] { --accent: #4cc27f; --accent-strong: #6fd69a; --accent-soft: #1a3325; --on-accent: #0e1113; --on-accent-icon: #0e1113; }
+  :root[data-accent='purple'] { --accent: #9b85ff; --accent-strong: #b8a8ff; --accent-soft: #2a2450; --on-accent: #0e1113; --on-accent-icon: #0e1113; }
+  :root[data-accent='coral'] { --accent: #ff8a65; --accent-strong: #ffab91; --accent-soft: #3a231c; --on-accent: #0e1113; --on-accent-icon: #0e1113; }
+}
+.accent-swatches { display: inline-flex; gap: 10px; }
+.swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+.swatch.active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }

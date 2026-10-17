@@ -4,7 +4,8 @@ import { DEFAULT_SHORTCUTS } from './shortcuts';
 import { applyFloatImport, fetchFloatPlan } from './float';
 import { applyPersonioImport, fetchPersonioAbsences } from './personio';
 import { PROJECT_COLORS } from './actions';
-import { uid } from './time';
+import { dayKey, uid } from './time';
+import { fullDayHours } from './schedule';
 import { t, useLanguage } from './i18n';
 
 const DEFAULT_DATA: Data = {
@@ -128,7 +129,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     personioBusy.current = true;
     setPersonioSync({ busy: true });
     try {
-      const imp = await fetchPersonioAbsences(s.personioPersonId, s.dailyTargetHours);
+      const imp = await fetchPersonioAbsences(s.personioPersonId, fullDayHours(dataRef.current!, dayKey(new Date())));
       setData((d) => (d ? applyPersonioImport(d, imp) : d));
       const days = t('count.daysOff', { n: imp.daysOff.length });
       setPersonioSync({ busy: false, message: imp.partial.length ? t('personio.importedPartial', { days, n: imp.partial.length }) : t('personio.imported', { days }) });

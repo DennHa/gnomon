@@ -11,6 +11,7 @@ declare global {
     api: {
       load(): Promise<unknown>;
       profile(): Promise<CompanyProfile | null>;
+      setTheme(value: 'system' | 'light' | 'dark'): void;
       save(data: unknown): Promise<void>;
       saveSync(data: unknown): boolean;
       updateTray(state: TrayState): void;

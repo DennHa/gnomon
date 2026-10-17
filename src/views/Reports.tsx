@@ -1,5 +1,6 @@
 import { Icon } from '../icons';
-import { balanceByMonth } from '../balance';
+import { balanceByMonth, targetFor } from '../balance';
+import { targetHoursOn } from '../schedule';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { deleteWorkday } from '../actions';
@@ -170,7 +171,13 @@ export default function Reports({ onOpenDay }: { onOpenDay: (day: string) => voi
     const attended = workdays.reduce((s, w) => s + workdayMs(w, now), 0);
     const worked = workdays.filter((w) => !w.off);
     // Overtime-off days keep their target (they use the balance); normal days off don't.
-    const target = workdays.filter((w) => !w.off || w.offKind === 'overtime').length * hoursToMs(data.settings.dailyTargetHours);
+    // The schedule's target on recorded days (overtime-off days keep theirs); with "count every scheduled day", also on
+    // past scheduled days without a record.
+    const recorded = new Set(workdays.map((w) => w.date));
+    const today = dayKey(now);
+    const target =
+      workdays.reduce((sum, w) => sum + targetFor(data, w), 0) +
+      (data.settings.countAllScheduledDays ? days.filter((d) => !recorded.has(d) && d < today).reduce((sum, d) => sum + hoursToMs(targetHoursOn(data, d)), 0) : 0);
     const dayTotals = days.map((d) => [...perDay.get(d)!.values()].reduce((a, b) => a + b, 0));
     return { entries, days, perDay, perProject, perActivity, billable, activityOf, tracked, workdays, daysWorked: worked.length, attended, target, projectOf, maxDay: Math.max(1, ...dayTotals) };
   }, [data, fromKey, toKey, from, to, now]);

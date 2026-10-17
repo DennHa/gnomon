@@ -80,6 +80,11 @@ function readCompanyProfile() {
 const companyProfile = readCompanyProfile();
 ipcMain.handle('profile:get', () => companyProfile);
 
+// Appearance from Settings: light, dark or like macOS. Screenshots (CAPTURE_THEME) keep their own.
+ipcMain.on('theme:set', (_e, value) => {
+  if (!process.env.CAPTURE_THEME && ['system', 'light', 'dark'].includes(value)) nativeTheme.themeSource = value;
+});
+
 // The Float API token is encrypted with the macOS keychain and never handed back to the renderer.
 // It's decrypted once per launch and kept in memory: every decrypt can trigger a keychain password prompt.
 let floatTokenCache;

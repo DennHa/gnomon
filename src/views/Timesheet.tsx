@@ -6,6 +6,7 @@ import { EntryFeed } from '../feed';
 import { Icon } from '../icons';
 import { DayReview, MissingHours, StaleBanner, WorkdayEditor, shiftDay } from './day';
 import type { Data } from '../types';
+import { targetHoursOn } from '../schedule';
 import { addDays, dayKey, entryMs, fmtDate, fmtDayLabel, fmtDayLong, fmtDuration, fmtHM, fmtTime, hoursToMs, startOfWeek, useNow, workdayMs } from '../time';
 import { goalFor } from '../plan';
 import { t } from '../i18n';
@@ -13,12 +14,17 @@ import { t } from '../i18n';
 const noProject = () => ({ id: '', name: t('noProject'), color: '#B0BEC5', dailyGoalHours: undefined });
 
 /** Monday–Friday of the week that aren't marked as days off: the days a daily goal applies to. */
+/** Days of the week that are scheduled workdays and not days off (for project week goals). */
 export function goalDays(data: Data, days: string[]): number {
-  return days.filter((d) => {
-    const wd = new Date(`${d}T12:00`).getDay();
-    return wd !== 0 && wd !== 6 && !data.workdays.find((w) => w.date === d)?.off;
-  }).length;
+  return days.filter((d) => targetHoursOn(data, d) > 0 && !data.workdays.find((w) => w.date === d)?.off).length;
 }
+
+/** The week's attendance target from the work schedule; normal days off don't count, overtime-off days do. */
+const weekTarget = (data: Data, days: string[]) =>
+  days.reduce((sum, d) => {
+    const w = data.workdays.find((x) => x.date === d);
+    return w?.off && w.offKind !== 'overtime' ? sum : sum + hoursToMs(targetHoursOn(data, d));
+  }, 0);
 
 /** Saturday and Sunday: shown muted in the week, but still editable. */
 const isWeekend = (d: string) => [0, 6].includes(new Date(`${d}T12:00`).getDay());
@@ -161,7 +167,6 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
   const now = useNow(30_000);
   const today = dayKey(now);
   const days = useMemo(() => weekDays(day), [day]);
-  const target = hoursToMs(data.settings.dailyTargetHours);
   // Rows added by hand stay visible for this week even while they're still empty.
   const [extraRows, setExtraRows] = useState<string[]>([]);
   useEffect(() => setExtraRows([]), [days[0]]);
@@ -206,7 +211,6 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
     return { cells, rows, running, dayTotal };
   }, [data, days, now, extraRows]);
 
-  const nGoalDays = goalDays(data, days);
   const weekTracked = days.reduce((s, d) => s + sheet.dayTotal(d), 0);
   const weekAtWork = days.reduce((s, d) => {
     const w = data.workdays.find((x) => x.date === d);
@@ -372,13 +376,13 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
               const ms = w && !w.off ? workdayMs(w, now) : 0;
               const closed = w?.end && !w.off;
               return (
-                <td key={d} className={`ts-cell ${d === today ? 'today' : ''} ${isWeekend(d) ? 'weekend' : ''} ${closed ? (ms >= target ? 'pos' : 'neg') : ''}`}>
+                <td key={d} className={`ts-cell ${d === today ? 'today' : ''} ${isWeekend(d) ? 'weekend' : ''} ${closed ? (ms >= hoursToMs(targetHoursOn(data, d)) ? 'pos' : 'neg') : ''}`}>
                   {ms ? fmtHM(ms) : ''}
                 </td>
               );
             })}
             <td className="ts-total">{fmtHM(weekAtWork)}</td>
-            <td className="ts-goal small">{t('ts.target', { duration: fmtDuration(target * nGoalDays) })}</td>
+            <td className="ts-goal small">{t('ts.target', { duration: fmtDuration(weekTarget(data, days)) })}</td>
           </tr>
         </tfoot>
       </table>

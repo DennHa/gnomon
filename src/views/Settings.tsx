@@ -4,7 +4,8 @@ import { useStore } from '../store';
 import { FloatConnect, PersonioConnect } from './integrations';
 import { Icon, type IconName } from '../icons';
 import type { Settings as S } from '../types';
-import { dayKey, useNow } from '../time';
+import { dayKey, fmtDate, useNow } from '../time';
+import { removeSchedule, SCHEDULE_PRESETS, scheduleOn, schedulesOf, setSchedule, SINCE_ALWAYS, weekTotal } from '../schedule';
 import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel, type LayoutMap } from '../shortcuts';
 import { LANGUAGE_NAMES, locale, resolveLanguage, t, type MsgKey } from '../i18n';
 import qrcode from 'qrcode-generator';
@@ -346,6 +347,99 @@ function initialTab(): SettingsTab {
   return 'general';
 }
 
+/** Highlight colours; the full light/dark palettes are the [data-accent] rules in styles.css. */
+const ACCENTS: { id: NonNullable<S['accent']>; color: string }[] = [
+  { id: 'sun', color: '#f5b400' },
+  { id: 'blue', color: '#03a9f4' },
+  { id: 'green', color: '#2e9e5b' },
+  { id: 'purple', color: '#7c5cff' },
+  { id: 'coral', color: '#f0643c' },
+];
+
+/** Work schedule: hours per weekday, in periods that start on a date (see src/schedule.ts). */
+function WorkScheduleCard() {
+  const { data, update } = useStore();
+  const s = data.settings;
+  const periods = schedulesOf(data);
+  const current = scheduleOn(data, dayKey(new Date())).from;
+  const [adding, setAdding] = useState(false);
+  const [from, setFrom] = useState(() => dayKey(new Date()));
+  // Monday 1 Jan 2024 … Sunday 7 Jan 2024, for localized weekday names.
+  const weekdays = Array.from({ length: 7 }, (_, i) => fmtDate(`2024-01-0${i + 1}`, { weekday: 'short' }));
+  const setDay = (periodFrom: string, hours: number[], i: number, v: string) =>
+    update((d) => setSchedule(d, periodFrom, hours.map((h, j) => (j === i ? Number(v.replace(',', '.')) || 0 : h))));
+
+  return (
+    <section className="card">
+      <h3>{t('sched.title')}</h3>
+      <p className="muted small section-hint">{t('sched.hint')}</p>
+      <div className="sched-list">
+        {[...periods].reverse().map((p) => (
+          <div key={p.from} className={`sched ${p.from === current ? 'current' : ''}`}>
+            <div className="sched-head">
+              <strong>{p.from === SINCE_ALWAYS ? t('sched.always') : t('sched.since', { date: fmtDate(p.from, { day: 'numeric', month: 'short', year: 'numeric' }) })}</strong>
+              {p.from === current && <span className="badge">{t('sched.current')}</span>}
+              {p.source === 'personio' && <span className="badge">Personio</span>}
+              <span className="muted">{t('sched.perWeek', { hours: String(weekTotal(p.hours)).replace('.', locale().startsWith('de') ? ',' : '.') })}</span>
+              <span className="spacer" />
+              {periods.length > 1 && p.from !== periods[0].from && (
+                <button className="icon-btn" title={t('sched.remove')} onClick={() => update((d) => removeSchedule(d, p.from))}>
+                  <Icon name="delete" size={18} />
+                </button>
+              )}
+            </div>
+            <div className="sched-days">
+              {weekdays.map((name, i) => (
+                <label key={name} className={p.hours[i] ? '' : 'free'}>
+                  <span>{name}</span>
+                  <input type="number" min={0} max={24} step={0.25} value={p.hours[i]} onChange={(e) => setDay(p.from, p.hours, i, e.target.value)} />
+                </label>
+              ))}
+            </div>
+            <div className="sched-presets">
+              {SCHEDULE_PRESETS.map((pr) => (
+                <button key={pr.id} className={`chip-btn ${pr.hours.join() === p.hours.join() ? 'active' : ''}`} onClick={() => update((d) => setSchedule(d, p.from, pr.hours))}>
+                  {t(`sched.preset.${pr.id}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {adding ? (
+        <div className="add-row sched-add">
+          <span>{t('sched.from')}</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <button
+            className="btn primary"
+            disabled={!from}
+            onClick={() => {
+              update((d) => setSchedule(d, from, scheduleOn(d, from).hours));
+              setAdding(false);
+            }}
+          >
+            {t('sched.add')}
+          </button>
+          <button className="btn ghost" onClick={() => setAdding(false)}>
+            {t('sched.cancel')}
+          </button>
+        </div>
+      ) : (
+        <button className="btn ghost small" onClick={() => setAdding(true)}>
+          <Icon name="add" size={18} /> {t('sched.change')}
+        </button>
+      )}
+      <label className="check-row sched-count">
+        <input type="checkbox" checked={Boolean(s.countAllScheduledDays)} onChange={(e) => update((d) => ({ ...d, settings: { ...d.settings, countAllScheduledDays: e.target.checked } }))} />
+        <span>
+          {t('sched.countAll')}
+          <span className="muted small field-hint">{t('sched.countAllHint')}</span>
+        </span>
+      </label>
+    </section>
+  );
+}
+
 export default function Settings() {
   const { data, update, profile } = useStore();
   const s = data.settings;
@@ -384,25 +478,35 @@ export default function Settings() {
           </select>
         </label>
         <label className="field">
+          <span>{t('set.appearance')}</span>
+          <select value={s.appearance ?? 'system'} onChange={(e) => set({ appearance: e.target.value as S['appearance'] })}>
+            <option value="system">{t('set.appearance.system')}</option>
+            <option value="light">{t('set.appearance.light')}</option>
+            <option value="dark">{t('set.appearance.dark')}</option>
+          </select>
+        </label>
+        <div className="field">
+          <span>{t('set.accent')}</span>
+          <span className="accent-swatches" role="radiogroup" aria-label={t('set.accent')}>
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                role="radio"
+                aria-checked={(s.accent ?? 'sun') === a.id}
+                className={`swatch ${(s.accent ?? 'sun') === a.id ? 'active' : ''}`}
+                style={{ background: a.color }}
+                title={t(`set.accent.${a.id}`)}
+                onClick={() => set({ accent: a.id })}
+              />
+            ))}
+          </span>
+        </div>
+        <label className="field">
           <span>
             {t('set.userName')}
             <span className="muted small field-hint">{t('set.userNameHint')}</span>
           </span>
           <input value={s.userName ?? ''} placeholder={t('set.userNamePlaceholder')} onChange={(e) => set({ userName: e.target.value || undefined })} />
-        </label>
-        <label className="field">
-          <span>{t('set.dailyTarget')}</span>
-          <span>
-            <input
-              type="number"
-              min={0}
-              max={24}
-              step={0.25}
-              value={s.dailyTargetHours}
-              onChange={(e) => set({ dailyTargetHours: Math.max(0, Number(e.target.value) || 0) })}
-            />{' '}
-            {t('set.hours')}
-          </span>
         </label>
         <label className="field">
           <span>
@@ -426,6 +530,7 @@ export default function Settings() {
           {t('set.billable')}
         </label>
           </section>
+          <WorkScheduleCard />
           <section className="card onb-entry">
             <span className="onb-entry-text">
               <strong>{t('tour.open')}</strong>
