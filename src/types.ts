@@ -1,5 +1,8 @@
 import type { ShortcutConfig } from './shortcuts';
 
+/** Ready-made activity sets per role (names in i18n: preset.<id>). */
+export type ActivityPreset = 'designer' | 'pm' | 'director' | '3d' | 'ux' | 'ui';
+
 export type Project = {
   id: string;
   name: string;
@@ -109,6 +112,8 @@ export type Settings = {
   menuBarColor: 'project' | 'activity' | 'mono';
   /** Opt-in: remember which app was in front, to help reviewing later. */
   activityTrail: boolean;
+  /** Which role's activity set the list came from; any manual change makes it 'custom'. */
+  activityPreset?: ActivityPreset | 'custom';
   /** Local REST API (see API.md). */
   apiEnabled: boolean;
   apiPort: number;

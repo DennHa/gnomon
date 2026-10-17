@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { addActivity, addProject, PROJECT_COLORS, removeActivity, removeProject, updateActivity, updateProject } from '../actions';
+import { ACTIVITY_PRESETS, addActivity, addProject, applyActivityPreset, PROJECT_COLORS, removeActivity, removeProject, updateActivity, updateProject } from '../actions';
 import { dayKey, entryMs, fmtDate, fmtDayLabel, fmtDuration, fmtTime, hoursToMs } from '../time';
 import { timeWindow } from '../plan';
-import type { Data, PlanItem, Project } from '../types';
+import type { ActivityPreset, Data, PlanItem, Project } from '../types';
 import { t } from '../i18n';
 
 const fmtShort = (d: string) => fmtDate(d, { day: 'numeric', month: 'short' });
@@ -89,6 +89,34 @@ function PlanList({ data, project }: { data: Data; project: Project }) {
   );
 }
 
+/** "Custom" by default; picking a role swaps in its activity set (see applyActivityPreset). */
+function RolePicker() {
+  const { data, update } = useStore();
+  const current = data.settings.activityPreset ?? 'custom';
+  const pick = (value: string) => {
+    if (value === 'custom' || value === current) return;
+    const preset = value as ActivityPreset;
+    if (!confirm(t('act.roleConfirm', { role: t(`role.${preset}`) }))) return;
+    update((d) => applyActivityPreset(d, preset, t(`preset.${preset}`).split('|')));
+  };
+  return (
+    <div className="role-picker">
+      <label>
+        <span>{t('act.role')}</span>
+        <select value={current} onChange={(e) => pick(e.target.value)}>
+          <option value="custom">{t('role.custom')}</option>
+          {ACTIVITY_PRESETS.map((p) => (
+            <option key={p} value={p}>
+              {t(`role.${p}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="muted small">{t('act.roleHint')}</span>
+    </div>
+  );
+}
+
 export default function Projects() {
   const { data, update } = useStore();
   const [name, setName] = useState('');
@@ -161,6 +189,7 @@ export default function Projects() {
         <p className="muted small section-hint">
           {t('act.hint')}
         </p>
+        <RolePicker />
         <form className="add-row" onSubmit={(e) => (e.preventDefault(), submitActivity())}>
           <input placeholder={t('act.newPlaceholder')} value={activity} onChange={(e) => setActivity(e.target.value)} />
           <button className="btn primary" type="submit">

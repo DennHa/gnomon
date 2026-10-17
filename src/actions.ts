@@ -1,5 +1,5 @@
 // Pure state transitions. Every function takes the current Data and returns the next one.
-import type { Activity, Break, Data, Entry, Project, Workday } from './types';
+import type { Activity, ActivityPreset, Break, Data, Entry, Project, Workday } from './types';
 import { atTime, dayKey, nowIso, uid } from './time';
 import { goalFor, planItemsOn } from './plan';
 
@@ -208,21 +208,41 @@ export function removeProject(d: Data, id: string): Data {
   };
 }
 
+// Any manual change to the activity list makes it the user's own ("Custom").
+const custom = (d: Data): Data => (d.settings.activityPreset && d.settings.activityPreset !== 'custom' ? { ...d, settings: { ...d.settings, activityPreset: 'custom' } } : d);
+
 export function addActivity(d: Data, name: string, color?: string): Data {
   const a: Activity = { id: uid(), name: name.trim(), color: color ?? PROJECT_COLORS[(d.activities.length + 3) % PROJECT_COLORS.length] };
-  return { ...d, activities: [...d.activities, a] };
+  return custom({ ...d, activities: [...d.activities, a] });
 }
 
 export function updateActivity(d: Data, id: string, patch: Partial<Activity>): Data {
-  return { ...d, activities: d.activities.map((a) => (a.id === id ? { ...a, ...patch } : a)) };
+  const next = { ...d, activities: d.activities.map((a) => (a.id === id ? { ...a, ...patch } : a)) };
+  return patch.name !== undefined ? custom(next) : next;
 }
 
 export function removeActivity(d: Data, id: string): Data {
-  return {
+  return custom({
     ...d,
     activities: d.activities.filter((x) => x.id !== id),
     entries: d.entries.map((e) => (e.activityId === id ? { ...e, activityId: undefined } : e)),
-  };
+  });
+}
+
+export const ACTIVITY_PRESETS: ActivityPreset[] = ['designer', 'pm', 'director', '3d', 'ux', 'ui'];
+
+/**
+ * Switch to a role's activity set. Activities with the same name are kept (with their colour), missing ones are added,
+ * and the rest are removed unless entries use them, so no tracked time loses its activity.
+ */
+export function applyActivityPreset(d: Data, preset: ActivityPreset, names: string[]): Data {
+  const used = new Set(d.entries.map((e) => e.activityId).filter(Boolean));
+  const byName = new Map(d.activities.map((a) => [a.name.trim().toLowerCase(), a]));
+  const wanted = names.map((n) => n.trim()).filter(Boolean);
+  const keep = new Set(wanted.map((n) => n.toLowerCase()));
+  const fromPreset = wanted.map((name, i) => byName.get(name.toLowerCase()) ?? { id: uid(), name, color: PROJECT_COLORS[(i + 3) % PROJECT_COLORS.length] });
+  const stillUsed = d.activities.filter((a) => !keep.has(a.name.trim().toLowerCase()) && used.has(a.id));
+  return { ...d, activities: [...fromPreset, ...stillUsed], settings: { ...d.settings, activityPreset: preset } };
 }
 
 /**

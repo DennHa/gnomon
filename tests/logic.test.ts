@@ -236,4 +236,21 @@ test('shortcuts: key presses become accelerators, shown with Mac symbols', () =>
   assert.equal(projectAccel('', 0), '');
 });
 
+test('activity presets: role set replaces the list, used activities stay, edits make it custom', () => {
+  let d = base();
+  d.entries.push({ id: 'e1', description: '', activityId: 'a1', start: atTime(today, '09:00'), end: atTime(today, '10:00') });
+  d = A.applyActivityPreset(d, 'ux', ['Research', 'Design', 'Workshop']);
+  assert.deepEqual(d.activities.map((a) => a.name), ['Research', 'Design', 'Workshop', 'Call'], 'Call is used, so it stays; Design is reused');
+  assert.equal(d.activities.find((a) => a.name === 'Design')!.id, 'a2', 'same name keeps its id and colour');
+  assert.equal(d.settings.activityPreset, 'ux');
+  assert.equal(A.updateActivity(d, 'a2', { color: '#000' }).settings.activityPreset, 'ux', 'a colour change is not a list change');
+  assert.equal(A.addActivity(d, 'Mood').settings.activityPreset, 'custom');
+  assert.equal(A.removeActivity(d, 'a2').settings.activityPreset, 'custom');
+  for (const lang of ['en', 'de'] as const) {
+    setLanguage(lang);
+    for (const p of A.ACTIVITY_PRESETS) assert.equal(t(`preset.${p}`).split('|').length, 6, `${lang} ${p}`);
+  }
+  setLanguage('en');
+});
+
 console.log(`\n${passed} passed`);

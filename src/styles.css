@@ -698,3 +698,5 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .settings-tabs { flex-wrap: nowrap; }
 .settings-tab { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .settings-tabs { flex-direction: row; }
+.role-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
+.role-picker label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
