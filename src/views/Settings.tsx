@@ -148,6 +148,7 @@ const SERVER_ERRORS = ['bad_url', 'no_code', 'invalid_code', 'unreachable', 'una
 const serverError = (code: string) => (SERVER_ERRORS.includes(code) ? t(`srv.err.${code}` as MsgKey) : code);
 
 function ServerSettings() {
+  const { serverSync, runServerSync, refreshServer } = useStore();
   const [status, setStatus] = useState<{ connected: boolean; url?: string; name?: string } | null>(null);
   const [url, setUrl] = useState('');
   const [code, setCode] = useState('');
@@ -178,12 +179,14 @@ function ServerSettings() {
     setError(null);
     setCode('');
     setStatus(r);
+    await refreshServer(); // starts the first sync
   };
 
   const disconnect = async () => {
     if (!confirm(t('srv.disconnectConfirm'))) return;
     setStatus(await window.api.serverDisconnect());
     setInvite(null);
+    await refreshServer();
   };
 
   const connectPhone = async () => {
@@ -221,7 +224,14 @@ function ServerSettings() {
       ) : (
         <>
           <p className="small">{t('srv.connectedAs', { url: status.url ?? '', name: status.name ?? '' })}</p>
-          <p className="muted small">{t('srv.noSyncYet')}</p>
+          <p className="muted small">{t('srv.syncIntro')}</p>
+          <div className="add-row">
+            <button className="btn ghost small" onClick={() => void runServerSync()} disabled={serverSync.busy}>
+              <Icon name="sync" size={16} /> {serverSync.busy ? t('srv.syncing') : t('srv.syncNow')}
+            </button>
+            {serverSync.at && !serverSync.busy && <span className="muted small">{t('srv.syncedAt', { time: new Date(serverSync.at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</span>}
+          </div>
+          {serverSync.error && <p className="error small">{t('srv.syncFailed', { error: SERVER_ERRORS.includes(serverSync.error) ? serverError(serverSync.error) : serverSync.error })}</p>}
           {invite && (
             <div className="server-invite">
               <div className="qr" dangerouslySetInnerHTML={{ __html: invite.svg }} />

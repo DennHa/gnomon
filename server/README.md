@@ -163,7 +163,7 @@ limits. In addition, the server has:
 | `POST /sync` | Push changes from another copy of the data (see below). |
 | `GET /healthz` | Liveness, no key (used by Docker). |
 
-### Sync (for the Mac app, not wired up yet)
+### Sync (used by the Mac app)
 
 The server is the source of truth. Every write gets a sequence number; a client remembers the last `cursor` it saw.
 
@@ -188,8 +188,15 @@ Mac app's `data.json` (`src/types.ts`). Repeat with `since=<cursor>` while `more
 - If a push leaves two running timers (the phone and the Mac each started one), the newest keeps running and the
   other ends when it started.
 
-A Mac sync loop would be: pull since the stored cursor and apply it to `data.json`; push records changed locally since
-the last sync (with their change time); store the new cursor. Float plans, settings and the activity trail stay on the Mac.
+**How the Mac uses it** (`src/sync.ts`, run by the store; the main process does the HTTP calls with the key):
+once connected under Settings → Connections, the Mac syncs on start, every minute and a few seconds after each change.
+It remembers the cursor and the last agreed version of every record (`server-sync.json` next to `data.json`, mode
+0600), pulls, merges, pushes its own changes, and pulls again for the server's final word. If the same record changed
+on both sides between two syncs, the later edit wins: the Mac notes when each record changed there, the server stamps
+the phone's changes (a Mac edit made before a restart counts as made at the next sync). The very first sync joins projects and activities with the
+same name (the Mac's ids stay), drops the server's unused starter activities, and combines a day stamped on both
+devices (earliest arrival, latest leaving). Float plans, settings and the activity trail stay on the Mac.
+Status and "Sync now" are in the same Settings card.
 
 ## Layout
 
@@ -205,7 +212,6 @@ server/
 
 ## Not done yet
 
-- **Mac app sync** with this server (the API above is ready for it).
 - Offline tracking on the phone (taps while offline show an error; nothing is queued).
 - Float plans and "Planned today" on the phone; projects and activities are managed on the Mac (the phone can create
   a project by name when starting a timer).

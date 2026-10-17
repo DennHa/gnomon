@@ -10,6 +10,7 @@ import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
 import type { Data } from '../src/types';
+import * as Sync from '../src/sync';
 import { setLanguage, t, trayStrings } from '../src/i18n';
 
 let passed = 0;
@@ -306,6 +307,111 @@ test('daylight: sun height by time and season, moon phase, and a shade that neve
     const look = daylight(new Date(2026, 9, 26, h, 30), true);
     assert.ok(look.shadow.startsWith('0 '), `ambient shade at ${h}:30`);
   }
+});
+
+// ---- Sync with a Gnomon server --------------------------------------------------------------------------
+const NOW = '2026-10-17T12:00:00.000Z';
+const entry = (id: string, extra: Partial<Data['entries'][number]> = {}) => ({ id, description: id, start: '2026-10-16T07:00:00.000Z', end: '2026-10-16T08:00:00.000Z', ...extra });
+const put = (kind: Sync.Kind, data: { id?: string; date?: string }, updatedAt = '2026-10-17T11:00:00.000Z'): Sync.Change => ({ kind, id: (kind === 'workdays' ? data.date : data.id)!, updatedAt, deleted: false, data: data as never });
+
+test('sync: local changes are found against the agreed state, including deletions', () => {
+  const d0 = { ...base(), entries: [entry('e1'), entry('e2')] };
+  const agreed = Sync.baseOf(d0);
+  const d1 = { ...d0, entries: [{ ...entry('e1'), description: 'changed' }, entry('e3')] };
+  const ch = Sync.localChanges(d1, agreed, NOW).map((c) => `${c.kind}:${c.id}:${c.deleted ? 'del' : 'put'}`).sort();
+  assert.deepEqual(ch, ['entries:e1:put', 'entries:e2:del', 'entries:e3:put']);
+  assert.deepEqual(Sync.localChanges(d0, agreed, NOW), []);
+});
+
+test('sync: server changes merge in; a Mac edit without a known time counts as now', () => {
+  const d0 = { ...base(), entries: [entry('e1'), entry('e2')] };
+  const agreed = Sync.baseOf(d0);
+  const local = { ...d0, entries: [{ ...entry('e1'), description: 'mac' }, entry('e2')] };
+  const incoming = [put('entries', { ...entry('e1'), description: 'phone' }), put('entries', { ...entry('e2'), description: 'phone2' }), put('entries', entry('p1')), { kind: 'entries' as const, id: 'gone', updatedAt: NOW, deleted: true, data: null }];
+  const plan = Sync.planSync(local, agreed, incoming, { first: false, now: NOW });
+  const byId = new Map(plan.merged.entries.map((e) => [e.id, e.description]));
+  assert.equal(byId.get('e1'), 'mac');
+  assert.equal(byId.get('e2'), 'phone2');
+  assert.equal(byId.get('p1'), 'p1');
+  assert.deepEqual(plan.push.map((c) => c.id), ['e1'], 'only the Mac’s own change is pushed');
+});
+
+test('sync: when both sides changed the same record, the later edit wins', () => {
+  const d0 = { ...base(), entries: [entry('e1'), entry('e2')] };
+  const agreed = Sync.baseOf(d0);
+  const local = { ...d0, entries: [{ ...entry('e1'), description: 'mac at 10:00' }, { ...entry('e2'), description: 'mac at 11:30' }] };
+  const changedAt = (k: string) => ({ 'entries:e1': '2026-10-17T10:00:00.000Z', 'entries:e2': '2026-10-17T11:30:00.000Z' })[k];
+  const incoming = [put('entries', { ...entry('e1'), description: 'phone at 11:00' }, '2026-10-17T11:00:00.000Z'), put('entries', { ...entry('e2'), description: 'phone at 11:00' }, '2026-10-17T11:00:00.000Z')];
+  const plan = Sync.planSync(local, agreed, incoming, { first: false, now: NOW, changedAt });
+  const byId = new Map(plan.merged.entries.map((e) => [e.id, e.description]));
+  assert.equal(byId.get('e1'), 'phone at 11:00', 'the phone edited e1 later');
+  assert.equal(byId.get('e2'), 'mac at 11:30', 'the Mac edited e2 later');
+  assert.deepEqual(plan.push.map((c) => [c.id, c.updatedAt]), [['e2', '2026-10-17T11:30:00.000Z']], 'pushed with the time of the Mac edit');
+});
+
+test('sync: markChanges notes changed, added and deleted records only', () => {
+  const d0 = { ...base(), entries: [entry('e1'), entry('e2')] };
+  const d1 = A.updateEntry(A.deleteEntry(d0, 'e2'), 'e1', { description: 'x' });
+  const d2 = { ...d1, entries: [...d1.entries, entry('e3')] };
+  const m = new Map<string, string>();
+  Sync.markChanges(d0, d2, m, NOW);
+  assert.deepEqual([...m.keys()].sort(), ['entries:e1', 'entries:e2', 'entries:e3']);
+  const m2 = new Map<string, string>();
+  Sync.markChanges(d2, { ...d2, settings: { ...d2.settings, dailyTargetHours: 7 } }, m2, NOW);
+  assert.equal(m2.size, 0, 'settings are not synced records');
+});
+
+test('sync: first sync joins projects and activities by name and drops unused starter activities', () => {
+  const local = { ...base(), entries: [entry('m1', { projectId: 'p1', activityId: 'a1' })] };
+  const incoming = [
+    put('activities', { id: 'srv-call', name: 'call', color: '#E91E63' } as never),
+    put('activities', { id: 'srv-admin', name: 'Admin', color: '#607D8B' } as never),
+    put('projects', { id: 'srv-xyz', name: 'XYZ', color: '#8E44AD' } as never),
+    put('entries', entry('ph1', { projectId: 'srv-xyz', activityId: 'srv-call' })),
+  ];
+  const plan = Sync.planSync(local, {}, incoming, { first: true, now: NOW });
+  const ph1 = plan.merged.entries.find((e) => e.id === 'ph1')!;
+  assert.equal(ph1.projectId, 'p1', 'the phone entry now points to the Mac project');
+  assert.equal(ph1.activityId, 'a1');
+  assert.equal(plan.merged.projects.length, 2);
+  assert.deepEqual(plan.merged.activities.map((a) => a.id), ['a1', 'a2'], 'no duplicates, Admin dropped');
+  const pushed = new Set(plan.push.map((c) => `${c.kind}:${c.id}:${c.deleted ? 'del' : 'put'}`));
+  for (const k of ['activities:srv-call:del', 'activities:srv-admin:del', 'projects:srv-xyz:del', 'entries:ph1:put', 'entries:m1:put', 'projects:p1:put', 'activities:a1:put']) assert.ok(pushed.has(k), k);
+});
+
+test('sync: a day stamped on both devices before the first sync is combined', () => {
+  const day = '2026-10-16';
+  const local = { ...base(), workdays: [{ date: day, start: `${day}T07:30:00.000Z`, end: `${day}T17:00:00.000Z`, breaks: [] }] };
+  const phone = { date: day, start: `${day}T07:00:00.000Z`, end: `${day}T16:00:00.000Z`, breaks: [{ start: `${day}T10:00:00.000Z`, end: `${day}T10:30:00.000Z` }] };
+  const plan = Sync.planSync(local, {}, [put('workdays', phone)], { first: true, now: NOW });
+  const w = plan.merged.workdays[0];
+  assert.equal(w.start, phone.start);
+  assert.equal(w.end, `${day}T17:00:00.000Z`, 'latest leaving');
+  assert.equal(w.breaks.length, 1);
+  assert.ok(plan.push.some((c) => c.kind === 'workdays' && c.id === day));
+});
+
+test('sync: two running timers become one, invalid records are not pushed', () => {
+  const local = { ...base(), entries: [entry('mac', { start: '2026-10-17T08:00:00.000Z', end: undefined }), entry('bad', { start: 'not a date' })] };
+  const phone = entry('phone', { start: '2026-10-17T09:00:00.000Z', end: undefined });
+  const plan = Sync.planSync(local, {}, [put('entries', phone)], { first: false, now: NOW });
+  assert.equal(plan.merged.entries.filter((e) => !e.end).length, 1);
+  assert.equal(plan.merged.entries.find((e) => e.id === 'mac')!.end, phone.start, 'the older timer ends when the newer began');
+  assert.deepEqual(plan.invalid, ['entries:bad'], JSON.stringify(plan.invalid));
+  assert.ok(!plan.push.some((c) => c.id === 'bad'));
+});
+
+test('sync: rebase keeps edits made during the sync and is a no-op when nothing changed', () => {
+  const before = { ...base(), entries: [entry('e1'), entry('e2')] };
+  const synced = { ...before, entries: [{ ...entry('e1'), description: 'server' }, { ...entry('e2'), description: 'server' }, entry('n1')] };
+  const live = { ...before, entries: [entry('e1'), { ...entry('e2'), description: 'typed meanwhile' }, entry('x1')] };
+  const r = Sync.rebase(live, before, synced);
+  const byId = new Map(r.entries.map((e) => [e.id, e.description]));
+  assert.equal(byId.get('e1'), 'server');
+  assert.equal(byId.get('e2'), 'typed meanwhile');
+  assert.equal(byId.get('n1'), 'n1');
+  assert.equal(byId.get('x1'), 'x1');
+  assert.equal(Sync.rebase(synced, synced, synced), synced);
 });
 
 console.log(`\n${passed} passed`);

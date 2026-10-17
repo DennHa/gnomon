@@ -1044,14 +1044,14 @@ function serverOrigin(input) {
   return u.origin;
 }
 
-async function serverCall(origin, method, apiPath, body, key) {
+async function serverCall(origin, method, apiPath, body, key, timeoutMs = 10_000) {
   let res;
   try {
     res = await fetch(`${origin}/api/v1${apiPath}`, {
       method,
       headers: { ...(key && { Authorization: `Bearer ${key}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(timeoutMs),
       redirect: 'error',
     });
   } catch {
@@ -1082,12 +1082,14 @@ ipcMain.handle('server:connect', async (_e, { url, code }) => {
   const me = await serverCall(origin, 'GET', '/me', undefined, key);
   if (!me.ok) return { ok: false, error: me.error };
   writeServer({ url: origin, name: me.data.name, key });
+  fs.rmSync(syncStateFile(), { force: true }); // a new connection starts with a first sync
   return { ok: true, ...serverStatus() };
 });
 ipcMain.handle('server:disconnect', async () => {
   const s = readServer();
   if (s) await serverCall(s.url, 'DELETE', '/me', undefined, s.key); // revoke this Mac's key; ignore if offline
   writeServer(null);
+  fs.rmSync(syncStateFile(), { force: true });
   return serverStatus();
 });
 ipcMain.handle('server:pairCode', async (_e, name) => {
@@ -1096,6 +1098,37 @@ ipcMain.handle('server:pairCode', async (_e, name) => {
   const r = await serverCall(s.url, 'POST', '/pair-codes', { name: String(name || 'iPhone').slice(0, 60) }, s.key);
   if (!r.ok) return r;
   return { ok: true, code: r.data.code, expiresAt: r.data.expiresAt, link: `${s.url}/#pair=${r.data.code}` };
+});
+// Sync (src/sync.ts does the merging in the window; here only the HTTP calls with the key, and the sync state:
+// the cursor and the last agreed version of every record, kept next to data.json).
+const syncStateFile = () => path.join(app.getPath('userData'), 'server-sync.json');
+ipcMain.handle('server:syncState', () => {
+  const s = readServer();
+  try {
+    const st = JSON.parse(fs.readFileSync(syncStateFile(), 'utf8'));
+    return s && st.url === s.url ? st : null; // another server: start over
+  } catch {
+    return null;
+  }
+});
+ipcMain.handle('server:setSyncState', (_e, state) => {
+  const s = readServer();
+  if (!s || !state || typeof state.cursor !== 'number' || typeof state.base !== 'object') return false;
+  writeAtomic(syncStateFile(), JSON.stringify({ url: s.url, cursor: state.cursor, base: state.base, at: new Date().toISOString() }));
+  return true;
+});
+ipcMain.handle('server:syncPull', async (_e, since) => {
+  const s = readServer();
+  if (!s) return { ok: false, error: 'not_connected' };
+  const r = await serverCall(s.url, 'GET', `/sync?since=${Math.max(0, Math.floor(Number(since) || 0))}&limit=5000`, undefined, s.key, 30_000);
+  return r.ok ? { ok: true, ...r.data } : r;
+});
+ipcMain.handle('server:syncPush', async (_e, changes) => {
+  const s = readServer();
+  if (!s) return { ok: false, error: 'not_connected' };
+  if (!Array.isArray(changes)) return { ok: false, error: 'invalid' };
+  const r = await serverCall(s.url, 'POST', '/sync', { changes }, s.key, 60_000);
+  return r.ok ? { ok: true, ...r.data } : r;
 });
 ipcMain.handle('float:get', (_e, { path: apiPath, contact }) => floatGet(apiPath, contact));
 

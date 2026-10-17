@@ -3,6 +3,13 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.3 · 2026-10-17
+
+- **Sync with your phone**: when this Mac is connected to a Gnomon server (Settings → Connections), your times,
+  workdays, projects and activities sync automatically, about once a minute and right after changes, so the phone
+  and the Mac show the same. If the same thing changed on both, the later edit wins. Float plans, settings and the
+  activity trail stay on the Mac. Status and "Sync now" are in the same card.
+
 ## 0.1.2 · 2026-10-17
 
 - **Daylight ruler**: with Daylight on, hour marks appear along the top. Drag along them, swipe sideways on the

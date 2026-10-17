@@ -7,6 +7,7 @@ import { PROJECT_COLORS } from './actions';
 import { dayKey, uid } from './time';
 import { fullDayHours } from './schedule';
 import { t, useLanguage } from './i18n';
+import { applyChanges, baseOf, markChanges, planSync, rebase, type Change } from './sync';
 
 const DEFAULT_DATA: Data = {
   version: 1,
@@ -53,6 +54,8 @@ function normalize(raw: unknown): Data {
 }
 
 type SyncState = { busy: boolean; error?: string; message?: string };
+/** Sync with the Gnomon server: `at` is the last successful sync. */
+type ServerSyncState = SyncState & { connected: boolean; at?: string };
 
 type Store = {
   data: Data;
@@ -61,6 +64,10 @@ type Store = {
   runFloatSync: () => Promise<void>;
   personioSync: SyncState;
   runPersonioSync: () => Promise<void>;
+  serverSync: ServerSyncState;
+  runServerSync: () => Promise<void>;
+  /** Re-read whether this Mac is connected to a server (after connecting or disconnecting in Settings). */
+  refreshServer: () => Promise<void>;
   /** Synchronous read/write for the API bridge, which needs the result of a change right away. */
   getData: () => Data;
   commit: (next: Data) => void;
@@ -79,6 +86,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const floatBusy = useRef(false);
   const [personioSync, setPersonioSync] = useState<SyncState>({ busy: false });
   const personioBusy = useRef(false);
+  const [serverSync, setServerSync] = useState<ServerSyncState>({ busy: false, connected: false });
+  const serverBusy = useRef(false);
+  const serverAgain = useRef(false);
+  // When each record last changed on this Mac, so a conflict with the phone goes to the later edit.
+  const changedAt = useRef(new Map<string, string>());
+  const prevData = useRef<Data | null>(null);
 
   useEffect(() => {
     Promise.all([window.api.load(), window.api.profile().catch(() => null)]).then(([raw, p]) => {
@@ -140,6 +153,92 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ---- Sync with the Gnomon server (src/sync.ts) -----------------------------------------------------------
+
+  const runServerSync = useCallback(async () => {
+    if (!dataRef.current) return;
+    if (serverBusy.current) {
+      serverAgain.current = true; // something changed meanwhile: go again right after this one
+      return;
+    }
+    serverBusy.current = true;
+    setServerSync((s) => ({ ...s, busy: true }));
+    const fail = (error: string) => setServerSync((s) => ({ ...s, busy: false, error }));
+    try {
+      const state = await window.api.serverSyncState();
+      const pullAll = async (since: number) => {
+        const changes: Change[] = [];
+        for (;;) {
+          const r = await window.api.serverSyncPull(since);
+          if (!r.ok) throw new Error(r.error);
+          changes.push(...r.changes);
+          since = r.cursor;
+          if (!r.more) return { changes, cursor: since };
+        }
+      };
+      const first = !state;
+      const pulled = await pullAll(state?.cursor ?? 0);
+      const before = dataRef.current!;
+      const now = new Date().toISOString();
+      const plan = planSync(before, state?.base ?? {}, pulled.changes, { first, now, changedAt: (k) => changedAt.current.get(k) });
+      let merged = plan.merged;
+      for (let i = 0; i < plan.push.length; i += 2000) {
+        const r = await window.api.serverSyncPush(plan.push.slice(i, i + 2000));
+        if (!r.ok) throw new Error(r.error);
+        // The server kept its own (newer) version of these: take it.
+        for (const sk of r.skipped) {
+          const k = `${sk.kind}:${sk.id}`;
+          if (plan.remote.has(k)) merged = applyChanges(merged, [{ kind: sk.kind as Change['kind'], id: sk.id, updatedAt: now, deleted: !plan.remote.get(k), data: plan.remote.get(k) ?? null }]);
+        }
+      }
+      // The server's final word after our push (our own changes come back, plus e.g. a timer it stopped).
+      const after = plan.push.length ? await pullAll(pulled.cursor) : pulled;
+      if (after !== pulled) merged = applyChanges(merged, after.changes);
+      await window.api.serverSetSyncState({ cursor: after.cursor, base: baseOf(merged) });
+      setData((d) => (d ? rebase(d, before, merged) : d));
+      // Edits up to the start of this sync are settled; later ones keep their time for the next sync.
+      for (const [k, at] of changedAt.current) if (at <= now) changedAt.current.delete(k);
+      setServerSync((s) => ({ ...s, busy: false, error: plan.invalid.length ? t('srv.syncInvalid', { n: plan.invalid.length }) : undefined, at: new Date().toISOString() }));
+    } catch (err) {
+      fail(err instanceof Error ? err.message : String(err));
+    } finally {
+      serverBusy.current = false;
+      if (serverAgain.current) {
+        serverAgain.current = false;
+        setTimeout(() => void runServerSync(), 1000);
+      }
+    }
+  }, []);
+
+  const refreshServer = useCallback(async () => {
+    const st = await window.api.serverStatus();
+    setServerSync((s) => ({ ...s, connected: st.connected, error: undefined, ...(st.connected ? {} : { at: undefined }) }));
+  }, []);
+
+  useEffect(() => {
+    void refreshServer();
+  }, [refreshServer]);
+
+  useEffect(() => {
+    if (!data) return;
+    if (prevData.current) markChanges(prevData.current, data, changedAt.current, new Date().toISOString());
+    prevData.current = data;
+  }, [data]);
+
+  // While connected: sync now, every minute, and a few seconds after each change (a sync that only brings the
+  // server's state leaves `data` untouched, so it doesn't trigger another one).
+  useEffect(() => {
+    if (!serverSync.connected) return;
+    void runServerSync();
+    const i = setInterval(() => void runServerSync(), 60_000);
+    return () => clearInterval(i);
+  }, [serverSync.connected, runServerSync]);
+  useEffect(() => {
+    if (!serverSync.connected || !data) return;
+    const tm = setTimeout(() => void runServerSync(), 4000);
+    return () => clearTimeout(tm);
+  }, [data, serverSync.connected, runServerSync]);
+
   useLanguage(data?.settings.language);
 
   const getData = useCallback(() => dataRef.current!, []);
@@ -149,7 +248,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (!data) return <div className="loading">{t('loading')}</div>;
-  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, getData, commit, profile }}>{children}</StoreContext.Provider>;
+  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, serverSync, runServerSync, refreshServer, getData, commit, profile }}>{children}</StoreContext.Provider>;
 }
 
 export function useStore(): Store {

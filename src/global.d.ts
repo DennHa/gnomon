@@ -41,6 +41,10 @@ declare global {
       serverConnect(url: string, code: string): Promise<ServerResult<ServerStatus>>;
       serverDisconnect(): Promise<ServerStatus>;
       serverPairCode(name: string): Promise<ServerResult<{ code: string; expiresAt: string; link: string }>>;
+      serverSyncState(): Promise<import('./sync').SyncState | null>;
+      serverSetSyncState(state: import('./sync').SyncState): Promise<boolean>;
+      serverSyncPull(since: number): Promise<ServerResult<{ cursor: number; more: boolean; changes: import('./sync').Change[] }>>;
+      serverSyncPush(changes: import('./sync').Change[]): Promise<ServerResult<{ applied: number; skipped: { kind: string; id: string; reason: string }[]; cursor: number }>>;
       floatSetToken(token: string | null): Promise<void>;
       floatHasToken(): Promise<boolean>;
       floatGet(
