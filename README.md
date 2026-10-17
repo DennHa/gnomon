@@ -15,13 +15,15 @@ Clock in and out, track your projects, catch up later, and always know your over
 
 Gnomon asks on the first start how you like to work, and fits around it. You can switch any time.
 
-**Clock in, fill in later.** The bare minimum is knowing when you came and went.
+**Clock in, fill in later.** The bare minimum is knowing when you came and went. The Track page leads with your workday, and the menu
+bar shows today's work time.
 1. Morning: **Start day** (sidebar, menu bar, or the phone's time clock).
 2. Lunch: **Break**. Evening: **Leave**. That's your attendance: 8:00–19:00 with an hour's break is 10 hours.
 3. Later, with your calendar open: the Week view shows **"1:30 to assign"** per day. Type hours into the cells or
    **fill from plan**; they land inside the time you were clocked in.
 
-**Track live, precisely.** You time what you're doing as you do it.
+**Track live, precisely.** You time what you're doing as you do it. The Track page leads with the timer, and the menu bar shows the
+running task.
 1. Start a timer (⌃⌥P from any app, or the Track page). The first timer **clocks you in**.
 2. Switch project or activity as you go; there's no stopping in between.
 3. Stopped the timer for lunch? The next start asks **"Were you on a break from 12:05 to 12:50?"**

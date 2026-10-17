@@ -5,6 +5,7 @@ import { planItemsOn } from './plan';
 import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from './time';
 import { targetHoursOn } from './schedule';
 import { Burst, daySummary, weekSummary } from './motion';
+import { toAssign, weekReminderDue } from './reminders';
 import { daylight } from './daylight';
 import { DaylightRuler } from './daylight-ruler';
 import type { Data, QuickStart, TrayAction } from './types';
@@ -101,7 +102,10 @@ function useTrayBridge(onShowReview: () => void) {
   const rawName = running ? running.taskName || running.description || runningProject?.name || t('timer') : '';
   const name = rawName.length > 24 ? `${rawName.slice(0, 23)}…` : rawName;
   let title = '';
-  if (menuBarLabel !== 'none') {
+  if (menuBarLabel === 'workday') {
+    // Clocking in first: today's work time, whether a timer runs or not.
+    if (wd && !wd.off && !wd.end) title = isOnBreak(wd) ? t('break') : fmtDuration(Math.max(0, workdayMs(wd, now)));
+  } else if (menuBarLabel !== 'none') {
     if (running) {
       if (menuBarLabel === 'task') title = name;
       else if (menuBarLabel === 'task-time') title = `${name} · ${fmtHM(entryMs(running, now))}`;
@@ -131,6 +135,8 @@ function useTrayBridge(onShowReview: () => void) {
       todayPlan,
       runningSince: running?.start,
       runningColor,
+      workStyle: data.settings.workStyle,
+      reminders: data.settings.reminders !== false,
       shortcutsEnabled: data.settings.shortcutsEnabled,
       shortcuts: data.settings.shortcuts,
       idleMinutes: data.settings.idleMinutes,
@@ -227,7 +233,7 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const [starting, setStarting] = useState(false);
   const [reached, setReached] = useState(false);
   const [burst, setBurst] = useState(0);
-  const [summary, setSummary] = useState<{ weekend: boolean; worked: number; diff: number } | null>(null);
+  const [summary, setSummary] = useState<{ weekend: boolean; worked: number; diff: number; open: number } | null>(null);
   useEffect(() => {
     const was = prev.current;
     prev.current = state;
@@ -240,7 +246,11 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
     if ((was === 'on' || was === 'break') && state === 'done') {
       const week = weekSummary(data, today);
       const day = daySummary(data, today);
-      setSummary(week.lastWorkday ? { weekend: true, worked: week.worked, diff: week.diff } : { weekend: false, worked: day.worked, diff: day.diff });
+      const open = toAssign(data, today);
+      setSummary(week.lastWorkday ? { weekend: true, worked: week.worked, diff: week.diff, open } : { weekend: false, worked: day.worked, diff: day.diff, open });
+      // Clocking in first: leaving is the moment to say what's still to fill in.
+      if (data.settings.workStyle === 'clock' && data.settings.reminders !== false && open >= 15 * 60_000)
+        window.api.notify(t('rem.leaveTitle', { duration: fmtDuration(open) }), t('rem.leaveBody'));
       if (week.lastWorkday) setBurst(Date.now());
     }
   }, [state]);
@@ -260,7 +270,7 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   }, [targetReached, today]);
   const signed = (ms: number) => `${ms < 0 ? '−' : '+'}${fmtDuration(Math.abs(ms))}`;
   // Live trackers who stop the timer for lunch: offer the pause as a break when the next timer starts.
-  const gap = breakBeforeRunning(data);
+  const gap = data.settings.workStyle === 'clock' ? null : breakBeforeRunning(data);
   const [askedGap, setAskedGap] = useState<string | null>(null);
   const gapKey = gap ? `${gap.start}|${gap.end}` : null;
   const showGap = gap && gapKey !== askedGap && Date.now() - Date.parse(gap.end) < 30 * 60_000;
@@ -311,6 +321,11 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
             <span>
               <strong>{t('moment.today', { duration: fmtDuration(summary.worked) })}</strong> <span className={summary.diff >= 0 ? 'pos' : 'neg'}>{signed(summary.diff)}</span>
             </span>
+          )}
+          {summary.open >= 15 * 60_000 && (
+            <button className="link small" onClick={() => onOpenDay(today)}>
+              {t('ts.toAssign', { duration: fmtHM(summary.open) })}
+            </button>
           )}
         </div>
       )}
@@ -405,6 +420,15 @@ export default function App() {
   // A time picked on the Daylight ruler, while scrubbing; null = now.
   const [daylightAt, setDaylightAt] = useState<number | null>(null);
   useDaylight(daylightOn, daylightOn ? daylightAt : null);
+
+  // Clocking in first: on the week's last workday afternoon, a reminder to fill in the week (once a week).
+  const minute = useNow(60_000);
+  useEffect(() => {
+    const due = weekReminderDue(data, minute);
+    if (!due) return;
+    update((d) => ({ ...d, settings: { ...d.settings, weekReminded: due.monday } }));
+    window.api.notify(t('rem.weekTitle'), t('rem.weekBody', { duration: fmtDuration(due.ms) }));
+  }, [minute]);
 
   // Appearance and highlight colour from Settings.
   useEffect(() => window.api.setTheme(data.settings.appearance ?? 'system'), [data.settings.appearance]);

@@ -3,6 +3,17 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.5 · 2026-10-17
+
+The two ways of working now really differ.
+
+- **Clock in, fill in later**: the Track page starts with your workday (Start day, Break, Leave, today's hours and
+  what's still to assign); the timer sits smaller below. The menu bar shows today's work time. After *Leave*, a
+  reminder says what's still to assign, and on the week's last workday afternoon, "Fill in your week".
+- **Track live**: the timer leads as before; the menu bar shows the running task. You're reminded when you're clocked
+  in but no timer has run for 20 minutes, and asked about pauses between timers.
+- Reminders can be switched off under Settings → Tracking.
+
 ## 0.1.4 · 2026-10-17
 
 Two ways to work, and clocked-in time that always fits what you tracked.

@@ -8,6 +8,7 @@ import { balanceByMonth } from '../src/balance';
 import { daySummary, weekSummary } from '../src/motion';
 import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { fitAll, fitWorkdays } from '../src/fit';
+import { toAssign, weekReminderDue, weekToAssign } from '../src/reminders';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
 import type { Data } from '../src/types';
@@ -460,6 +461,24 @@ test('flows: typed hours go inside clocked-in time, a pause before the next time
   assert.deepEqual([gap.start, gap.end], [atTime(today, '12:05'), atTime(today, '12:50')]);
   assert.equal(A.breakBeforeRunning(A.addBreakBetween(live, today, gap.start, gap.end)), null);
   assert.equal(A.workStyleDefaults('live').reviewOnLeave, false);
+});
+
+test('reminders: time to assign, and the week reminder only for clocking in, on the last workday afternoon, once', () => {
+  const day = (date: string, from: string, to: string) => ({ date, start: atTime(date, from), end: atTime(date, to), breaks: [] });
+  let d = base();
+  d.workdays.push(day('2026-10-12', '08:00', '17:00'), day('2026-10-16', '08:00', '15:00'));
+  d.entries.push({ id: 'e', description: '', start: atTime('2026-10-12', '08:00'), end: atTime('2026-10-12', '15:00') });
+  const fri = Date.parse('2026-10-16T16:00:00');
+  assert.equal(toAssign(d, '2026-10-12', fri), 2 * H);
+  assert.equal(weekToAssign(d, '2026-10-16', fri), 9 * H, 'Mon 2 h + Fri 7 h');
+  assert.equal(weekReminderDue(d, fri), null, 'no style chosen: no reminder');
+  d = { ...d, settings: { ...d.settings, workStyle: 'clock' } };
+  assert.equal(weekReminderDue(d, fri)?.ms, 9 * H);
+  assert.equal(weekReminderDue(d, Date.parse('2026-10-16T11:00:00')), null, 'not before 15:00');
+  assert.equal(weekReminderDue(d, Date.parse('2026-10-15T16:00:00')), null, 'Thursday is not the last workday');
+  assert.equal(weekReminderDue({ ...d, settings: { ...d.settings, weekReminded: '2026-10-12' } }, fri), null, 'once a week');
+  assert.equal(weekReminderDue({ ...d, settings: { ...d.settings, reminders: false } }, fri), null);
+  assert.equal(A.workStyleDefaults('clock').menuBarLabel, 'workday');
 });
 
 console.log(`\n${passed} passed`);

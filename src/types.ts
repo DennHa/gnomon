@@ -108,6 +108,10 @@ export type Settings = {
   /** Daylight: sky tint and shadows follow the real sun and moon (src/daylight.ts). */
   daylight?: boolean;
   workStyle?: WorkStyle;
+  /** Reminders that fit your way of working (src/reminders.ts and trackNudges in main); on unless switched off. */
+  reminders?: boolean;
+  /** Monday of the week the "fill in your week" reminder last showed. */
+  weekReminded?: string;
   /** Days with entries got a workday once (src/fit.ts, fitAll). */
   workdaysFitted?: boolean;
   /** The day the daily-target celebration last showed (once per day). */
@@ -151,7 +155,7 @@ export type Settings = {
   /** Close a workday and timer left running from an earlier day at 23:59. */
   autoStopMidnight: boolean;
   /** What the menu bar shows next to the icon. */
-  menuBarLabel: 'task' | 'task-time' | 'time' | 'none';
+  menuBarLabel: 'task' | 'task-time' | 'time' | 'workday' | 'none';
   /** Colour of the menu bar dot while a timer runs. */
   menuBarColor: 'project' | 'activity' | 'mono';
   /** Opt-in: remember which app was in front, to help reviewing later. */
@@ -201,6 +205,9 @@ export type TrayState = {
   todayPlan: (QuickStart & { label: string; color: string })[];
   runningColor?: string;
   runningSince?: string;
+  /** Which nudges main shows: "nothing running" only for live tracking, none when reminders are off. */
+  workStyle?: WorkStyle;
+  reminders: boolean;
   shortcutsEnabled: boolean;
   shortcuts: ShortcutConfig;
   idleMinutes: number;

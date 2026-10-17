@@ -430,11 +430,12 @@ export function toggleWeekDone(d: Data, monday: string): Data {
 }
 
 /**
- * Defaults for a way of working. Clocking in first: the day is started by hand, "Close the day" helps fill it in
- * afterwards. Tracking live: the first timer clocks you in, and you're asked about time away from the computer.
+ * Defaults for a way of working. Clocking in first: the day is started by hand, the menu bar shows today's work time
+ * and "Close the day" helps fill it in afterwards. Tracking live: the first timer clocks you in, the menu bar shows the
+ * running task, and you're asked about time away from the computer.
  */
 export function workStyleDefaults(style: WorkStyle): Partial<Settings> {
   return style === 'live'
-    ? { workStyle: style, startDayWithTimer: true, idleMinutes: 10, reviewOnLeave: false }
-    : { workStyle: style, startDayWithTimer: true, reviewOnLeave: true };
+    ? { workStyle: style, startDayWithTimer: true, idleMinutes: 10, reviewOnLeave: false, menuBarLabel: 'task-time' }
+    : { workStyle: style, startDayWithTimer: true, reviewOnLeave: true, menuBarLabel: 'workday' };
 }

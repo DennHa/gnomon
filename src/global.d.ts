@@ -12,6 +12,7 @@ declare global {
       load(): Promise<unknown>;
       profile(): Promise<CompanyProfile | null>;
       setTheme(value: 'system' | 'light' | 'dark'): void;
+      notify(title: string, body: string): void;
       appInfo(): Promise<{ version: string; electron: string; chrome: string; node: string; updateSource: string | null }>;
       checkUpdate(): Promise<
         | { ok: true; newer: boolean; latest: { version: string; date?: string; notes: string[]; download?: string; page?: string } }

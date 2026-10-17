@@ -960,9 +960,16 @@ function notify(title, body, onClick) {
   n.show();
 }
 
+// Reminders worked out in the window (src/reminders.ts): plain text only; a click opens the window.
+ipcMain.on('notify', (_e, msg) => {
+  if (msg && typeof msg.title === 'string' && typeof msg.body === 'string') notify(msg.title.slice(0, 120), msg.body.slice(0, 300), showWindow);
+});
+
 function trackNudges(s) {
-  // Clocked in, not on a break, but no timer for 20 minutes.
-  if (s.dayActive && !s.onBreak && !s.running) {
+  if (s.reminders === false) return;
+  // Clocked in, not on a break, but no timer for 20 minutes (live tracking only: when you clock in and fill in
+  // later, no timer is the normal case).
+  if (s.workStyle !== 'clock' && s.dayActive && !s.onBreak && !s.running) {
     nothingRunningSince ??= Date.now();
     if (!notifiedNothingRunning && Date.now() - nothingRunningSince > 20 * 60_000) {
       notifiedNothingRunning = true;

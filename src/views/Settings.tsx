@@ -579,6 +579,13 @@ export default function Settings() {
           </select>
         </label>
         <label className="check-row">
+          <input type="checkbox" checked={s.reminders !== false} onChange={(e) => set({ reminders: e.target.checked })} />
+          <span>
+            {t('rem.setting')}
+            <span className="muted small field-hint">{t(s.workStyle === 'clock' ? 'rem.settingClock' : 'rem.settingLive')}</span>
+          </span>
+        </label>
+        <label className="check-row">
           <input type="checkbox" checked={s.autoStartDay} onChange={(e) => set({ autoStartDay: e.target.checked })} />
           {t('set.autoStartDay')}
         </label>
@@ -636,6 +643,7 @@ export default function Settings() {
           <select value={s.menuBarLabel} onChange={(e) => set({ menuBarLabel: e.target.value as S['menuBarLabel'] })}>
             <option value="task">{t('set.labelTask')}</option>
             <option value="task-time">{t('set.labelTaskTime')}</option>
+            <option value="workday">{t('set.labelWorkday')}</option>
             <option value="time">{t('set.labelTime')}</option>
             <option value="none">{t('set.labelNone')}</option>
           </select>
