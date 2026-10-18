@@ -3,6 +3,24 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.7 · 2026-10-18
+
+A friendlier start to the day, and a calmer Track page.
+
+- **Good morning**: the first time you open Gnomon on a workday, a short sunrise greets you by name with a line from a
+  Greek philosopher. Clocking in first, one click starts the day; tracking live, the tracker is right there, ready with
+  today's first planned task. Switch it off under Settings → Tracking.
+- **The intro** asks for your first name (skip it if you like), tells each step the way you chose to work, and keeps
+  the same size on every page.
+- **Track**: description, project and task sit in one field; entries run oldest first with **+ Add entry** below;
+  times and durations are quieter; delete and continue only show on hover.
+- **Activities are optional** (off on new installs). Add one right at the chips with **+**, or right-click a chip to
+  hide it there; your reports keep its history.
+- **Week**: cells look like fields you can click into, the Tracked row is calmer, and "days under target" is a small
+  badge with a list.
+- **Reports**: one card for where the time went, the overtime explanation behind an ⓘ, and the starting balance links
+  to Settings. The month chart labels no longer run into the bars.
+
 ## 0.1.6 · 2026-10-18
 
 - **Your way of working decides where Gnomon opens**: clocking in first, the **Week** comes first in the sidebar and
