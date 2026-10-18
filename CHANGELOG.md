@@ -3,6 +3,13 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.8 · 2026-10-18
+
+- **Labs**: five quick clicks on the icon under Info & feedback open a hidden Settings tab. Play the morning welcome
+  whenever you like (as a preview, nothing is clocked in), switch Daylight, or show the tour again. Hide it any time;
+  the same five clicks bring it back.
+- The name field in the intro keeps what you type and no longer cuts off its focus ring.
+
 ## 0.1.7 · 2026-10-18
 
 A friendlier start to the day, and a calmer Track page.
