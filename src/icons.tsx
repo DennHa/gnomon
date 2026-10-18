@@ -50,6 +50,7 @@ import i_arrow_back from '@material-symbols/svg-400/rounded/arrow_back.svg?raw';
 import i_check_circle from '@material-symbols/svg-400/rounded/check_circle.svg?raw';
 import i_hourglass_top from '@material-symbols/svg-400/rounded/hourglass_top.svg?raw';
 import i_waving_hand from '@material-symbols/svg-400/rounded/waving_hand.svg?raw';
+import i_person from '@material-symbols/svg-400/rounded/person.svg?raw';
 import i_link from '@material-symbols/svg-400/rounded/link.svg?raw';
 import i_tune from '@material-symbols/svg-400/rounded/tune.svg?raw';
 import i_keyboard from '@material-symbols/svg-400/rounded/keyboard.svg?raw';
@@ -106,6 +107,7 @@ const ICONS = {
   check_circle: i_check_circle,
   hourglass_top: i_hourglass_top,
   waving_hand: i_waving_hand,
+  person: i_person,
   link: i_link,
   tune: i_tune,
   keyboard: i_keyboard,

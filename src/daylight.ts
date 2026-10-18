@@ -108,3 +108,4 @@ export function daylight(date: Date, dark: boolean): DaylightLook {
   const text = longShadow(source.hourAngle, Math.max(source.elevation, 0.5), rgb, strength * 1.2, 0.35, 10);
   return { sky: layers.join(',') || 'none', shadow: [ambient, ...long].join(','), textShadow: text.join(',') || 'none' };
 }
+

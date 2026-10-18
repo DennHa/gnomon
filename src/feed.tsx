@@ -92,7 +92,7 @@ export function HoursInput({ ms, onCommit, disabled, autoFocus, inputRef }: { ms
   );
 }
 
-function FeedRow({ entry, mode, showProject, readOnly }: { entry: Entry; mode: 'hours' | 'times'; showProject: boolean; readOnly?: boolean }) {
+function FeedRow({ entry, mode, showProject, readOnly, tasks }: { entry: Entry; mode: 'hours' | 'times'; showProject: boolean; readOnly?: boolean; tasks: boolean }) {
   const { update } = useStore();
   const now = Date.now();
   const day = dayKey(entry.start);
@@ -105,7 +105,7 @@ function FeedRow({ entry, mode, showProject, readOnly }: { entry: Entry; mode: '
       <input className="feed-desc" value={entry.description} placeholder={t('feed.whatDidYouDo')} disabled={readOnly} onChange={(e) => set({ description: e.target.value })} />
       <div className="feed-meta">
         {showProject && <ProjectSelect value={entry.projectId} onChange={(projectId) => set({ projectId, taskId: undefined, taskName: undefined })} />}
-        <TaskPicker keepSpace={mode === 'times'} projectId={entry.projectId} day={day} value={entry.taskId} name={entry.taskName} onChange={(taskId, taskName) => set({ taskId, taskName })} />
+        <TaskPicker keepSpace={mode === 'times' && tasks} projectId={entry.projectId} day={day} value={entry.taskId} name={entry.taskName} onChange={(taskId, taskName) => set({ taskId, taskName })} />
         <ActivityPicker value={entry.activityId} onChange={(activityId) => set({ activityId })} />
         <BillableToggle value={entry.billable} onChange={(billable) => set({ billable })} />
       </div>
@@ -229,11 +229,14 @@ export function EntryFeed({
   readOnly?: boolean;
   prefill?: { ms: number; taskId?: number; taskName?: string } | null;
 }) {
+  const { data } = useStore();
   const showProject = projectId === undefined;
+  // Only keep a column for the Float task when some entry of the day can have one; otherwise the activity gets the room.
+  const tasks = entries.some((e) => e.taskId || (e.projectId && planItemsOn(data, e.projectId, day).length));
   return (
-    <div className={`feed mode-${mode} ${showProject ? 'with-project' : ''}`}>
+    <div className={`feed mode-${mode} ${showProject ? 'with-project' : ''} ${tasks ? '' : 'no-tasks'}`}>
       {entries.map((e) => (
-        <FeedRow key={e.id} entry={e} mode={mode} showProject={showProject} readOnly={readOnly} />
+        <FeedRow key={e.id} entry={e} mode={mode} showProject={showProject} readOnly={readOnly} tasks={tasks} />
       ))}
       {!readOnly && mode === 'hours' && <NewRow day={day} projectId={projectId ?? undefined} showProject={showProject} prefill={prefill} />}
     </div>

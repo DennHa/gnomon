@@ -124,6 +124,10 @@ export type Settings = {
   workdaysFitted?: boolean;
   /** The day the daily-target celebration last showed (once per day). */
   celebratedDay?: string;
+  /** The morning welcome (src/views/Morning.tsx); on unless switched off. */
+  morningWelcome?: boolean;
+  /** The day the morning welcome last showed (once per day). */
+  welcomedDay?: string;
   /** Highlight colour (see ACCENTS in src/views/Settings.tsx and the [data-accent] rules in styles.css). */
   accent?: 'sun' | 'blue' | 'green' | 'purple' | 'coral';
   /** Work schedule periods (hours per weekday, each from a date on). */

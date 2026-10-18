@@ -18,6 +18,7 @@ import Reports from './views/Reports';
 import Projects from './views/Projects';
 import Settings from './views/Settings';
 import Onboarding from './views/Onboarding';
+import Morning, { morningDue } from './views/Morning';
 import Tour from './views/Tour';
 import About from './views/About';
 import { locale, t, trayStrings, type MsgKey } from './i18n';
@@ -540,7 +541,7 @@ export default function App() {
       </main>
       <FitToast />
       {/* First launch: the feature tour. The integrations guide opens only on request (tour's last step or Settings). */}
-      {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && !profile?.managed && <Onboarding />}
+      {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && !profile?.managed ? <Onboarding /> : morningDue(data) && <Morning />}
     </div>
   );
 }

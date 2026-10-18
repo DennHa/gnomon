@@ -15,15 +15,21 @@ import imgSwitcher from '../assets/tour/switcher.png';
 import imgWeek from '../assets/tour/week.jpg';
 import imgBalance from '../assets/tour/balance.jpg';
 
-type Step = { icon: IconName; title: MsgKey; text: MsgKey; img?: string; choice?: boolean };
+type Step = { icon: IconName; title: MsgKey; text: MsgKey; img?: string; choice?: boolean; name?: boolean };
 const WELCOME: Step = { icon: 'waving_hand', title: 'tour.welcomeTitle', text: 'tour.welcomeText', img: imgTimer };
+/** Your name, for the morning greeting and CSV exports; skipping leaves it out. */
+const NAME: Step = { icon: 'person', title: 'tour.nameTitle', text: 'tour.nameText', name: true };
 const STYLE: Step = { icon: 'tune', title: 'tour.styleTitle', text: 'tour.styleText', choice: true };
 const DAY: Step = { icon: 'login', title: 'tour.dayTitle', text: 'tour.dayText', img: imgStartDay };
 const TRACK: Step = { icon: 'timer', title: 'tour.trackTitle', text: 'tour.trackText', img: imgSwitcher };
 const LATER: Step = { icon: 'calendar_view_week', title: 'tour.laterTitle', text: 'tour.laterText', img: imgWeek };
+// The same steps, told for live tracking: the first timer clocks you in, and the week is for what you missed.
+const DAY_LIVE: Step = { ...DAY, text: 'tour.dayTextLive' };
+const LATER_LIVE: Step = { ...LATER, text: 'tour.laterTextLive' };
+const TRACK_CLOCK: Step = { ...TRACK, text: 'tour.trackTextClock' };
 const BALANCE: Step = { icon: 'savings', title: 'tour.balanceTitle', text: 'tour.balanceText', img: imgBalance };
 /** After the welcome you pick how you work; the steps then follow that way of working. */
-const stepsFor = (style?: WorkStyle): Step[] => [WELCOME, STYLE, ...(style === 'live' ? [TRACK, DAY, LATER] : [DAY, LATER, TRACK]), BALANCE];
+const stepsFor = (style?: WorkStyle): Step[] => [WELCOME, NAME, STYLE, ...(style === 'live' ? [TRACK, DAY_LIVE, LATER_LIVE] : [DAY, LATER, TRACK_CLOCK]), BALANCE];
 const STEP_COUNT = stepsFor().length;
 
 /** The step to open with, e.g. "#tour@3" for screenshots. */
@@ -47,6 +53,7 @@ export default function Tour() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') finish();
+      if (e.target instanceof HTMLInputElement) return;
       if (e.key === 'ArrowRight' && !last) setStep(step + 1);
       if (e.key === 'ArrowLeft' && step > 0) setStep(step - 1);
     };
@@ -72,10 +79,21 @@ export default function Tour() {
           <h2 id="tour-title">{t(s.title)}</h2>
         </div>
 
-        {s.img && <img className="tour-img" src={s.img} alt="" />}
+        {/* The last step also offers to connect Float and Personio: a lower picture keeps the height the same. */}
+        {s.img && <img className={`tour-img ${last && !profile?.managed ? 'small' : ''}`} src={s.img} alt="" />}
 
         <div className="onb-body">
           <p>{t(s.text, { key: prettyAccel(data.settings.shortcuts.quick) || '⌃⌥P' })}</p>
+          {s.name && (
+            <input
+              className="tour-name"
+              autoFocus
+              value={data.settings.userName ?? ''}
+              placeholder={t('set.userNamePlaceholder')}
+              onChange={(e) => update((d) => ({ ...d, settings: { ...d.settings, userName: e.target.value || undefined } }))}
+              onKeyDown={(e) => e.key === 'Enter' && setStep(step + 1)}
+            />
+          )}
           {s.choice && (
             <div className="style-cards">
               {(['clock', 'live'] as const).map((style) => (
@@ -110,7 +128,7 @@ export default function Tour() {
             </button>
           )}
           <button className="btn primary" onClick={() => (last ? finish() : setStep(step + 1))}>
-            {last ? t('tour.start') : t('onb.next')} {!last && <Icon name="arrow_forward" size={18} />}
+            {last ? t('tour.start') : s.name && !data.settings.userName?.trim() ? t('tour.skipName') : t('onb.next')} {!last && <Icon name="arrow_forward" size={18} />}
           </button>
         </div>
       </div>

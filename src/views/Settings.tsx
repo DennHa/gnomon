@@ -586,6 +586,13 @@ export default function Settings() {
           </span>
         </label>
         <label className="check-row">
+          <input type="checkbox" checked={s.morningWelcome !== false} onChange={(e) => set({ morningWelcome: e.target.checked })} />
+          <span>
+            {t('set.morning')}
+            <span className="muted small field-hint">{t('set.morningHint')}</span>
+          </span>
+        </label>
+        <label className="check-row">
           <input type="checkbox" checked={s.reminders !== false} onChange={(e) => set({ reminders: e.target.checked })} />
           <span>
             {t('rem.setting')}
