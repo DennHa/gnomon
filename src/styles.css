@@ -921,14 +921,18 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 /* Summary band: a step below the card (between card and page), inset from the card's edges so it doesn't read as a hole. */
 .timesheet tfoot tr.ts-sum td { --band: color-mix(in srgb, var(--bg) 55%, var(--surface)); background: var(--band); }
 .timesheet tfoot tr.ts-sum td.today { background: color-mix(in srgb, var(--accent) 8%, var(--band)); }
-.timesheet tfoot tr.ts-sum td:first-child { box-shadow: inset 14px 0 0 var(--surface); padding-left: 30px; }
-.timesheet tfoot tr.ts-sum td:last-child { box-shadow: inset -14px 0 0 var(--surface); }
+/* A transparent 6px border is the gap to the card's edge; with the card's 12px radius the band's corners come out concentric. */
+.timesheet { border-collapse: separate; border-spacing: 0; }
+.timesheet tfoot tr.ts-sum td { border-bottom: 6px solid transparent; background-clip: padding-box; }
+.timesheet tfoot tr.ts-sum td:first-child { border-left: 6px solid transparent; border-bottom-left-radius: 12px; padding-left: 20px; }
+.timesheet tfoot tr.ts-sum td:last-child { border-right: 6px solid transparent; border-bottom-right-radius: 12px; }
 /* Week cells look like fields you can click into, instead of a hint telling you so. */
 .timesheet tbody td.ts-cell { padding: 4px 3px; }
 .timesheet tbody .ts-btn { background: var(--field); border-color: transparent; border-radius: 8px; }
 .timesheet tbody .ts-btn:hover { background: color-mix(in srgb, var(--text) 10%, var(--field)); }
-.card.week .timesheet { margin-bottom: 14px; }
+.card.week .timesheet { margin-bottom: 0; }
 .timesheet tbody .ts-btn, .timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { opacity: 1; }
 .timesheet tbody .ts-btn.empty { color: color-mix(in srgb, var(--muted) 35%, transparent); }
 .timesheet tbody .ts-btn.planned { color: color-mix(in srgb, var(--muted) 70%, transparent); }
 .timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.timesheet tfoot tr.ts-sum td.today { background-clip: padding-box; }
