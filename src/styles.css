@@ -923,3 +923,12 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .timesheet tfoot tr.ts-sum td.today { background: color-mix(in srgb, var(--accent) 8%, var(--band)); }
 .timesheet tfoot tr.ts-sum td:first-child { box-shadow: inset 14px 0 0 var(--surface); padding-left: 30px; }
 .timesheet tfoot tr.ts-sum td:last-child { box-shadow: inset -14px 0 0 var(--surface); }
+/* Week cells look like fields you can click into, instead of a hint telling you so. */
+.timesheet tbody td.ts-cell { padding: 4px 3px; }
+.timesheet tbody .ts-btn { background: var(--field); border-color: transparent; border-radius: 8px; }
+.timesheet tbody .ts-btn:hover { background: color-mix(in srgb, var(--text) 10%, var(--field)); }
+.card.week .timesheet { margin-bottom: 14px; }
+.timesheet tbody .ts-btn, .timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { opacity: 1; }
+.timesheet tbody .ts-btn.empty { color: color-mix(in srgb, var(--muted) 35%, transparent); }
+.timesheet tbody .ts-btn.planned { color: color-mix(in srgb, var(--muted) 70%, transparent); }
+.timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { color: color-mix(in srgb, var(--muted) 60%, transparent); }

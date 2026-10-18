@@ -423,7 +423,6 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
           </tr>
         </tfoot>
       </table>
-      {!done && <p className="ts-hint muted small">{t('ts.hint')}</p>}
     </section>
     </div>
   );
