@@ -918,6 +918,8 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .breakdown h4 { margin-top: 18px; }
 .plain-section { padding: 6px 18px 14px; }
 .feed.mode-times .picker-slot { width: 118px; flex: none; }
-/* Summary band: a light tint of the card, not the page background showing through. */
-.timesheet tfoot tr.ts-sum td { background: color-mix(in srgb, var(--field) 55%, var(--surface)); }
-.timesheet tfoot tr.ts-sum td.today { background: color-mix(in srgb, var(--accent) 10%, color-mix(in srgb, var(--field) 55%, var(--surface))); }
+/* Summary band: a step below the card (between card and page), inset from the card's edges so it doesn't read as a hole. */
+.timesheet tfoot tr.ts-sum td { --band: color-mix(in srgb, var(--bg) 55%, var(--surface)); background: var(--band); }
+.timesheet tfoot tr.ts-sum td.today { background: color-mix(in srgb, var(--accent) 8%, var(--band)); }
+.timesheet tfoot tr.ts-sum td:first-child { box-shadow: inset 14px 0 0 var(--surface); padding-left: 30px; }
+.timesheet tfoot tr.ts-sum td:last-child { box-shadow: inset -14px 0 0 var(--surface); }
