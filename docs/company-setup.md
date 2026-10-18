@@ -1,7 +1,8 @@
 # Gnomon in a company: plan
 
-> **Status: partly built.** The Mac app reads the settings profile and has a managed mode (steps 1–2 below); the
-> server side is planned. Today every person connects Float and Personio themselves, with tokens
+> **Status: partly built.** The Mac app reads the settings profile and has a managed mode, and the server has the
+> setup wizard and Admin page (without company sign-in yet: people connect with invitation links). See "What's still
+> to build" at the end. Today every person connects Float and Personio themselves, with tokens
 > stored in their own Mac's keychain. This document describes how a company-wide setup would work and what's
 > still to build.
 
@@ -42,8 +43,9 @@ Float and Personio with their own tokens, as today.
 
 ## What the admin does: the setup wizard
 
-> **Planned.** The admin should never need to edit config files by hand. After starting the server, a guided
-> web page walks through everything once and produces the files to roll Gnomon out with Iru.
+> **Built** (except the sign-in screen). The admin never edits config files by hand: after starting the server, a
+> guided web page walks through everything once and produces the files to roll Gnomon out with Iru. Code:
+> `server/src/company.ts` (settings, encryption, checks, profile), `server/web/admin.tsx` (the page).
 
 ### Getting to the wizard
 
@@ -53,8 +55,9 @@ Float and Personio with their own tokens, as today.
 2. On its first start, the server prints a **one-time setup link** (and a QR code) in its log, valid for 60 minutes,
    for example `https://gnomon.example.com/setup#code=ABCD-EFGH`. Without that code nobody can open the wizard, so a
    freshly started server can't be claimed by someone else on the network.
-3. When the wizard is finished, the setup link stops working. Later changes go through the **Admin** page, which
-   needs an admin sign-in (step 2 below).
+3. When the wizard is finished, the setup link stops working. Later changes go through the **Admin** page: until
+   company sign-in exists, `gnomon-admin admin-link` (Docker: `docker exec gnomon gnomon-admin admin-link`) prints a
+   one-time link to it, valid 60 minutes. A session lasts two hours after the last change and ends on restart.
 
 ### Before you start
 
@@ -214,9 +217,9 @@ Settings → Connections then shows "Managed by your company" with the server ad
 |---|---|---|
 | 1 | ✅ Mac app reads the settings profile (`serverUrl`, `managed`, rules, defaults) | done |
 | 2 | ✅ Managed mode hides the integration guide, token fields and pairing; the profile's rules switch off the local API and the activity trail | done |
-| 3 | Server: first-start setup link, the wizard (screens 0–8) and the Admin page, secrets encrypted at rest | medium |
+| 3 | ✅ Server: first-start setup link, the wizard (screens 0, 1, 3–8), the Admin page via `gnomon-admin admin-link`, secrets encrypted at rest, invitation links | done |
 | 4 | Sign-in with any OpenID Connect provider (presets for Microsoft and Google) and invitations, on the server and in the Mac app | medium |
 | 5 | Server becomes multi-user; Float and Personio sync on the server per person | large |
-| 6 | Profile and .dmg downloads from the wizard; Iru roll-out tested with a real Mac | small |
+| 6 | ✅ Profile and .dmg downloads from the wizard · Iru roll-out tested with a real Mac | partly done |
 | 7 | A signed and notarized official build (Apple Developer ID), and the guide for companies signing their own | small, once the ID exists |
 | 8 | ✅ Sync of time entries Mac ↔ server (one person); for companies it needs step 5 | partly done |

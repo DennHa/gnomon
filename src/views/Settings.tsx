@@ -678,7 +678,7 @@ export default function Settings() {
               <Icon name="hub" size={26} />
             </span>
             <span className="onb-entry-text">
-              <strong>{t('managed.title')}</strong>
+              <strong>{profile.companyName ? t('managed.titleNamed', { name: profile.companyName }) : t('managed.title')}</strong>
               <span className="muted small">{t('managed.text')}</span>
               {profile.serverUrl && (
                 <span className="small">
@@ -687,6 +687,8 @@ export default function Settings() {
               )}
             </span>
           </section>
+          {/* Until company sign-in exists, a managed Mac connects with the invitation link from the Admin page. */}
+          {profile.signIn !== 'oidc' && <ServerSettings />}
           {profile.allowLocalApi === false ? <p className="muted small">{t('managed.apiOff')}</p> : <ApiSettings />}
         </>
       )}

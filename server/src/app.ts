@@ -10,13 +10,16 @@ import { targetHoursOn } from '../../src/schedule';
 import type { Data, Entry, Workday } from '../../src/types';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
 import { pickLang, readRelease, releasePage } from './releases';
+import { applyConfigUpdate, mobileconfig, testFloat, testPersonio, type Company } from './company';
+import { randomBytes } from 'node:crypto';
 
 const MB = 1024 * 1024;
 const PAIR_MAX_FAILURES = 10;
 const PAIR_LOCK_MS = 15 * 60_000;
 
 /** releasesDir: optional folder with version.json and the .dmg for /latest (see releases.ts). */
-export type AppOptions = { store: Store; webDir?: string; releasesDir?: string };
+/** company: the setup wizard's settings and secrets (company.ts); without it, /setup and /admin aren't served. */
+export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company };
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -72,7 +75,7 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
   });
 }
 
-export function createApp({ store, webDir, releasesDir }: AppOptions) {
+export function createApp({ store, webDir, releasesDir, company }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
@@ -268,6 +271,115 @@ export function createApp({ store, webDir, releasesDir }: AppOptions) {
 
   // ---- Request entry point ----------------------------------------------------------------------
 
+  // ---- Setup wizard and Admin page (docs/company-setup.md) --------------------------------------
+  // Access: a one-time code from the server log (setup) or from `gnomon-admin admin-link`, traded for a session that
+  // lives in memory for two hours after the last request. A restart signs the admin out.
+  const adminSessions = new Map<string, number>();
+  const ADMIN_SESSION_MS = 2 * 3_600_000;
+  let adminFailures = 0;
+  let adminLockedUntil = 0;
+
+  function adminSession(req: IncomingMessage): boolean {
+    const auth = String(req.headers.authorization ?? '');
+    const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+    const until = adminSessions.get(token);
+    if (!until || until < Date.now()) return false;
+    adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
+    return true;
+  }
+
+  function adminState() {
+    const c = company!.get();
+    const release = readRelease(releasesDir);
+    return {
+      config: { ...c, audit: c.audit.slice(-20).reverse() },
+      secrets: { float: company!.hasSecret('float'), personio: company!.hasSecret('personio') },
+      keySource: company!.keySource,
+      release: release ? { version: release.version, size: release.size } : null,
+      devices: store.listDevices().filter((d) => !d.revokedAt).length,
+    };
+  }
+
+  async function adminRoute(req: IncomingMessage, method: string, p: string, body: unknown): Promise<[number, unknown]> {
+    if (!company) throw new HttpError(404, 'not_found', 'Company setup isn’t available on this server');
+    if (method === 'POST' && p === '/admin/session') {
+      if (Date.now() < adminLockedUntil) throw new HttpError(429, 'too_many_attempts', 'Too many wrong codes. Try again in 15 minutes.');
+      const code = isObj(body) && typeof body.code === 'string' && body.code.length <= 20 ? body.code : '';
+      const purpose = code ? store.redeemAdminCode(code) : undefined;
+      if (!purpose || (purpose === 'setup' && company.get().setupDone)) {
+        if (++adminFailures >= PAIR_MAX_FAILURES) {
+          adminFailures = 0;
+          adminLockedUntil = Date.now() + PAIR_LOCK_MS;
+          store.clearAdminCodes();
+        }
+        throw new HttpError(401, 'invalid_code', 'This link is wrong, was used already, or has expired');
+      }
+      adminFailures = 0;
+      const token = randomBytes(24).toString('base64url');
+      adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
+      return [201, { token, ...adminState() }];
+    }
+    if (!adminSession(req)) throw new HttpError(401, 'unauthorized', 'Open a new setup or admin link');
+
+    const c = company.get();
+    if (method === 'GET' && p === '/admin/state') return [200, adminState()];
+    if (method === 'PUT' && p === '/admin/config') {
+      if (!isObj(body)) throw bad('Send the settings as an object');
+      try {
+        company.save(applyConfigUpdate(c, body), `Changed ${Object.keys(body).join(', ')}`);
+      } catch (err) {
+        throw bad((err as Error).message);
+      }
+      return [200, adminState()];
+    }
+    if (method === 'POST' && p === '/admin/float') {
+      const token = isObj(body) && typeof body.token === 'string' ? body.token.trim() : '';
+      if (!token || token.length > 500) throw bad('Paste the Float API token');
+      const r = await testFloat(token);
+      if (!r.ok) throw new HttpError(422, 'test_failed', r.error);
+      company.setSecret('float', token);
+      company.save({ ...c, float: { tested: new Date().toISOString(), people: r.people } }, 'Connected Float');
+      return [200, adminState()];
+    }
+    if (method === 'POST' && p === '/admin/personio') {
+      const id = isObj(body) && typeof body.clientId === 'string' ? body.clientId.trim() : '';
+      const secret = isObj(body) && typeof body.clientSecret === 'string' ? body.clientSecret.trim() : '';
+      if (!id || !secret || id.length > 300 || secret.length > 500) throw bad('Enter the client ID and secret');
+      const r = await testPersonio(id, secret);
+      if (!r.ok) throw new HttpError(422, 'test_failed', r.error);
+      company.setSecret('personio', JSON.stringify({ clientId: id, clientSecret: secret }));
+      // Full-day absence types become days off by default; hourly ones stay manual.
+      const dayOffTypes = c.personio.dayOffTypes ?? r.absenceTypes.filter((t) => t.unit !== 'HOUR').map((t) => t.id);
+      company.save({ ...c, personio: { tested: new Date().toISOString(), people: r.people, absenceTypes: r.absenceTypes, dayOffTypes } }, 'Connected Personio');
+      return [200, { ...adminState(), morePeople: r.morePeople }];
+    }
+    const which = p.match(/^\/admin\/(float|personio)$/)?.[1] as 'float' | 'personio' | undefined;
+    if (method === 'DELETE' && which) {
+      company.setSecret(which, null);
+      company.save({ ...c, [which]: {} }, `Disconnected ${which === 'float' ? 'Float' : 'Personio'}`);
+      return [200, adminState()];
+    }
+    if (method === 'GET' && p === '/admin/profile') {
+      if (!c.company.publicUrl) throw bad('Enter the server’s address first');
+      company.save(c, 'Downloaded the settings profile');
+      return [200, { filename: 'Gnomon.mobileconfig', profile: mobileconfig(c) }];
+    }
+    if (method === 'POST' && p === '/admin/invite') {
+      // Until company sign-in exists, people connect with a personal one-time link (a pairing code, 7 days).
+      const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : 'Mac';
+      const code = store.createPairCode(name, 7 * 24 * 60);
+      const formatted = `${code.slice(0, 4)}-${code.slice(4)}`;
+      company.save(c, `Invited ${name}`);
+      return [201, { name, code: formatted, link: c.company.publicUrl ? `${c.company.publicUrl}/#pair=${formatted}` : null, expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() }];
+    }
+    if (method === 'POST' && p === '/admin/finish') {
+      store.clearAdminCodes('setup'); // the setup link from the log stops working
+      company.save({ ...c, setupDone: true }, 'Finished the setup');
+      return [200, adminState()];
+    }
+    throw new HttpError(404, 'not_found', 'Unknown admin route');
+  }
+
   async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL) {
     const p = url.pathname.slice('/api/v1'.length) || '/';
     const method = req.method ?? 'GET';
@@ -301,6 +413,9 @@ export function createApp({ store, webDir, releasesDir }: AppOptions) {
       return send(res, 201, { key: paired.key, device: { id: paired.device.id, name: paired.device.name } });
     }
 
+    // The setup wizard and Admin page have their own sign-in (a one-time admin code, then a short session).
+    if (p === '/admin' || p.startsWith('/admin/')) return send(res, ...(await adminRoute(req, method, p, body)));
+
     const auth = String(req.headers.authorization ?? '');
     const device = auth.startsWith('Bearer ') ? store.authenticate(auth.slice(7).trim()) : undefined;
     if (!device) throw new HttpError(401, 'unauthorized', 'Missing or wrong API key');
@@ -315,7 +430,9 @@ export function createApp({ store, webDir, releasesDir }: AppOptions) {
   function serveStatic(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (!webDir || (req.method !== 'GET' && req.method !== 'HEAD')) return send(res, 404, { error: 'not_found', message: 'Not found' });
     let rel = decodeURIComponent(url.pathname);
-    if (rel === '/' || !path.extname(rel)) rel = '/index.html'; // the app has no server-side routes
+    // The setup wizard and Admin page are their own small app; everything else is the phone app (no server routes).
+    if (company && /^\/(setup|admin)\/?$/.test(rel)) rel = '/admin.html';
+    else if (rel === '/' || !path.extname(rel)) rel = '/index.html';
     const file = path.resolve(webDir, `.${rel}`);
     if (!file.startsWith(path.resolve(webDir) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { error: 'not_found', message: 'Not found' });
     let content = fs.readFileSync(file);

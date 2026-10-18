@@ -1,0 +1,52 @@
+/* Setup wizard and Admin page: desktop first, same palette as the apps (styles.css). */
+body { margin: 0; }
+.a-page { max-width: 1040px; margin: 0 auto; padding: 32px 24px 64px; }
+.a-head { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.a-head img { border-radius: 12px; }
+.a-head h1 { margin: 0; font-size: 24px; }
+.a-body { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
+.a-steps { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 24px; }
+.a-step { display: flex; align-items: center; gap: 10px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; text-align: left; padding: 9px 10px; border-radius: 10px; cursor: pointer; }
+.a-step:hover { background: var(--field); }
+.a-step.on { background: var(--accent-soft); color: var(--accent-strong); }
+.a-step.past { color: var(--text); }
+.a-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--field); font-size: 12px; flex: none; }
+.a-step.on .a-num { background: var(--accent); color: var(--on-accent); }
+.a-panel { background: var(--surface); border-radius: 18px; padding: 22px 26px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px; }
+.a-panel h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; }
+.a-intro { margin: 0; line-height: 1.55; }
+.a-hint { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.a-label { font-size: 13px; font-weight: 600; }
+.a-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.a-field input, .a-field select, .a-inline input { font: inherit; border: 0; border-radius: 10px; background: var(--field); color: var(--text); padding: 10px 12px; }
+.a-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.a-list { display: flex; flex-direction: column; gap: 8px; }
+.a-item, .a-check { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--field); cursor: pointer; }
+.a-item > span, .a-check > span { display: flex; flex-direction: column; gap: 3px; }
+.a-item input, .a-check input { margin-top: 3px; }
+.a-item .icon { color: var(--muted); flex: none; }
+.a-item.done .icon { color: var(--ok); }
+.a-card { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 12px; background: var(--field); }
+.a-card ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.a-save { align-self: flex-start; }
+.a-btn { text-decoration: none; }
+.a-ok { display: flex; align-items: center; gap: 8px; color: var(--ok); font-weight: 600; }
+.a-warn { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 13px; line-height: 1.45; }
+.a-error { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 14px; }
+.a-types { display: flex; flex-direction: column; gap: 6px; }
+.a-type { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.a-inline { display: flex; gap: 8px; }
+.a-inline input { flex: 1; }
+.a-invite { display: flex; gap: 16px; align-items: center; margin-top: 4px; }
+.a-invite > div { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.a-invite code { font-size: 12px; word-break: break-all; }
+.a-qr { width: 132px; height: 132px; border-radius: 10px; background: #fff; padding: 6px; image-rendering: pixelated; }
+.a-summary { display: grid; gap: 6px; margin: 0; }
+.a-summary div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; font-size: 14px; }
+.a-summary dt { color: var(--muted); }
+.a-summary dd { margin: 0; }
+.a-audit { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.a-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.spacer { flex: 1; }
+@media (max-width: 760px) { .a-body { grid-template-columns: 1fr; } .a-steps { position: static; flex-direction: row; overflow-x: auto; } .a-step { white-space: nowrap; } }
+.a-card input, .a-card select { background: var(--surface); }

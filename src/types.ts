@@ -6,6 +6,7 @@ export type CompanyProfile = {
   serverUrl?: string;
   /** Hide what the company handles: the integrations guide, token fields and own-server pairing. */
   managed?: boolean;
+  companyName?: string;
   /** Company login via OpenID Connect, or invitation links from the admin (docs/company-setup.md → Sign-in options). */
   signIn?: 'oidc' | 'invite';
   signInIssuer?: string;

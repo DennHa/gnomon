@@ -344,3 +344,87 @@ describe('download page (/latest)', () => {
     }
   });
 });
+
+describe('company setup (wizard API)', () => {
+  test('setup code → session → settings, Float and Personio checks, profile, invitation, finish', async () => {
+    const { Company } = await import('../src/company');
+    const company = new Company(store, Buffer.alloc(32, 7), 'file');
+    // Stand-ins for Float and Personio.
+    const mock = http.createServer((req, res) => {
+      const auth = String(req.headers.authorization ?? '');
+      if (req.url?.startsWith('/people')) {
+        if (auth !== 'Bearer good-float') return res.writeHead(401).end();
+        res.writeHead(200, { 'Content-Type': 'application/json', 'X-Pagination-Total-Count': '42' }).end('[{}]');
+      } else if (req.url === '/v2/auth/token') {
+        let b = '';
+        req.on('data', (c) => (b += c));
+        req.on('end', () => (b.includes('client_secret=good') ? res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"access_token":"t"}') : res.writeHead(400).end('{}')));
+      } else if (req.url?.startsWith('/v2/persons')) res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"_data":[{},{},{}],"_meta":{}}');
+      else if (req.url?.startsWith('/v2/absence-types')) res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"_data":[{"id":"v","name":"Vacation","unit":"DAY"},{"id":"d","name":"Doctor","unit":"HOUR"}]}');
+      else res.writeHead(404).end();
+    });
+    await new Promise<void>((r) => mock.listen(0, '127.0.0.1', r));
+    const mockBase = `http://127.0.0.1:${(mock.address() as AddressInfo).port}`;
+    process.env.FLOAT_API_BASE = mockBase;
+    process.env.PERSONIO_API_BASE = mockBase;
+    const app = http.createServer(createApp({ store, webDir, company }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    let session = '';
+    const call = async (method: string, p: string, body?: unknown) => {
+      const r = await fetch(`${url}/api/v1/admin${p}`, { method, headers: { ...(session && { Authorization: `Bearer ${session}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+      return { status: r.status, body: (await r.json()) as any };
+    };
+    try {
+      assert.equal((await call('GET', '/state')).status, 401, 'no session');
+      assert.equal((await call('POST', '/session', { code: 'WRONG-CODE' })).status, 401);
+      const code = store.createAdminCode('setup');
+      const s = await call('POST', '/session', { code: `${code.slice(0, 4)}-${code.slice(4)}` });
+      assert.equal(s.status, 201);
+      session = s.body.token;
+      assert.equal((await call('POST', '/session', { code })).status, 401, 'a code works once');
+
+      assert.equal((await call('PUT', '/config', { company: { publicUrl: 'http://evil.example' } })).status, 422, 'https only');
+      let st = await call('PUT', '/config', { company: { name: 'Acme', publicUrl: 'https://gnomon.example.com/' }, rules: { allowLocalApi: true }, checklist: { https: true } });
+      assert.equal(st.body.config.company.publicUrl, 'https://gnomon.example.com');
+      assert.equal(st.body.config.rules.allowLocalApi, true);
+
+      assert.equal((await call('POST', '/float', { token: 'bad' })).status, 422);
+      st = await call('POST', '/float', { token: 'good-float' });
+      assert.equal(st.body.config.float.people, 42);
+      assert.equal(st.body.secrets.float, true);
+      assert.equal(company.secret('float'), 'good-float', 'stored encrypted, readable with the key');
+      assert.ok(!(store.getMeta('secret:float') ?? '').includes('good-float'), 'not in plain text');
+      assert.ok(!JSON.stringify(st.body).includes('good-float'), 'never sent back');
+
+      assert.equal((await call('POST', '/personio', { clientId: 'x', clientSecret: 'bad' })).status, 422);
+      st = await call('POST', '/personio', { clientId: 'x', clientSecret: 'good' });
+      assert.equal(st.body.config.personio.people, 3);
+      assert.deepEqual(st.body.config.personio.dayOffTypes, ['v'], 'full-day types by default, hourly ones not');
+
+      const prof = await call('GET', '/profile');
+      assert.match(prof.body.profile, /<key>serverUrl<\/key>\s*<string>https:\/\/gnomon\.example\.com<\/string>/);
+      assert.match(prof.body.profile, /<key>allowLocalApi<\/key>\s*<true\/>/);
+      assert.ok(!prof.body.profile.includes('good'), 'no secrets in the profile');
+
+      const inv = await call('POST', '/invite', { name: 'Sam' });
+      assert.match(inv.body.link, /^https:\/\/gnomon\.example\.com\/#pair=[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+      assert.equal((await fetch(`${url}/api/v1/pair`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: inv.body.code }) })).status, 201, 'the invitation pairs a device');
+
+      const setupCode = store.createAdminCode('setup');
+      st = await call('POST', '/finish');
+      assert.equal(st.body.config.setupDone, true);
+      session = '';
+      assert.equal((await call('POST', '/session', { code: setupCode })).status, 401, 'setup links stop working once finished');
+      assert.equal((await call('POST', '/session', { code: store.createAdminCode('admin') })).status, 201, 'admin links still work');
+      fs.writeFileSync(path.join(webDir, 'admin.html'), '<!doctype html><title>Gnomon setup</title>');
+      assert.match(await (await fetch(`${url}/setup`)).text(), /Gnomon setup/, '/setup serves the wizard page');
+      assert.match(await (await fetch(`${url}/`)).text(), /<title>Gnomon<\/title>/, 'everything else stays the phone app');
+    } finally {
+      await new Promise((r) => app.close(r));
+      await new Promise((r) => mock.close(r));
+      delete process.env.FLOAT_API_BASE;
+      delete process.env.PERSONIO_API_BASE;
+    }
+  });
+});

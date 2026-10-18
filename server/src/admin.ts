@@ -12,7 +12,8 @@ const usage = `Usage:
   add-key <device name>  Create a device key directly (for scripts and the Mac app); shown once
   devices                List devices
   revoke <id|name>       Revoke a device's key
-  backup <file>          Copy the database to a file (safe while the server runs)`;
+  backup <file>          Copy the database to a file (safe while the server runs)
+  admin-link             One-time link to the Admin page (company setup), valid 60 minutes`;
 
 try {
   if (cmd === 'pair' && args.length) {
@@ -20,6 +21,10 @@ try {
   } else if (cmd === 'add-key' && args.length) {
     const { device, key } = store.addDevice(args.join(' '));
     console.log(`Device "${device.name}" (${device.id.slice(0, 8)})\nKey (shown only now): ${key}`);
+  } else if (cmd === 'admin-link') {
+    const code = store.createAdminCode('admin', 60);
+    const base = process.env.GNOMON_PUBLIC_URL?.trim().replace(/\/+$/, '') || 'http://localhost:8080';
+    console.log(`Admin page (valid 60 minutes, works once):\n${base}/admin#code=${code.slice(0, 4)}-${code.slice(4)}`);
   } else if (cmd === 'devices') {
     const list = store.listDevices();
     if (!list.length) console.log('No devices.');

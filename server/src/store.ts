@@ -95,6 +95,11 @@ export class Store {
         device_name TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS admin_codes (
+        code_hash TEXT PRIMARY KEY,
+        purpose TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
     `);
     if (file !== ':memory:') for (const f of [file, `${file}-wal`, `${file}-shm`]) if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
     this.data = this.load();
@@ -200,11 +205,11 @@ export class Store {
     return row?.updated_at;
   }
 
-  private getMeta(key: string): string | undefined {
+  getMeta(key: string): string | undefined {
     return (this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined)?.value;
   }
 
-  private setMeta(key: string, value: string) {
+  setMeta(key: string, value: string) {
     this.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
   }
 
@@ -266,6 +271,32 @@ export class Store {
     this.db.prepare('DELETE FROM pair_codes WHERE code_hash = ?').run(sha256(normalized));
     if (row.expires_at < new Date().toISOString()) return undefined;
     return this.addDevice(row.device_name);
+  }
+
+  // ---- Admin access (setup wizard and Admin page, see company.ts) --------------------------
+
+  /** A one-time code for the setup wizard ('setup') or the Admin page ('admin'), shown as a link in the log. */
+  createAdminCode(purpose: 'setup' | 'admin', ttlMinutes = 60): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const code = Array.from({ length: 8 }, () => alphabet[randomInt(alphabet.length)]).join('');
+    this.db.prepare('DELETE FROM admin_codes WHERE expires_at < ?').run(new Date().toISOString());
+    this.db.prepare('INSERT INTO admin_codes (code_hash, purpose, expires_at) VALUES (?, ?, ?)').run(sha256(code), purpose, new Date(Date.now() + ttlMinutes * 60_000).toISOString());
+    return code;
+  }
+
+  /** Redeem an admin code once; returns its purpose, or undefined when unknown or expired. */
+  redeemAdminCode(code: string): 'setup' | 'admin' | undefined {
+    const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const row = this.db.prepare('SELECT purpose, expires_at FROM admin_codes WHERE code_hash = ?').get(sha256(normalized)) as { purpose: 'setup' | 'admin'; expires_at: string } | undefined;
+    if (!row) return undefined;
+    this.db.prepare('DELETE FROM admin_codes WHERE code_hash = ?').run(sha256(normalized));
+    return row.expires_at < new Date().toISOString() ? undefined : row.purpose;
+  }
+
+  /** Setup codes stop working once the wizard is finished. */
+  clearAdminCodes(purpose?: 'setup' | 'admin') {
+    if (purpose) this.db.prepare('DELETE FROM admin_codes WHERE purpose = ?').run(purpose);
+    else this.db.prepare('DELETE FROM admin_codes').run();
   }
 
   /** After too many wrong guesses every open code is dropped, so codes can't be brute-forced. */

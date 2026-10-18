@@ -17,8 +17,19 @@ import cloud_off from '@material-symbols/svg-400/rounded/cloud_off.svg';
 import timer from '@material-symbols/svg-400/rounded/timer.svg';
 import schedule from '@material-symbols/svg-400/rounded/schedule.svg';
 import qr_code_scanner from '@material-symbols/svg-400/rounded/qr_code_scanner.svg';
+import check_circle from '@material-symbols/svg-400/rounded/check_circle.svg';
+import download from '@material-symbols/svg-400/rounded/download.svg';
+import link from '@material-symbols/svg-400/rounded/link.svg';
+import warning from '@material-symbols/svg-400/rounded/warning.svg';
+import arrow_forward from '@material-symbols/svg-400/rounded/arrow_forward.svg';
+import arrow_back from '@material-symbols/svg-400/rounded/arrow_back.svg';
+import rocket_launch from '@material-symbols/svg-400/rounded/rocket_launch.svg';
+import lock from '@material-symbols/svg-400/rounded/lock.svg';
+import verified_user from '@material-symbols/svg-400/rounded/verified_user.svg';
+import apartment from '@material-symbols/svg-400/rounded/apartment.svg';
+import group from '@material-symbols/svg-400/rounded/group.svg';
 
-const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner };
+const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group };
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {

@@ -125,6 +125,15 @@ offline shell (plain `http://localhost` is fine for testing).
 | `GNOMON_DATA_DIR` | `./data` (`/data` in Docker) | Where `gnomon.db` lives |
 | `TZ` | system | Set by `GNOMON_TZ` in compose |
 
+## Company setup (optional)
+
+For a team, the server has a setup wizard: on the first start the log shows a one-time link (`/setup#code=…`, valid 60
+minutes; a restart makes a new one). It walks through the company details, Float and Personio (tokens are checked,
+then stored encrypted), the rules for Macs, and the roll-out: a settings profile for Iru and invitation links for
+people. Afterwards `gnomon-admin admin-link` opens the Admin page for changes. Set `GNOMON_SECRET_KEY` (for example as a
+Docker secret) to keep the encryption key out of the data folder; without it, a key file `secret.key` is created there.
+Personal use can ignore all of this. Details: [docs/company-setup.md](../docs/company-setup.md).
+
 ## Download page for the Mac app (optional)
 
 The server can also hand out the Mac app: **`/latest`** is a short page with the version, what's new, a download

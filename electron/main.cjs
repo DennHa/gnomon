@@ -63,6 +63,7 @@ function readCompanyProfile() {
       const p = {};
       if (typeof raw.serverUrl === 'string' && /^https:\/\/[^\s/]+/i.test(raw.serverUrl)) p.serverUrl = new URL(raw.serverUrl).origin;
       if (typeof raw.managed === 'boolean') p.managed = raw.managed;
+      if (typeof raw.companyName === 'string' && raw.companyName.trim()) p.companyName = raw.companyName.trim().slice(0, 100);
       if (typeof raw.updateUrl === 'string' && /^https:\/\/\S+$/i.test(raw.updateUrl)) p.updateUrl = raw.updateUrl;
       if (typeof raw.entraTenantId === 'string' && UUID.test(raw.entraTenantId)) p.entraTenantId = raw.entraTenantId;
       if (typeof raw.entraClientId === 'string' && UUID.test(raw.entraClientId)) p.entraClientId = raw.entraClientId;

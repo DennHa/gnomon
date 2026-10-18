@@ -40,6 +40,20 @@ if (process.argv.includes('--tests')) {
     outfile: path.join(out, 'web/app.js'),
     logLevel: 'warning',
   });
+  // The setup wizard and Admin page (/setup, /admin).
+  await esbuild.build({
+    entryPoints: [path.join(root, 'web/admin.tsx')],
+    bundle: true,
+    minify: true,
+    format: 'esm',
+    target: ['safari16', 'chrome110'],
+    jsx: 'automatic',
+    nodePaths,
+    loader: { '.svg': 'text' },
+    define: { 'process.env.NODE_ENV': '"production"' },
+    outfile: path.join(out, 'web/admin.js'),
+    logLevel: 'warning',
+  });
   // Static files; the service worker gets a build id so a new deploy replaces the cached app.
   for (const f of fs.readdirSync(path.join(root, 'web/public'))) fs.copyFileSync(path.join(root, 'web/public', f), path.join(out, 'web', f));
   const sw = path.join(out, 'web/sw.js');
