@@ -135,7 +135,8 @@ export default function Today({ onOpenDay }: { onOpenDay: (d: string) => void })
   const now = useNow(60_000);
   const today = dayKey(now);
   const wd = todayWorkday(data);
-  const entries = data.entries.filter((e) => dayKey(e.start) === today).sort((a, b) => b.start.localeCompare(a.start));
+  // Oldest first, like a day reads; the newest entry and the Add button sit at the bottom.
+  const entries = data.entries.filter((e) => dayKey(e.start) === today).sort((a, b) => a.start.localeCompare(b.start));
   const tracked = entries.reduce((s, e) => s + entryMs(e), 0);
 
   return (
@@ -153,13 +154,12 @@ export default function Today({ onOpenDay }: { onOpenDay: (d: string) => void })
         <div className="card-head">
           <h3>{t('entries')}</h3>
           <span className="muted">{t('today.totalTime', { time: fmtClock(tracked) })}</span>
-          <span className="spacer" />
-          <button className="btn small entries-add" onClick={() => update((d) => addEntry(d, today))}>
-            <Icon name="add" size={18} /> {t('today.add')}
-          </button>
         </div>
         {entries.length === 0 && <p className="muted empty-state">{t('today.empty', { key: prettyAccel(data.settings.shortcuts.quick) || '—' })}</p>}
         <EntryFeed day={today} entries={entries} mode="times" />
+        <button className="link-add" onClick={() => update((d) => addEntry(d, today))}>
+          + {t('today.addEntry')}
+        </button>
       </section>
       {data.settings.activityTrail && (
         <section className="quiet-section">

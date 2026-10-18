@@ -936,3 +936,11 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .timesheet tbody .ts-btn.planned { color: color-mix(in srgb, var(--muted) 70%, transparent); }
 .timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { color: color-mix(in srgb, var(--muted) 60%, transparent); }
 .timesheet tfoot tr.ts-sum td.today { background-clip: padding-box; }
+/* "+ Add entry" under the list, the same quiet link as "+ Add project" in the week. */
+.link-add { border: 0; background: none; padding: 8px 10px; margin-top: 4px; border-radius: 8px; color: var(--accent-strong); font: inherit; font-weight: 600; cursor: pointer; }
+.link-add:hover { background: var(--field); }
+/* More room for the description: tighter pickers. */
+.feed.mode-times .feed-row { grid-template-columns: minmax(200px, 1fr) 340px 214px 60px; }
+.feed-meta .project-select select { width: 136px; }
+.feed-meta .picker select { width: 80px; max-width: 80px; }
+.feed.mode-times .picker-slot { width: 106px; }
