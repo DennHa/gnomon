@@ -4,7 +4,7 @@ import { copyEntriesTo, fillGaps, lastDayEntries, planGaps, toggleWeekDone, week
 import { NewProjectInput, TrailSummary } from '../components';
 import { EntryFeed } from '../feed';
 import { Icon } from '../icons';
-import { DayReview, MissingHours, StaleBanner, WorkdayEditor, shiftDay } from './day';
+import { DayReview, MISSING_LOOKBACK_DAYS, StaleBanner, WorkdayEditor, missingDays, shiftDay } from './day';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
 import { Burst } from '../motion';
@@ -137,6 +137,38 @@ function DayModal({ day, onClose, readOnly }: { day: string; onClose: () => void
   );
 }
 
+/** Days under target in the last weeks: a small badge in the page head that opens the list. */
+function MissingBadge({ onOpenDay }: { onOpenDay: (d: string) => void }) {
+  const { data } = useStore();
+  const now = useNow(60_000);
+  const [open, setOpen] = useState(false);
+  const days = useMemo(() => missingDays(data, now), [data, now]);
+  if (!days.length) return null;
+  const total = days.reduce((s, d) => s + d.missing, 0);
+  return (
+    <>
+      <button className="under-badge" onClick={() => setOpen(true)} title={t('day.missingDetail', { n: MISSING_LOOKBACK_DAYS, duration: fmtDuration(total) })}>
+        <Icon name="warning" size={16} /> {t('day.daysUnder', { n: days.length })}
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} title={<strong>{t('day.daysUnder', { n: days.length })}</strong>}>
+          <p className="muted small">{t('day.missingDetail', { n: MISSING_LOOKBACK_DAYS, duration: fmtDuration(total) })}</p>
+          <div className="missing-list">
+            {days.map((d) => (
+              <button key={d.date} className="missing-row" onClick={() => (setOpen(false), onOpenDay(d.date))}>
+                <span>{fmtDayLabel(d.date)}</span>
+                <span className="muted">{d.worked ? t('day.worked', { duration: fmtDuration(d.worked) }) : t('day.nothingRecorded')}</span>
+                <span className="neg">−{fmtDuration(d.missing)}</span>
+                <Icon name="chevron_right" size={18} />
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
 /** "+ Add project" for the timesheet: pick an existing project or create one inline. */
 function AddRow({ exclude, onAdd }: { exclude: Set<string>; onAdd: (id: string) => void }) {
   const { data } = useStore();
@@ -245,6 +277,7 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
         </button>
       </div>
       <span className="spacer" />
+      <MissingBadge onOpenDay={openDay} />
       {!thisWeek && (
         <button className="btn" onClick={() => setDay(today)}>
           <Icon name="today" size={18} /> {t('ts.thisWeek')}
@@ -259,9 +292,7 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
             <Icon name="done_all" size={18} /> {t('ts.weekDone')}
             <Burst trigger={weekBurst} rays={12} style={{ left: 10, top: '50%' }} />
           </span>
-        ) : (
-          <span className="muted small">{t('ts.hint')}</span>
-        )}
+        ) : null}
         <span className="spacer" />
         {!done && lastWeekMs >= 60_000 && (
           <button className="btn small" onClick={copyLastWeek} title={t('ts.copyHint')}>
@@ -392,8 +423,8 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
           </tr>
         </tfoot>
       </table>
+      {!done && <p className="ts-hint muted small">{t('ts.hint')}</p>}
     </section>
-    <MissingHours onOpenDay={openDay} />
     </div>
   );
 }

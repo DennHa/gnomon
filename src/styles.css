@@ -845,7 +845,7 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 /* ---- Track page: top card (one aligned row), suggestions, calmer entries ---- */
 .hero-bar { display: flex; align-items: center; gap: 16px; }
 .hero-field { flex: 1; min-width: 0; position: relative; }
-.hero .hero-input { width: 100%; box-sizing: border-box; font-size: 19px; background: var(--field) !important; border: 0 !important; border-radius: 12px; padding: 12px 14px !important; }
+.hero .hero-input { width: 100%; box-sizing: border-box; font-size: 19px; background: var(--field) !important; border: 0 !important; border-radius: 999px !important; padding: 12px 22px !important; }
 .hero .hero-input:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); outline: none !important; }
 .hero-clock { font-size: 30px; min-width: 128px; text-align: right; }
 .hero-btn { width: 50px; height: 50px; }
@@ -895,3 +895,9 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .feed.mode-times .feed-row { grid-template-columns: minmax(140px, 1fr) 380px 214px 60px; }
 .feed-meta .project-select select { width: 150px; }
 .feed-meta .picker select { width: 92px; max-width: 92px; }
+/* Week: keep the card's rounded corners over the summary band; hint at the bottom; under-target badge. */
+.card.week { overflow: clip; }
+.ts-hint { margin: 0; padding: 10px 16px 12px; }
+.under-badge { display: inline-flex; align-items: center; gap: 6px; border: 0; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.under-badge:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); }
+.modal .missing-list { margin: 8px -4px 0; }

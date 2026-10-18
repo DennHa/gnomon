@@ -26,7 +26,7 @@ import { targetHoursOn } from '../schedule';
 import { addDays, atTime, breakMs, dayKey, entryMs, fmtDayLabel, fmtDuration, fmtTime, hoursToMs, useNow, workdayMs } from '../time';
 import { t } from '../i18n';
 
-const MISSING_LOOKBACK_DAYS = 30;
+export const MISSING_LOOKBACK_DAYS = 30;
 export const shiftDay = (day: string, n: number) => dayKey(addDays(new Date(`${day}T12:00`), n));
 
 /** Planned hours per project for a day (Float plan or manual goals), with progress. */
@@ -85,7 +85,7 @@ export function ProjectGoals({ day }: { day: string }) {
 }
 
 /** Days in the recent past that ended below their scheduled target (scheduled days without any record count too). */
-function missingDays(data: Data, now: number): { date: string; worked: number; missing: number }[] {
+export function missingDays(data: Data, now: number): { date: string; worked: number; missing: number }[] {
   const today = dayKey(now);
   // Don't count days from before you started using Gnomon.
   const first = data.workdays.reduce((min, w) => (w.date < min ? w.date : min), today);
@@ -100,45 +100,6 @@ function missingDays(data: Data, now: number): { date: string; worked: number; m
     if (worked < target) out.push({ date, worked, missing: target - worked });
   }
   return out;
-}
-
-export function MissingHours({ onOpenDay }: { onOpenDay: (d: string) => void }) {
-  const { data } = useStore();
-  const now = useNow(60_000);
-  const [open, setOpen] = useState(false);
-  const days = useMemo(() => missingDays(data, now), [data, now]);
-  const total = days.reduce((s, d) => s + d.missing, 0);
-
-  if (!days.length) {
-    return (
-      <div className="banner ok">
-        <Icon name="check" size={18} /> {t('day.allReached', { n: MISSING_LOOKBACK_DAYS })}
-      </div>
-    );
-  }
-  return (
-    <section className="card missing">
-      <button className="missing-head" onClick={() => setOpen(!open)}>
-        <span>
-          <strong>{t('day.daysUnder', { n: days.length })}</strong>{' '}
-          <span className="muted">{t('day.missingDetail', { n: MISSING_LOOKBACK_DAYS, duration: fmtDuration(total) })}</span>
-        </span>
-        <span className="muted">{t(open ? 'hide' : 'show')}</span>
-      </button>
-      {open && (
-        <div className="missing-list">
-          {days.map((d) => (
-            <button key={d.date} className="missing-row" onClick={() => onOpenDay(d.date)}>
-              <span>{fmtDayLabel(d.date)}</span>
-              <span className="muted">{d.worked ? t('day.worked', { duration: fmtDuration(d.worked) }) : t('day.nothingRecorded')}</span>
-              <span className="neg">−{fmtDuration(d.missing)}</span>
-              <Icon name="chevron_right" size={18} />
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
-  );
 }
 
 /**
