@@ -66,6 +66,13 @@ function readCompanyProfile() {
       if (typeof raw.updateUrl === 'string' && /^https:\/\/\S+$/i.test(raw.updateUrl)) p.updateUrl = raw.updateUrl;
       if (typeof raw.entraTenantId === 'string' && UUID.test(raw.entraTenantId)) p.entraTenantId = raw.entraTenantId;
       if (typeof raw.entraClientId === 'string' && UUID.test(raw.entraClientId)) p.entraClientId = raw.entraClientId;
+      // Sign-in, provider-neutral (OpenID Connect) or by invitation; Microsoft's tenant ID is a shorthand for the issuer.
+      if (raw.signIn === 'oidc' || raw.signIn === 'invite') p.signIn = raw.signIn;
+      if (typeof raw.signInIssuer === 'string' && /^https:\/\/\S+$/i.test(raw.signInIssuer)) p.signInIssuer = raw.signInIssuer.replace(/\/$/, '');
+      else if (p.entraTenantId) p.signInIssuer = `https://login.microsoftonline.com/${p.entraTenantId}/v2.0`;
+      if (typeof raw.signInClientId === 'string' && /^[\w.\-]{1,200}$/.test(raw.signInClientId)) p.signInClientId = raw.signInClientId;
+      else if (p.entraClientId) p.signInClientId = p.entraClientId;
+      if (!p.signIn && p.signInIssuer && p.signInClientId) p.signIn = 'oidc';
       if (typeof raw.allowLocalApi === 'boolean') p.allowLocalApi = raw.allowLocalApi;
       if (typeof raw.allowActivityTrail === 'boolean') p.allowActivityTrail = raw.allowActivityTrail;
       if (typeof raw.dailyTargetHours === 'number' && raw.dailyTargetHours > 0 && raw.dailyTargetHours <= 24) p.dailyTargetHours = raw.dailyTargetHours;

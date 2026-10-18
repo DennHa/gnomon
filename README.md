@@ -111,8 +111,8 @@ version over the old one; your data stays where it is.
 ## For teams (planned)
 
 Float and Personio hand out company-wide admin tokens, which don't belong on every Mac. For teams, a company-run Gnomon
-server holds those tokens and gives each person only their own plan and absences; people sign in with their Microsoft
-work account, and IT deploys Gnomon preconfigured with Iru or another Mac management tool. The Mac app already
+server holds those tokens and gives each person only their own plan and absences; people sign in with the company login they
+already have (Microsoft, Google, Okta and others, or by invitation), and IT deploys Gnomon preconfigured with Iru or another Mac management tool. The Mac app already
 supports managed settings; the rest is planned. See [docs/company-setup.md](docs/company-setup.md).
 
 ## Screenshots

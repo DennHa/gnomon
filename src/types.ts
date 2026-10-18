@@ -6,6 +6,11 @@ export type CompanyProfile = {
   serverUrl?: string;
   /** Hide what the company handles: the integrations guide, token fields and own-server pairing. */
   managed?: boolean;
+  /** Company login via OpenID Connect, or invitation links from the admin (docs/company-setup.md → Sign-in options). */
+  signIn?: 'oidc' | 'invite';
+  signInIssuer?: string;
+  signInClientId?: string;
+  /** Shorthand for Microsoft Entra ID; turned into signInIssuer / signInClientId when read. */
   entraTenantId?: string;
   entraClientId?: string;
   allowLocalApi?: boolean;

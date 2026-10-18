@@ -823,3 +823,21 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .style-card:hover { background: color-mix(in srgb, var(--accent) 10%, var(--field)); }
 .style-card.active { box-shadow: inset 0 0 0 2px var(--accent); }
 .att-ask-btns .btn { min-width: 0; padding-left: 6px; padding-right: 6px; white-space: nowrap; font-size: 12px; }
+
+/* Activities look different from projects: outlined, squarer corners. Projects keep their round colour dot.
+   Text mixes the activity colour with the normal text colour, so even yellow stays readable on white. */
+.activity-chip {
+  --chip-text: color-mix(in srgb, var(--chip) 62%, var(--text));
+  border: 1.5px solid color-mix(in srgb, var(--chip) 75%, var(--text)) !important;
+  border-radius: 7px;
+  padding: 3px 10px;
+  color: var(--chip-text);
+  background: linear-gradient(color-mix(in srgb, var(--chip) 24%, transparent), color-mix(in srgb, var(--chip) 24%, transparent)) left / 0% 100% no-repeat, transparent;
+}
+.activity-chip:hover { background: linear-gradient(color-mix(in srgb, var(--chip) 24%, transparent), color-mix(in srgb, var(--chip) 24%, transparent)) left / 0% 100% no-repeat, color-mix(in srgb, var(--chip) 10%, transparent); }
+/* Chosen: filled with a tint from the left, text at full strength. */
+.activity-chip.active {
+  color: color-mix(in srgb, var(--chip) 45%, var(--text));
+  background: linear-gradient(color-mix(in srgb, var(--chip) 24%, transparent), color-mix(in srgb, var(--chip) 24%, transparent)) left / 100% 100% no-repeat, transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip) 75%, var(--text));
+}

@@ -23,8 +23,9 @@ Iru (Mac management, formerly Kandji)
   └─ installs Gnomon.app on every Mac
   └─ pushes a settings profile: server address, sign-in settings, "managed" switch (no secrets)
 
-Gnomon.app on the Mac
-  └─ "Sign in with Microsoft" (Microsoft Entra ID, the existing company account)
+Gnomon.app on the Mac (signed with an Apple Developer ID and notarized, see "Before you start")
+  └─ "Sign in" with the company's existing login (Microsoft, Google, Okta, Keycloak… via OpenID Connect),
+     or with an invitation from the admin when the company has no single sign-on
   └─ talks only to the company's Gnomon server
 
 Gnomon server (company)
@@ -55,12 +56,37 @@ Float and Personio with their own tokens, as today.
 3. When the wizard is finished, the setup link stops working. Later changes go through the **Admin** page, which
    needs an admin sign-in (step 2 below).
 
+### Before you start
+
+The wizard's first screen is a checklist, so nothing surprises the admin halfway through. Each item says why it's needed
+and what happens without it.
+
+| Needed | Why | Without it |
+|---|---|---|
+| **An HTTPS address** for the server (e.g. `gnomon.example.com`) | Phones and Macs only talk to the server over HTTPS | The wizard stops here |
+| **A signed and notarized Gnomon app** (Apple Developer ID) | macOS only runs apps from outside the App Store without questions when they're signed with an Apple Developer ID and notarized by Apple. Mac management tools such as Iru expect that too | Fine for a test with a few people (each allows the app once in System Settings); not for a rollout |
+| **A company login** (optional) | So people sign in with the account they already have | People get personal invitation links from the admin instead |
+| **Admin access to Float and Personio** (optional) | Only admins can create the API tokens | Plans and absences aren't imported; people enter days off by hand |
+| **Mac management (Iru or similar)** (optional) | Installs the app and the settings on every Mac | People install the app themselves and connect it with a link |
+
+About the **Apple Developer ID** (Apple Developer Program, 99 € a year, as a person or as a company):
+
+- **Use the official Gnomon build** once it's signed and notarized by the Gnomon project. The roll-out screen offers it
+  for download; nothing to do for the company.
+- **Or sign it yourself** with the company's own Developer ID, for example to show the company as the publisher. The
+  roll-out screen links to a short guide (sign, notarize, staple) and accepts the signed `.dmg` as an upload.
+- A native **iPhone app** later (TestFlight, App Store or private company distribution through Apple Business Manager)
+  needs a Developer account in any case.
+
+The server runs on Linux and can't sign Mac apps itself; signing always happens on a Mac.
+
 ### The screens
 
 | # | Screen | What the admin enters | What Gnomon checks or shows |
 |---|---|---|---|
+| 0 | **Before you start** | Ticks the checklist above | Which optional parts will be skipped, and a link to come back later |
 | 1 | **Welcome** | Company name, the server's public address (`https://gnomon.example.com`), time zone, default daily target (e.g. 8 h), default language | That the address is reachable over HTTPS and matches the browser's address; server version |
-| 2 | **Sign-in with Microsoft** | Directory (tenant) ID, application (client) ID and client secret of an Entra app registration; optionally the ID of the group allowed to use Gnomon and of the group of Gnomon admins | Step-by-step instructions with copy buttons for the redirect addresses to register (one for the server, `gnomon://auth` for the Mac app). **Test sign-in**: the admin signs in and becomes the first Gnomon admin |
+| 2 | **Sign-in** | First the kind of login (see "Sign-in options" below), then its details: for Microsoft the directory (tenant) ID; for Google the Workspace domain; for any other provider its issuer address. Always the client ID and client secret of an app registered there, and optionally the groups allowed to use Gnomon and to administer it. With *Invitations*, nothing | Step-by-step instructions for the chosen provider with copy buttons for the redirect addresses to register (one for the server, `gnomon://auth` for the Mac app). It reads the provider's discovery document to check the address. **Test sign-in**: the admin signs in and becomes the first Gnomon admin |
 | 3 | **Float** (optional) | The Float API token (Account Settings → Integrations, owner/admin only) | **Test connection**: shows the Float account name and how many people it has. Explains that people are matched by work email and that Gnomon only reads |
 | 4 | **Personio** (optional) | Client ID and secret of Personio API credentials with read access to absences and employees | **Test connection**: number of employees and absence types. The admin ticks which types become days off (vacation, sick, special leave…); half days stay manual |
 | 5 | **Weblog** | Nothing yet | "Coming once Weblog has an API" |
@@ -69,6 +95,23 @@ Float and Personio with their own tokens, as today.
 | 8 | **Done** | Nothing | Summary of what's set up, a link to the Admin page, and "the setup link no longer works" |
 
 Every integration screen can be skipped and filled in later from the Admin page.
+
+### Sign-in options
+
+Gnomon doesn't care which company login is used, as long as it speaks **OpenID Connect**, the open standard that
+nearly all of them support. The wizard offers:
+
+| Option | For | What the admin needs |
+|---|---|---|
+| **Microsoft Entra ID** (Microsoft 365, Teams) | Most companies on Microsoft | An app registration in Entra; the wizard fills in the provider address from the tenant ID |
+| **Google Workspace** | Companies on Google | An OAuth client in Google Cloud; sign-in limited to the company domain |
+| **Other provider (OpenID Connect)** | Okta, Keycloak, Authentik, JumpCloud, Auth0, OneLogin, a company's own login server… | The provider's issuer address (the wizard reads `/.well-known/openid-configuration` from it), a client ID and secret |
+| **Invitations** (no single sign-on) | Small teams, or companies whose login doesn't support OpenID Connect | Nothing: the admin creates a personal invitation link or QR code per person on the Admin page; each Mac and phone gets its own key, which the admin can revoke |
+
+A login that only speaks the older **SAML** standard can be connected through a bridge that translates to OpenID
+Connect (Keycloak and Authentik both do); until then, invitations work. Who counts as an admin is decided by a group
+from the login (or, with invitations, by the admin who set up the server). Switching the sign-in later keeps
+everyone's data: people are matched by their work email.
 
 ### Secrets
 
@@ -82,7 +125,7 @@ Every integration screen can be skipped and filled in later from the Admin page.
 The wizard's download is a standard macOS configuration profile with one "custom settings" payload for Gnomon's
 preference domain `app.gnomon.timetracker`. The app reads it on start (managed preferences), so a Mac that has it is
 preconfigured. Profiles are readable by the person using the Mac, so the profile holds **addresses, IDs and switches
-only**, never tokens or passwords. The Entra client ID is public by design; the Mac signs in with PKCE, no secret.
+only**, never tokens or passwords. A client ID is public by design; the Mac signs in with PKCE and needs no secret.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -106,9 +149,10 @@ only**, never tokens or passwords. The Entra client ID is public by design; the 
       <key>serverUrl</key>         <string>https://gnomon.example.com</string>
       <key>managed</key>           <true/>
 
-      <!-- Sign in with Microsoft (public IDs, no secret) -->
-      <key>entraTenantId</key>     <string>00000000-0000-0000-0000-000000000000</string>
-      <key>entraClientId</key>     <string>00000000-0000-0000-0000-000000000000</string>
+      <!-- Sign-in: the company login via OpenID Connect (public values, no secret) -->
+      <key>signIn</key>            <string>oidc</string>
+      <key>signInIssuer</key>      <string>https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0</string>
+      <key>signInClientId</key>    <string>00000000-0000-0000-0000-000000000000</string>
 
       <!-- Rules from wizard screen 6 -->
       <key>allowLocalApi</key>     <false/>
@@ -127,7 +171,8 @@ only**, never tokens or passwords. The Entra client ID is public by design; the 
 |---|---|---|
 | `serverUrl` | string | The company server; the app talks only to this one |
 | `managed` | bool | Hides the integrations guide, token fields and own-server pairing (see below) |
-| `entraTenantId`, `entraClientId` | string | Microsoft sign-in |
+| `signIn` | string | `oidc` (company login) or `invite` (invitation links from the admin) |
+| `signInIssuer`, `signInClientId` | string | The login provider's issuer address and the app's client ID (public). For Microsoft, `entraTenantId` and `entraClientId` work as a shorthand |
 | `updateUrl` | string | Where new versions are announced (a `version.json`); defaults to `<serverUrl>/latest/version.json` |
 | `allowLocalApi` | bool | Whether the local REST API (API.md) may be switched on |
 | `allowActivityTrail` | bool | Whether the opt-in activity trail is offered |
@@ -140,7 +185,7 @@ without Iru, start the app with `PROFILE_FILE=/path/to/profile.plist` (or a `.js
 ## What the employee sees
 
 1. Gnomon appears in Applications (installed by Iru).
-2. First start: **Sign in with Microsoft**, then the short tour of the key features.
+2. First start: **Sign in** with their company account (or open the invitation link they got), then the short tour.
 3. Their Float plan and Personio absences are already there; nothing to configure.
 
 ## Managed mode: what's hidden
@@ -169,8 +214,9 @@ Settings → Connections then shows "Managed by your company" with the server ad
 |---|---|---|
 | 1 | ✅ Mac app reads the settings profile (`serverUrl`, `managed`, rules, defaults) | done |
 | 2 | ✅ Managed mode hides the integration guide, token fields and pairing; the profile's rules switch off the local API and the activity trail | done |
-| 3 | Server: first-start setup link, the wizard (screens 1–8) and the Admin page, secrets encrypted at rest | medium |
-| 4 | Sign in with Microsoft Entra (server and Mac app), replacing pairing codes for company use | medium |
+| 3 | Server: first-start setup link, the wizard (screens 0–8) and the Admin page, secrets encrypted at rest | medium |
+| 4 | Sign-in with any OpenID Connect provider (presets for Microsoft and Google) and invitations, on the server and in the Mac app | medium |
 | 5 | Server becomes multi-user; Float and Personio sync on the server per person | large |
 | 6 | Profile and .dmg downloads from the wizard; Iru roll-out tested with a real Mac | small |
-| 7 | Optional: central storage of time entries, sync Mac ↔ server | large |
+| 7 | A signed and notarized official build (Apple Developer ID), and the guide for companies signing their own | small, once the ID exists |
+| 8 | ✅ Sync of time entries Mac ↔ server (one person); for companies it needs step 5 | partly done |
