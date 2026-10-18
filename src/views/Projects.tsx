@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Icon } from '../icons';
 import { useStore } from '../store';
 import { ACTIVITY_PRESETS, addActivity, addProject, applyActivityPreset, PROJECT_COLORS, removeActivity, removeProject, updateActivity, updateProject } from '../actions';
 import { dayKey, entryMs, fmtDate, fmtDayLabel, fmtDuration, fmtTime, hoursToMs } from '../time';
@@ -210,10 +211,17 @@ export default function Projects() {
         {data.activities.length === 0 && <p className="muted">{t('act.none')}</p>}
         <div className="list">
           {data.activities.map((a) => (
-            <div key={a.id} className="list-row">
+            <div key={a.id} className={`list-row ${a.hidden ? 'is-hidden' : ''}`}>
               <input type="color" value={a.color} onChange={(e) => update((d) => updateActivity(d, a.id, { color: e.target.value }))} />
               <input className="grow" value={a.name} onChange={(e) => update((d) => updateActivity(d, a.id, { name: e.target.value }))} />
               <span className="muted">{fmtDuration(totalFor('activityId', a.id))}</span>
+              <button
+                className={`icon-btn ${a.hidden ? 'muted' : ''}`}
+                title={t(a.hidden ? 'act.show' : 'act.hide')}
+                onClick={() => update((d) => updateActivity(d, a.id, { hidden: !a.hidden }))}
+              >
+                <Icon name={a.hidden ? 'visibility_off' : 'visibility'} size={18} />
+              </button>
               <button
                 className="icon-btn"
                 title={t('delete')}

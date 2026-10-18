@@ -15,6 +15,8 @@ import i_delete from '@material-symbols/svg-400/rounded/delete.svg?raw';
 import i_close from '@material-symbols/svg-400/rounded/close.svg?raw';
 import i_check from '@material-symbols/svg-400/rounded/check.svg?raw';
 import i_edit from '@material-symbols/svg-400/rounded/edit.svg?raw';
+import i_visibility from '@material-symbols/svg-400/rounded/visibility.svg?raw';
+import i_visibility_off from '@material-symbols/svg-400/rounded/visibility_off.svg?raw';
 import i_coffee from '@material-symbols/svg-400/rounded/coffee.svg?raw';
 import i_search from '@material-symbols/svg-400/rounded/search.svg?raw';
 import i_chevron_left from '@material-symbols/svg-400/rounded/chevron_left.svg?raw';
@@ -69,6 +71,8 @@ const ICONS = {
   close: i_close,
   check: i_check,
   edit: i_edit,
+  visibility: i_visibility,
+  visibility_off: i_visibility_off,
   coffee: i_coffee,
   search: i_search,
   chevron_left: i_chevron_left,

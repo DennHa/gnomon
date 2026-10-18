@@ -2,7 +2,7 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import { useStore } from './store';
 import { Icon } from './icons';
-import { addProject, activitiesOn } from './actions';
+import { addActivity, addProject, activitiesOn, updateActivity } from './actions';
 import { planItemsOn } from './plan';
 import { atTime, dayKey, toTimeInput, uid, useNow } from './time';
 import { t } from './i18n';
@@ -86,25 +86,88 @@ export function ActivitySelect({ value, onChange }: { value?: string; onChange: 
 }
 
 /** One chip per activity; the selected one is filled with its color. */
-export function ActivityChips({ value, onPick }: { value?: string; onPick: (id: string) => void }) {
-  const { data } = useStore();
+/**
+ * Activity chips for switching with one click. "+" adds an activity right here; right-click a chip to hide it from
+ * here (history and reports keep it) or to open the full list.
+ */
+export function ActivityChips({ value, onPick, onEdit }: { value?: string; onPick: (id: string) => void; onEdit?: () => void }) {
+  const { data, update } = useStore();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('blur', close);
+    return () => (window.removeEventListener('mousedown', close), window.removeEventListener('keydown', onKey), window.removeEventListener('blur', close));
+  }, [menu]);
   if (!activitiesOn(data)) return null;
+  const add = () => {
+    const n = name.trim();
+    setName('');
+    setAdding(false);
+    if (!n) return;
+    const existing = data.activities.find((a) => a.name.toLowerCase() === n.toLowerCase());
+    if (existing) {
+      // Typing the name of a hidden one brings it back instead of making a twin.
+      if (existing.hidden) update((d) => updateActivity(d, existing.id, { hidden: false }));
+      onPick(existing.id);
+      return;
+    }
+    const id = uid();
+    update((d) => addActivity(d, n, undefined, id));
+    onPick(id);
+  };
   return (
     <div className="activity-chips">
-      {data.activities.map((a) => {
-        const active = a.id === value;
-        return (
-          <button
-            key={a.id}
-            type="button"
-            className={`activity-chip ${active ? 'active' : ''}`}
-            style={{ '--chip': a.color } as React.CSSProperties}
-            onClick={() => onPick(a.id)}
-          >
-            {a.name}
+      {data.activities
+        .filter((a) => !a.hidden || a.id === value)
+        .map((a) => {
+          const active = a.id === value;
+          return (
+            <button
+              key={a.id}
+              type="button"
+              className={`activity-chip ${active ? 'active' : ''}`}
+              style={{ '--chip': a.color } as React.CSSProperties}
+              onClick={() => onPick(a.id)}
+              onContextMenu={(e) => (e.preventDefault(), setMenu({ id: a.id, x: e.clientX, y: e.clientY }))}
+              title={t('act.chipHint')}
+            >
+              {a.name}
+            </button>
+          );
+        })}
+      {adding ? (
+        <input
+          className="activity-new"
+          autoFocus
+          value={name}
+          placeholder={t('act.newShort')}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={add}
+          onKeyDown={(e) => (e.key === 'Enter' ? add() : e.key === 'Escape' && (setName(''), setAdding(false)))}
+        />
+      ) : (
+        <button type="button" className="activity-add" title={t('act.addHere')} aria-label={t('act.addHere')} onClick={() => setAdding(true)}>
+          <Icon name="add" size={16} />
+        </button>
+      )}
+      {menu && (
+        <div className="ctx-menu" role="menu" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.stopPropagation()}>
+          <button role="menuitem" onClick={() => (update((d) => updateActivity(d, menu.id, { hidden: true })), setMenu(null))}>
+            <Icon name="visibility_off" size={16} /> {t('act.hideHere')}
           </button>
-        );
-      })}
+          {onEdit && (
+            <button role="menuitem" onClick={() => (setMenu(null), onEdit())}>
+              <Icon name="edit" size={16} /> {t('act.editAll')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

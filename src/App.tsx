@@ -134,7 +134,7 @@ function useTrayBridge(onShowReview: () => void) {
       runningDetail: running ? t('durationSince', { duration: fmtDuration(entryMs(running, now)), time: fmtTime(running.start) }) : undefined,
       runningProjectColor: running ? p?.color ?? '#B0BEC5' : undefined,
       projects: data.projects.map(({ id, name, color }) => ({ id, name, color })),
-      activities: activitiesOn(data) ? data.activities.map(({ id, name, color }) => ({ id, name, color })) : [],
+      activities: activitiesOn(data) ? data.activities.filter((a) => !a.hidden).map(({ id, name, color }) => ({ id, name, color })) : [],
       runningActivityId: running?.activityId,
       recent,
       todayPlan,
@@ -518,7 +518,7 @@ export default function App() {
       </aside>
       <main className="content">
         {daylightOn && <DaylightRuler preview={daylightAt} onPreview={setDaylightAt} />}
-        {view === 'today' && <Today onOpenDay={openDay} />}
+        {view === 'today' && <Today onOpenDay={openDay} onOpenProjects={() => setView('projects')} />}
         {view === 'timesheet' && <Timesheet day={day} setDay={setDay} dayModal={dayModal} setDayModal={setDayModal} />}
         {view === 'reports' && (
           <Reports

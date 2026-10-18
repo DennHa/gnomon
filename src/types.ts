@@ -63,6 +63,8 @@ export type Activity = {
   id: string;
   name: string;
   color: string;
+  /** Hidden from the quick-switch chips and pickers; past entries and reports keep it. */
+  hidden?: boolean;
 };
 
 export type Entry = {

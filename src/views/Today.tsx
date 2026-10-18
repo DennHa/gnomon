@@ -39,7 +39,7 @@ function useSuggestions(query: string) {
   }, [data.plan, data.entries, data.projects, query]);
 }
 
-function TimerHero() {
+function TimerHero({ onOpenProjects }: { onOpenProjects: () => void }) {
   const { data, update } = useStore();
   const now = useNow();
   const running = runningEntry(data);
@@ -124,14 +124,14 @@ function TimerHero() {
       {activitiesOn(data) && (
         <div className="hero-activities">
           <span className="muted small">{t(running ? 'today.switchTo' : 'activity')}</span>
-          <ActivityChips value={current.activityId} onPick={pickActivity} />
+          <ActivityChips value={current.activityId} onPick={pickActivity} onEdit={onOpenProjects} />
         </div>
       )}
     </section>
   );
 }
 
-export default function Today({ onOpenDay }: { onOpenDay: (d: string) => void }) {
+export default function Today({ onOpenDay, onOpenProjects }: { onOpenDay: (d: string) => void; onOpenProjects: () => void }) {
   const { data, update } = useStore();
   const now = useNow(60_000);
   const today = dayKey(now);
@@ -149,7 +149,7 @@ export default function Today({ onOpenDay }: { onOpenDay: (d: string) => void })
         </div>
       </header>
       <StaleBanner onOpenDay={onOpenDay} />
-      <TimerHero />
+      <TimerHero onOpenProjects={onOpenProjects} />
       <ProjectGoals day={today} />
       <section className="card">
         <div className="card-head">

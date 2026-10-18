@@ -268,8 +268,8 @@ export function removeProject(d: Data, id: string): Data {
 // Any manual change to the activity list makes it the user's own ("Custom").
 const custom = (d: Data): Data => (d.settings.activityPreset && d.settings.activityPreset !== 'custom' ? { ...d, settings: { ...d.settings, activityPreset: 'custom' } } : d);
 
-export function addActivity(d: Data, name: string, color?: string): Data {
-  const a: Activity = { id: uid(), name: name.trim(), color: color ?? PROJECT_COLORS[(d.activities.length + 3) % PROJECT_COLORS.length] };
+export function addActivity(d: Data, name: string, color?: string, id = uid()): Data {
+  const a: Activity = { id, name: name.trim(), color: color ?? PROJECT_COLORS[(d.activities.length + 3) % PROJECT_COLORS.length] };
   return custom({ ...d, activities: [...d.activities, a] });
 }
 

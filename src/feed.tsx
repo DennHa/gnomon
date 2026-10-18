@@ -47,11 +47,13 @@ export function ActivityPicker({ value, onChange }: { value?: string; onChange: 
       <Icon name="label" size={16} />
       <select value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
         <option value="">—</option>
-        {data.activities.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
+        {data.activities
+          .filter((a) => !a.hidden || a.id === value)
+          .map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
       </select>
     </label>
   );
