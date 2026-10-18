@@ -40,15 +40,25 @@ const initialStep = () => {
 
 export default function Tour() {
   const { data, update, profile } = useStore();
-  const [step, setStep] = useState(initialStep);
+  const [step, setStepRaw] = useState(initialStep);
+  // The name is kept here while you type and saved when you leave the step: saving every keystroke raced with the
+  // sync to a Gnomon server, which could hand back an older value mid-word.
+  const [nameDraft, setNameDraft] = useState(data.settings.userName ?? '');
+  const saveName = () => {
+    const name = nameDraft.trim() || undefined;
+    if (name !== data.settings.userName) update((d) => ({ ...d, settings: { ...d.settings, userName: name } }));
+  };
+  const setStep = (n: number) => (saveName(), setStepRaw(n));
   const STEPS = stepsFor(data.settings.workStyle);
   const last = step === STEPS.length - 1;
   const choose = (style: WorkStyle) => {
     update((d) => ({ ...d, settings: { ...d.settings, ...workStyleDefaults(style) } }));
     setStep(step + 1);
   };
-  const finish = (openGuide = false) =>
-    update((d) => ({ ...d, settings: { ...d.settings, tourDone: true, ...(openGuide && { onboardingDone: false }) } }));
+  const finish = (openGuide = false) => {
+    const name = nameDraft.trim() || undefined;
+    update((d) => ({ ...d, settings: { ...d.settings, userName: name, tourDone: true, ...(openGuide && { onboardingDone: false }) } }));
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,9 +98,9 @@ export default function Tour() {
             <input
               className="tour-name"
               autoFocus
-              value={data.settings.userName ?? ''}
+              value={nameDraft}
               placeholder={t('set.userNamePlaceholder')}
-              onChange={(e) => update((d) => ({ ...d, settings: { ...d.settings, userName: e.target.value || undefined } }))}
+              onChange={(e) => setNameDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && setStep(step + 1)}
             />
           )}
@@ -128,7 +138,7 @@ export default function Tour() {
             </button>
           )}
           <button className="btn primary" onClick={() => (last ? finish() : setStep(step + 1))}>
-            {last ? t('tour.start') : s.name && !data.settings.userName?.trim() ? t('tour.skipName') : t('onb.next')} {!last && <Icon name="arrow_forward" size={18} />}
+            {last ? t('tour.start') : s.name && !nameDraft.trim() ? t('tour.skipName') : t('onb.next')} {!last && <Icon name="arrow_forward" size={18} />}
           </button>
         </div>
       </div>
