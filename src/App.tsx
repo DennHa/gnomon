@@ -520,7 +520,20 @@ export default function App() {
         {daylightOn && <DaylightRuler preview={daylightAt} onPreview={setDaylightAt} />}
         {view === 'today' && <Today onOpenDay={openDay} />}
         {view === 'timesheet' && <Timesheet day={day} setDay={setDay} dayModal={dayModal} setDayModal={setDayModal} />}
-        {view === 'reports' && <Reports onOpenDay={openDay} />}
+        {view === 'reports' && (
+          <Reports
+            onOpenDay={openDay}
+            onOpenSettings={() => {
+              // The starting balance lives on the General tab.
+              try {
+                localStorage.setItem('gnomon.settingsTab', 'general');
+              } catch {
+                /* storage unavailable: Settings opens on General anyway */
+              }
+              setView('settings');
+            }}
+          />
+        )}
         {view === 'projects' && <Projects />}
         {view === 'settings' && <Settings />}
         {view === 'about' && <About />}

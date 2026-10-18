@@ -901,3 +901,18 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .under-badge { display: inline-flex; align-items: center; gap: 6px; border: 0; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .under-badge:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); }
 .modal .missing-list { margin: 8px -4px 0; }
+/* Reports: one card for where the time went; the explanation behind an ⓘ; the starting balance links to Settings. */
+.info-tip { position: relative; display: inline-flex; vertical-align: middle; margin-left: 4px; }
+.info-tip .icon-btn { color: var(--muted); }
+.info-bubble { position: absolute; top: calc(100% + 6px); left: -8px; z-index: 30; width: 320px; padding: 12px 14px; border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), var(--shadow); font-size: 13px; font-weight: 400; line-height: 1.45; color: var(--text); }
+.link-btn { display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; padding: 0; margin-top: 4px; cursor: pointer; font: inherit; }
+.link-btn.muted { color: var(--muted); }
+.link-btn:hover { color: var(--text); text-decoration: underline; }
+.card h4 { margin: 18px 0 10px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.card h3 + h4 { margin-top: 4px; }
+.bar-col { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
+.bar-col:hover .bar-track { opacity: 0.85; }
+.bar-value { white-space: nowrap; }
+.bars.month .bar-value { font-size: 10px; }
+.breakdowns { margin-top: 10px; gap: 32px; }
+.breakdown h4 { margin-top: 18px; }

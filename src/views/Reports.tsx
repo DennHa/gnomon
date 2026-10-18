@@ -3,7 +3,7 @@ import { balanceByMonth, targetFor } from '../balance';
 import { targetHoursOn } from '../schedule';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { deleteWorkday, activitiesOn } from '../actions';
+import { activitiesOn } from '../actions';
 import {
   addDays,
   breakMs,
@@ -12,6 +12,7 @@ import {
   fmtDate,
   fmtDayLabel,
   fmtDuration,
+  fmtHM,
   fmtHours,
   fmtTime,
   hoursToMs,
@@ -30,8 +31,8 @@ type BreakdownRow = { id: string; name: string; color: string; ms: number };
 
 function Breakdown({ title, rows, total }: { title: string; rows: BreakdownRow[]; total: number }) {
   return (
-    <section className="card">
-      <h3>{title}</h3>
+    <div className="breakdown">
+      <h4>{title}</h4>
       {rows.length === 0 && <p className="muted">{t('rep.nothing')}</p>}
       {rows.map((r) => {
         const pct = total ? (r.ms / total) * 100 : 0;
@@ -49,7 +50,24 @@ function Breakdown({ title, rows, total }: { title: string; rows: BreakdownRow[]
           </div>
         );
       })}
-    </section>
+    </div>
+  );
+}
+
+/** A small ⓘ button that shows an explanation in a bubble; closes on a second click, Escape or clicking elsewhere. */
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="info-tip" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}>
+      <button className="icon-btn" aria-expanded={open} aria-label={t('rep.explain')} onClick={() => setOpen(!open)} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+        <Icon name="info" size={18} />
+      </button>
+      {open && (
+        <span className="info-bubble" role="tooltip">
+          {text}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -78,7 +96,7 @@ function downloadCsv(name: string, rows: (string | number)[][]) {
 }
 
 /** The running overtime balance across all months, independent of the selected period. */
-function OvertimeBalance() {
+function OvertimeBalance({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { data } = useStore();
   const now = useNow(60_000);
   const { total, start, startDate, months } = useMemo(() => balanceByMonth(data, now), [data, now]);
@@ -90,11 +108,14 @@ function OvertimeBalance() {
         <div>
           <h3>
             <Icon name="savings" size={20} /> {t('bal.title')}
+            <InfoTip text={t('bal.explain')} />
           </h3>
-          <p className="muted small">{t('bal.explain')}</p>
-          {(start !== 0 || startDate) && (
-            <p className="muted small">{t('bal.start', { duration: signed(start), date: startDate ? new Date(`${startDate}T12:00`).toLocaleDateString(locale()) : '—' })}</p>
-          )}
+          <button className="link-btn muted small" onClick={onOpenSettings} title={t('bal.startHint')}>
+            {start !== 0 || startDate
+              ? t('bal.start', { duration: signed(start), date: startDate ? new Date(`${startDate}T12:00`).toLocaleDateString(locale()) : '—' })
+              : t('bal.setStart')}
+            <Icon name="chevron_right" size={16} />
+          </button>
         </div>
         <div className="balance-total">
           <span className="muted small">{t('bal.current')}</span>
@@ -133,8 +154,8 @@ function OvertimeBalance() {
   );
 }
 
-export default function Reports({ onOpenDay }: { onOpenDay: (day: string) => void }) {
-  const { data, update } = useStore();
+export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day: string) => void; onOpenSettings: () => void }) {
+  const { data } = useStore();
   const now = useNow(30_000);
   const [kind, setKind] = useState<Range>('week');
   const [offset, setOffset] = useState(0);
@@ -261,17 +282,18 @@ export default function Reports({ onOpenDay }: { onOpenDay: (day: string) => voi
         </div>
       </div>
 
-      <OvertimeBalance />
+      <OvertimeBalance onOpenSettings={onOpenSettings} />
 
       <section className="card">
-        <h3>{t('rep.perDay')}</h3>
+        <h3>{t('rep.timeTitle')}</h3>
+        <h4>{t('rep.perDay')}</h4>
         <div className={`bars ${kind}`}>
           {report.days.map((d) => {
             const segs = [...report.perDay.get(d)!.entries()];
             const total = segs.reduce((s, [, ms]) => s + ms, 0);
             return (
-              <div key={d} className="bar-col" title={`${fmtDayLabel(d)}: ${fmtDuration(total)}`}>
-                <span className="bar-value">{total ? fmtDuration(total) : ''}</span>
+              <button key={d} className="bar-col" title={`${fmtDayLabel(d)}: ${fmtDuration(total)}`} onClick={() => onOpenDay(d)}>
+                <span className="bar-value">{total ? (kind === 'month' ? fmtHM(total) : fmtDuration(total)) : ''}</span>
                 <div className="bar-track">
                   <div className="bar-stack" style={{ height: `${(total / report.maxDay) * 100}%` }}>
                     {segs.map(([pid, ms]) => (
@@ -282,65 +304,15 @@ export default function Reports({ onOpenDay }: { onOpenDay: (day: string) => voi
                 <span className="bar-label">
                   {kind === 'week' ? fmtDate(d, { weekday: 'short' }) : Number(d.slice(8))}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
+        <div className="two-col breakdowns">
+          <Breakdown title={t('rep.byProject')} rows={projectRows} total={report.tracked} />
+          {activitiesOn(data) && <Breakdown title={t('rep.byActivity')} rows={activityRows} total={report.tracked} />}
+        </div>
       </section>
-
-      <div className="two-col">
-        <Breakdown title={t('rep.byProject')} rows={projectRows} total={report.tracked} />
-        {activitiesOn(data) && <Breakdown title={t('rep.byActivity')} rows={activityRows} total={report.tracked} />}
-      </div>
-
-      <div>
-        <section className="card">
-          <h3>{t('rep.attendance')}</h3>
-          {report.workdays.length === 0 && <p className="muted">{t('rep.noWorkdays')}</p>}
-          {report.workdays.length > 0 && (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t('rep.day')}</th>
-                  <th>{t('wd.in')}</th>
-                  <th>{t('wd.out')}</th>
-                  <th>{t('rep.breaks')}</th>
-                  <th>{t('rep.worked')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {report.workdays.map((w) => (
-                  <tr key={w.date} className="clickable" onClick={() => onOpenDay(w.date)} title={t('openThisDay')}>
-                    <td>{fmtDayLabel(w.date)}</td>
-                    {w.off ? (
-                      <td colSpan={4} className="muted">
-                        {t('dayOff')}
-                      </td>
-                    ) : (
-                      <>
-                        <td>{fmtTime(w.start)}</td>
-                        <td>{w.end ? fmtTime(w.end) : '—'}</td>
-                        <td>{fmtDuration(breakMs(w, now))}</td>
-                        <td>{fmtDuration(workdayMs(w, now))}</td>
-                      </>
-                    )}
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="icon-btn"
-                        title={t('rep.deleteWorkday')}
-                        onClick={() => confirm(t('rep.deleteConfirm', { day: fmtDayLabel(w.date) })) && update((d) => deleteWorkday(d, w.date))}
-                      >
-                        🗑
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      </div>
     </div>
   );
 }
