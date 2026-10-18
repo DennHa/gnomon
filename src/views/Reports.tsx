@@ -3,7 +3,7 @@ import { balanceByMonth, targetFor } from '../balance';
 import { targetHoursOn } from '../schedule';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { deleteWorkday } from '../actions';
+import { deleteWorkday, activitiesOn } from '../actions';
 import {
   addDays,
   breakMs,
@@ -290,7 +290,7 @@ export default function Reports({ onOpenDay }: { onOpenDay: (day: string) => voi
 
       <div className="two-col">
         <Breakdown title={t('rep.byProject')} rows={projectRows} total={report.tracked} />
-        <Breakdown title={t('rep.byActivity')} rows={activityRows} total={report.tracked} />
+        {activitiesOn(data) && <Breakdown title={t('rep.byActivity')} rows={activityRows} total={report.tracked} />}
       </div>
 
       <div>

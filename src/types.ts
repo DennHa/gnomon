@@ -166,6 +166,8 @@ export type Settings = {
   menuBarColor: 'project' | 'activity' | 'mono';
   /** Opt-in: remember which app was in front, to help reviewing later. */
   activityTrail: boolean;
+  /** Activities (the kind of work: Design, Call…) next to projects. Off on new installs; earlier data keeps them. */
+  activitiesEnabled?: boolean;
   /** Which role's activity set the list came from; any manual change makes it 'custom'. */
   activityPreset?: ActivityPreset | 'custom';
   /** Local REST API (see API.md). */

@@ -841,3 +841,57 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
   background: linear-gradient(color-mix(in srgb, var(--chip) 24%, transparent), color-mix(in srgb, var(--chip) 24%, transparent)) left / 100% 100% no-repeat, transparent;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip) 75%, var(--text));
 }
+
+/* ---- Track page: top card (one aligned row), suggestions, calmer entries ---- */
+.hero-bar { display: flex; align-items: center; gap: 16px; }
+.hero-field { flex: 1; min-width: 0; position: relative; }
+.hero .hero-input { width: 100%; box-sizing: border-box; font-size: 19px; background: var(--field) !important; border: 0 !important; border-radius: 12px; padding: 12px 14px !important; }
+.hero .hero-input:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); outline: none !important; }
+.hero-clock { font-size: 30px; min-width: 128px; text-align: right; }
+.hero-btn { width: 50px; height: 50px; }
+.hero-suggest { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; margin: 0; padding: 6px; list-style: none; border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), var(--shadow); }
+.hero-suggest li { display: flex; align-items: baseline; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.hero-suggest li .dot { align-self: center; }
+.hero-suggest li:hover, .hero-suggest li.sel { background: var(--field); }
+.hs-label { font-weight: 600; }
+.hero-meta { margin-top: 12px; gap: 8px; }
+.hero-meta .project-select, .hero-meta .picker { background: var(--field); border-radius: 999px; padding: 3px 6px 3px 12px; }
+.hero-meta .project-select select, .hero-meta .picker select { padding: 3px 4px !important; }
+.hero-activities { margin-top: 12px; flex-wrap: wrap; row-gap: 6px; }
+.hero-activities .activity-chips { flex: 1; min-width: 0; }
+
+/* Entries in the Track page: more air, one clock, the duration quiet, actions only on hover. */
+.feed.mode-times { gap: 4px; }
+.feed.mode-times .feed-row { padding: 9px 10px; }
+.feed.mode-times .feed-times .time-field { color: var(--muted); }
+.feed.mode-times .feed-times .time-field:hover, .feed.mode-times .feed-times .time-field:focus { color: var(--text); }
+.feed.mode-times .feed-dur { color: var(--muted); font-weight: 600; }
+.feed-row.running .feed-dur { color: var(--accent-strong); }
+.feed-actions .icon-btn { opacity: 0; transition: opacity 0.15s; color: var(--muted); }
+.feed-row:hover .feed-actions .icon-btn, .feed-row:focus-within .feed-actions .icon-btn { opacity: 1; }
+.feed-actions .icon-btn:last-child:hover { color: var(--danger); }
+.entries-head-add { margin-left: 4px; }
+/* Sections you only read (activity trail): no card, a quiet panel on the page. */
+.quiet-section { padding: 14px 18px; border-radius: 14px; background: color-mix(in srgb, var(--field) 55%, transparent); }
+@media (hover: none) { .feed-actions .icon-btn { opacity: 1; } }
+.feed-times .time-field::-webkit-calendar-picker-indicator { display: none; }
+.feed-clock { color: var(--muted); margin-right: 2px; }
+.entries-add { background: var(--accent-soft) !important; color: var(--accent-strong) !important; border: 0 !important; font-weight: 700; }
+.card-head { display: flex; align-items: center; gap: 12px; }
+/* Compact times so project, task and billable fit without clipping. */
+.feed.mode-times .feed-row { grid-template-columns: minmax(110px, 1fr) minmax(0, max-content) 214px 60px; }
+.feed.mode-times .feed-times { gap: 2px; }
+.feed.mode-times .feed-times .time-field { width: 58px; }
+.feed.mode-times .feed-times .now { width: 58px; }
+.feed.mode-times .feed-dur { min-width: 70px; }
+.feed-meta .project-select select { max-width: 170px; }
+.feed.mode-times .feed-row { grid-template-columns: minmax(150px, 1fr) auto 214px 60px; }
+.feed-meta { gap: 6px; }
+.feed-meta .project-select select { max-width: 150px; }
+.feed-meta .picker select { max-width: 120px; text-overflow: ellipsis; }
+/* Selects as wide as their current value, not their longest option. */
+.hero-meta select { field-sizing: content; }
+/* Entry rows: a fixed meta column so rows line up; long names are cut inside their own picker. */
+.feed.mode-times .feed-row { grid-template-columns: minmax(140px, 1fr) 380px 214px 60px; }
+.feed-meta .project-select select { width: 150px; }
+.feed-meta .picker select { width: 92px; max-width: 92px; }

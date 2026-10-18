@@ -2,7 +2,7 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import { useStore } from './store';
 import { Icon } from './icons';
-import { addProject } from './actions';
+import { addProject, activitiesOn } from './actions';
 import { planItemsOn } from './plan';
 import { atTime, dayKey, toTimeInput, uid, useNow } from './time';
 import { t } from './i18n';
@@ -88,7 +88,7 @@ export function ActivitySelect({ value, onChange }: { value?: string; onChange: 
 /** One chip per activity; the selected one is filled with its color. */
 export function ActivityChips({ value, onPick }: { value?: string; onPick: (id: string) => void }) {
   const { data } = useStore();
-  if (!data.activities.length) return null;
+  if (!activitiesOn(data)) return null;
   return (
     <div className="activity-chips">
       {data.activities.map((a) => {

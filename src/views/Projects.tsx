@@ -184,6 +184,17 @@ export default function Projects() {
         </div>
       </section>
 
+      {data.settings.activitiesEnabled === false ? (
+        <section className="card onb-entry">
+          <span className="onb-entry-text">
+            <strong>{t('act.activities')}</strong>
+            <span className="muted small">{t('act.offHint')}</span>
+          </span>
+          <button className="btn" onClick={() => update((d) => ({ ...d, settings: { ...d.settings, activitiesEnabled: true } }))}>
+            {t('act.turnOn')}
+          </button>
+        </section>
+      ) : (
       <section className="card">
         <h3>{t('act.activities')}</h3>
         <p className="muted small section-hint">
@@ -214,6 +225,7 @@ export default function Projects() {
           ))}
         </div>
       </section>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store';
-import { addBreakBetween, breakBeforeRunning, closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
+import { activitiesOn, addBreakBetween, breakBeforeRunning, closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
 import { planItemsOn } from './plan';
 import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from './time';
 import { targetHoursOn } from './schedule';
@@ -134,7 +134,7 @@ function useTrayBridge(onShowReview: () => void) {
       runningDetail: running ? t('durationSince', { duration: fmtDuration(entryMs(running, now)), time: fmtTime(running.start) }) : undefined,
       runningProjectColor: running ? p?.color ?? '#B0BEC5' : undefined,
       projects: data.projects.map(({ id, name, color }) => ({ id, name, color })),
-      activities: data.activities.map(({ id, name, color }) => ({ id, name, color })),
+      activities: activitiesOn(data) ? data.activities.map(({ id, name, color }) => ({ id, name, color })) : [],
       runningActivityId: running?.activityId,
       recent,
       todayPlan,

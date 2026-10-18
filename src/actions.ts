@@ -6,6 +6,8 @@ import { goalFor, planItemsOn } from './plan';
 export const PROJECT_COLORS = ['#03A9F4', '#8BC34A', '#FF9800', '#E91E63', '#9C27B0', '#009688', '#3F51B5', '#795548', '#F44336', '#607D8B'];
 
 export const runningEntry = (d: Data) => d.entries.find((e) => !e.end);
+/** Whether activities are in use (Settings → Tracking); data from before the switch keeps them. */
+export const activitiesOn = (d: Data) => d.settings.activitiesEnabled !== false && d.activities.length > 0;
 export const todayWorkday = (d: Data) => d.workdays.find((w) => w.date === dayKey(new Date()));
 export const isOnBreak = (w?: Workday) => Boolean(w && !w.end && w.breaks.some((b) => !b.end));
 

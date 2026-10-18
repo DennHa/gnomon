@@ -42,7 +42,8 @@ function migrateTags(d: LegacyData): Partial<Data> {
 function normalize(raw: unknown): Data {
   if (!raw || typeof raw !== 'object') {
     const activities = t('starter.activities').split('|').map((name, i) => ({ id: uid(), name, color: PROJECT_COLORS[(i + 3) % PROJECT_COLORS.length] }));
-    return { ...DEFAULT_DATA, activities };
+    // New installs start without activities (less to think about); they can be switched on in Settings.
+    return { ...DEFAULT_DATA, activities, settings: { ...DEFAULT_DATA.settings, activitiesEnabled: false } };
   }
   const d = migrateTags(raw as LegacyData);
   // Older versions had an on/off switch for the time in the menu bar.

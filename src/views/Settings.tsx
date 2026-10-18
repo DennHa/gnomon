@@ -579,6 +579,13 @@ export default function Settings() {
           </select>
         </label>
         <label className="check-row">
+          <input type="checkbox" checked={s.activitiesEnabled !== false} onChange={(e) => set({ activitiesEnabled: e.target.checked })} />
+          <span>
+            {t('set.activities')}
+            <span className="muted small field-hint">{t('set.activitiesHint')}</span>
+          </span>
+        </label>
+        <label className="check-row">
           <input type="checkbox" checked={s.reminders !== false} onChange={(e) => set({ reminders: e.target.checked })} />
           <span>
             {t('rem.setting')}

@@ -1,7 +1,7 @@
 // Entry rows shared by Today (exact times) and the Timesheet modals (hours).
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from './store';
-import { appendEntry, deleteEntry, startTimer, updateEntry } from './actions';
+import { activitiesOn, appendEntry, deleteEntry, startTimer, updateEntry } from './actions';
 import { BillableToggle, ProjectSelect, TimeField } from './components';
 import { Icon } from './icons';
 import { planItemsOn } from './plan';
@@ -40,7 +40,7 @@ export function TaskPicker({ projectId, day, value, name, onChange }: { projectI
 export function ActivityPicker({ value, onChange }: { value?: string; onChange: (id?: string) => void }) {
   const { data } = useStore();
   const current = data.activities.find((a) => a.id === value);
-  if (!data.activities.length) return null;
+  if (!activitiesOn(data)) return null;
   return (
     <label className={`picker ${current ? 'set' : ''}`} style={current ? { color: current.color } : undefined} title={t('activity')}>
       <Icon name="label" size={16} />
@@ -108,6 +108,7 @@ function FeedRow({ entry, mode, showProject, readOnly }: { entry: Entry; mode: '
       </div>
       {mode === 'times' ? (
         <span className="feed-times">
+          <Icon name="schedule" size={16} className="feed-clock" />
           <TimeField value={entry.start} day={day} onChange={(start) => set({ start })} />
           <span className="muted">–</span>
           {entry.end ? <TimeField value={entry.end} day={day} onChange={(end) => set({ end })} /> : <span className="muted now">{t('now')}</span>}
