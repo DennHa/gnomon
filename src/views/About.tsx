@@ -97,17 +97,19 @@ function Updates({ info }: { info: Info }) {
   );
 }
 
-export default function About() {
+export default function About({ onOpenLabs }: { onOpenLabs: () => void }) {
   const { data, update } = useStore();
   const [info, setInfo] = useState<Info | null>(null);
-  // Easter egg: five clicks on the icon within three seconds unlock Daylight (and switch it on).
+  // Easter egg: five clicks on the icon within three seconds open Labs, the hidden Settings tab, and unlock Daylight
+  // (switched on the first time). Labs hidden again? The same five clicks bring it back.
   const clicks = useRef<number[]>([]);
   const [unlocked, setUnlocked] = useState(0);
   const tapIcon = () => {
     const now = Date.now();
     clicks.current = [...clicks.current.filter((c) => now - c < 3000), now];
-    if (clicks.current.length < 5 || data.settings.daylightUnlocked) return;
-    update((d) => ({ ...d, settings: { ...d.settings, daylightUnlocked: true, daylight: true } }));
+    const s = data.settings;
+    if (clicks.current.length < 5 || (s.labs ?? s.daylightUnlocked)) return;
+    update((d) => ({ ...d, settings: { ...d.settings, labs: true, daylightUnlocked: true, ...(!d.settings.daylightUnlocked && { daylight: true }) } }));
     setUnlocked(now);
   };
   useEffect(() => {
@@ -129,7 +131,10 @@ export default function About() {
 
       {unlocked > 0 && (
         <p className="egg" role="status">
-          <strong>{t('egg.title')}</strong> {t('egg.text')}
+          <strong>{t('egg.title')}</strong> {t('egg.text')}{' '}
+          <button className="link-btn" onClick={onOpenLabs}>
+            {t('egg.open')}
+          </button>
         </p>
       )}
 

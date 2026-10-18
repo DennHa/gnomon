@@ -336,12 +336,13 @@ function ApiSettings() {
   );
 }
 
-type SettingsTab = 'general' | 'tracking' | 'menubar' | 'connections';
+type SettingsTab = 'general' | 'tracking' | 'menubar' | 'connections' | 'labs';
 const TABS: { id: SettingsTab; icon: IconName; label: MsgKey }[] = [
   { id: 'general', icon: 'tune', label: 'set.tab.general' },
   { id: 'tracking', icon: 'timer', label: 'set.tab.tracking' },
   { id: 'menubar', icon: 'keyboard', label: 'set.tab.menubar' },
   { id: 'connections', icon: 'hub', label: 'set.tab.connections' },
+  { id: 'labs', icon: 'science', label: 'set.tab.labs' },
 ];
 const TAB_KEY = 'gnomon.settingsTab';
 
@@ -455,7 +456,11 @@ export default function Settings() {
   const { data, update, profile } = useStore();
   const s = data.settings;
   const set = (p: Partial<S>) => update((d) => ({ ...d, settings: { ...d.settings, ...p } }));
-  const [tab, setTab] = useState<SettingsTab>(initialTab);
+  const labs = s.labs ?? Boolean(s.daylightUnlocked);
+  const [tab, setTab] = useState<SettingsTab>(() => {
+    const first = initialTab();
+    return first === 'labs' && !labs ? 'general' : first;
+  });
   const choose = (id: SettingsTab) => {
     setTab(id);
     try {
@@ -468,13 +473,53 @@ export default function Settings() {
   return (
     <div className="page narrow settings-page">
       <nav className="settings-tabs" role="tablist">
-        {TABS.map((x) => (
+        {TABS.filter((x) => x.id !== 'labs' || labs).map((x) => (
           <button key={x.id} role="tab" aria-selected={tab === x.id} className={`settings-tab ${tab === x.id ? 'active' : ''}`} onClick={() => choose(x.id)}>
             <Icon name={x.icon} size={18} />
             {t(x.label)}
           </button>
         ))}
       </nav>
+
+      {tab === 'labs' && labs && (
+        <section className="card">
+          <h3>
+            <Icon name="science" size={20} /> {t('set.tab.labs')}
+          </h3>
+          <p className="muted small section-hint">{t('labs.hint')}</p>
+          <div className="labs-row">
+            <span>
+              <strong>{t('set.morning')}</strong>
+              <span className="muted small field-hint">{t('labs.morningHint')}</span>
+            </span>
+            <button className="btn" onClick={() => window.dispatchEvent(new Event('gnomon:morning-preview'))}>
+              <Icon name="wb_sunny" size={18} /> {t('labs.morningShow')}
+            </button>
+          </div>
+          <label className="check-row">
+            <input type="checkbox" checked={Boolean(s.daylight)} onChange={(e) => set({ daylight: e.target.checked })} />
+            <span>
+              {t('set.daylight')}
+              <span className="muted small field-hint">{t('set.daylightHint')}</span>
+            </span>
+          </label>
+          <div className="labs-row">
+            <span>
+              <strong>{t('tour.open')}</strong>
+              <span className="muted small field-hint">{t('tour.openHint')}</span>
+            </span>
+            <button className="btn" onClick={() => set({ tourDone: false })}>
+              <Icon name="waving_hand" size={18} /> {t('tour.open')}
+            </button>
+          </div>
+          <div className="labs-row">
+            <span className="muted small">{t('labs.hideHint')}</span>
+            <button className="btn ghost" onClick={() => (set({ labs: false }), choose('general'))}>
+              <Icon name="visibility_off" size={18} /> {t('labs.hide')}
+            </button>
+          </div>
+        </section>
+      )}
 
       {tab === 'general' && (
         <>
@@ -496,15 +541,6 @@ export default function Settings() {
             <option value="dark">{t('set.appearance.dark')}</option>
           </select>
         </label>
-        {s.daylightUnlocked && (
-          <label className="check-row">
-            <input type="checkbox" checked={Boolean(s.daylight)} onChange={(e) => set({ daylight: e.target.checked })} />
-            <span>
-              {t('set.daylight')}
-              <span className="muted small field-hint">{t('set.daylightHint')}</span>
-            </span>
-          </label>
-        )}
         <div className="field">
           <span>{t('set.accent')}</span>
           <span className="accent-swatches" role="radiogroup" aria-label={t('set.accent')}>

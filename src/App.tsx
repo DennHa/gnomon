@@ -410,6 +410,13 @@ export default function App() {
   const [view, setView] = useState<View>(() => initialView(data.settings.workStyle));
   const [day, setDay] = useState(initialDay);
   const [dayModal, setDayModal] = useState<string | null>(() => (hashParts()[2] === 'day' ? initialDay() : null));
+  // Settings → Labs can play the morning welcome on request.
+  const [morningPreview, setMorningPreview] = useState(false);
+  useEffect(() => {
+    const show = () => setMorningPreview(true);
+    window.addEventListener('gnomon:morning-preview', show);
+    return () => window.removeEventListener('gnomon:morning-preview', show);
+  }, []);
   const started = useRef(false);
   const now = useNow(60_000);
   const lastToday = useRef(dayKey(now));
@@ -537,11 +544,30 @@ export default function App() {
         )}
         {view === 'projects' && <Projects />}
         {view === 'settings' && <Settings />}
-        {view === 'about' && <About />}
+        {view === 'about' && (
+          <About
+            onOpenLabs={() => {
+              try {
+                localStorage.setItem('gnomon.settingsTab', 'labs');
+              } catch {
+                /* storage unavailable: Settings opens on its last tab */
+              }
+              setView('settings');
+            }}
+          />
+        )}
       </main>
       <FitToast />
       {/* First launch: the feature tour. The integrations guide opens only on request (tour's last step or Settings). */}
-      {!data.settings.tourDone ? <Tour /> : data.settings.onboardingDone === false && !profile?.managed ? <Onboarding /> : morningDue(data) && <Morning />}
+      {!data.settings.tourDone ? (
+        <Tour />
+      ) : data.settings.onboardingDone === false && !profile?.managed ? (
+        <Onboarding />
+      ) : morningPreview ? (
+        <Morning preview onClose={() => setMorningPreview(false)} />
+      ) : (
+        morningDue(data) && <Morning />
+      )}
     </div>
   );
 }

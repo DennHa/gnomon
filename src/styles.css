@@ -1055,3 +1055,9 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .tour .tour-connect .muted { flex: 1; line-height: 1.35; }
 .tour .tour-connect .btn { flex: none; padding: 5px 10px; font-size: 13px; }
 .tour-img.small { aspect-ratio: 3 / 1; }
+/* The scrolling step body would clip focus rings at its edges: room for them inside. */
+.tour .onb-body { padding: 3px; margin: -3px; }
+/* Settings → Labs: a row with an explanation and a button. */
+.labs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
+.labs-row > span { display: flex; flex-direction: column; gap: 2px; }
+.egg .link-btn { color: var(--accent-strong); font-weight: 600; margin: 0; }

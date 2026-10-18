@@ -115,6 +115,8 @@ export type Settings = {
   daylightUnlocked?: boolean;
   /** Daylight: sky tint and shadows follow the real sun and moon (src/daylight.ts). */
   daylight?: boolean;
+  /** Labs, the hidden Settings tab (five clicks on the icon under Info & feedback); unset follows daylightUnlocked. */
+  labs?: boolean;
   workStyle?: WorkStyle;
   /** Reminders that fit your way of working (src/reminders.ts and trackNudges in main); on unless switched off. */
   reminders?: boolean;

@@ -36,7 +36,8 @@ function firstUp(d: Data, today: string): TimerInput {
 
 const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-export default function Morning() {
+/** `preview` (from Settings → Labs) plays it all without clocking in or starting anything, and doesn't count as today's. */
+export default function Morning({ preview, onClose }: { preview?: boolean; onClose?: () => void } = {}) {
   const { data, update } = useStore();
   const now = useNow(60_000);
   const today = dayKey(now);
@@ -52,20 +53,21 @@ export default function Morning() {
   const name = data.settings.userName?.trim().split(/\s+/)[0];
   const greeting = t(hour < 12 ? 'morning.morning' : hour < 18 ? 'morning.afternoon' : 'morning.evening');
 
-  const done = () => update((d) => ({ ...d, settings: { ...d.settings, welcomedDay: today } }));
+  const done = () => (preview ? onClose?.() : update((d) => ({ ...d, settings: { ...d.settings, welcomedDay: today } })));
 
   // Off it goes: a little cheer on the button, then the card flies to where the day now lives (the "At work" status,
   // or the running timer) and the page underneath is already updated.
   const go = () => {
-    update((d) => {
-      const day = startDay(d);
-      return live ? startTimer(day, input) : day;
-    });
+    if (!preview)
+      update((d) => {
+        const day = startDay(d);
+        return live ? startTimer(day, input) : day;
+      });
     setCheer(Date.now());
     if (reduceMotion()) return void setTimeout(done, 250);
     setTimeout(() => {
       const el = card.current;
-      const target = document.querySelector(live ? '.hero-clock' : '.att-status')?.getBoundingClientRect();
+      const target = (document.querySelector(live ? '.hero-clock' : '.att-status') ?? document.querySelector('.att-status'))?.getBoundingClientRect();
       if (!el || !target) return done();
       const box = el.getBoundingClientRect();
       const dx = target.left + target.width / 2 - (box.left + box.width / 2);
