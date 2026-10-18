@@ -96,6 +96,12 @@ function TimerHero() {
             aria-expanded={showSuggestions}
             aria-autocomplete="list"
           />
+          {/* Project and task sit inside the field: one shape that reads as "what, on which project". */}
+          <div className="hero-meta">
+            <ProjectSelect value={current.projectId} onChange={(projectId) => edit({ projectId, taskId: undefined, taskName: undefined })} />
+            <TaskPicker projectId={current.projectId} day={dayKey(now)} value={current.taskId} name={current.taskName} onChange={(taskId, taskName) => edit({ taskId, taskName })} />
+            <BillableToggle value={current.billable} onChange={(billable) => edit({ billable })} />
+          </div>
           {showSuggestions && (
             <ul className="hero-suggest" role="listbox">
               {suggestions.map((sg, i) => (
@@ -113,11 +119,6 @@ function TimerHero() {
           {/* Keyed, so the icon re-enters with a small turn when play becomes stop and back. */}
           <Icon key={running ? 'stop' : 'play'} name={running ? 'stop' : 'play_arrow'} size={28} className="morph" />
         </button>
-      </div>
-      <div className="hero-meta">
-        <ProjectSelect value={current.projectId} onChange={(projectId) => edit({ projectId, taskId: undefined, taskName: undefined })} />
-        <TaskPicker projectId={current.projectId} day={dayKey(now)} value={current.taskId} name={current.taskName} onChange={(taskId, taskName) => edit({ taskId, taskName })} />
-        <BillableToggle value={current.billable} onChange={(billable) => edit({ billable })} />
       </div>
       {/* Activities on their own row, so they wrap cleanly. */}
       {activitiesOn(data) && (

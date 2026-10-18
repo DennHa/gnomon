@@ -896,7 +896,7 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .feed-meta .project-select select { width: 150px; }
 .feed-meta .picker select { width: 92px; max-width: 92px; }
 /* Week: keep the card's rounded corners over the summary band; hint at the bottom; under-target badge. */
-.card.week { overflow: clip; }
+.card.week { overflow: hidden; overflow-x: auto; } /* scrolls sideways in a narrow window instead of cutting off the right edge */
 .ts-hint { margin: 0; padding: 10px 16px 12px; }
 .under-badge { display: inline-flex; align-items: center; gap: 6px; border: 0; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .under-badge:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); }
@@ -934,7 +934,9 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .timesheet tbody .ts-btn, .timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { opacity: 1; }
 .timesheet tbody .ts-btn.empty { color: color-mix(in srgb, var(--muted) 35%, transparent); }
 .timesheet tbody .ts-btn.planned { color: color-mix(in srgb, var(--muted) 70%, transparent); }
-.timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { color: color-mix(in srgb, var(--muted) 60%, transparent); }
+/* Weekends fade only what's empty or merely planned; hours you actually tracked stay readable. */
+.timesheet tbody td.weekend .ts-btn:not(.short):not(.live) { color: inherit; }
+.timesheet tbody td.weekend .ts-btn.empty, .timesheet tbody td.weekend .ts-btn.planned { color: color-mix(in srgb, var(--muted) 45%, transparent); }
 .timesheet tfoot tr.ts-sum td.today { background-clip: padding-box; }
 /* "+ Add entry" under the list, the same quiet link as "+ Add project" in the week. */
 .link-add { border: 0; background: none; padding: 8px 10px; margin-top: 4px; border-radius: 8px; color: var(--accent-strong); font: inherit; font-weight: 600; cursor: pointer; }
@@ -944,3 +946,15 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .feed-meta .project-select select { width: 136px; }
 .feed-meta .picker select { width: 80px; max-width: 80px; }
 .feed.mode-times .picker-slot { width: 106px; }
+/* Option A: the field is one pill holding the description and the project/task pills. */
+.hero .hero-field { display: flex; align-items: center; gap: 8px; background: var(--field); border-radius: 999px; padding: 6px 8px 6px 0; }
+.hero .hero-field:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+.hero .hero-field .hero-input { flex: 1; min-width: 0; background: none !important; box-shadow: none !important; padding: 8px 8px 8px 22px !important; }
+.hero .hero-field .hero-meta { margin: 0; flex: none; flex-wrap: nowrap; gap: 6px; }
+.hero .hero-field .hero-meta .project-select, .hero .hero-field .hero-meta .picker { background: var(--surface); }
+.hero .hero-field .hero-meta .project-select select { max-width: 180px; }
+.hero .hero-field .hero-meta .picker select { max-width: 140px; }
+/* "0:23 to assign" wraps under the time instead of widening the day column; a narrower goal column. */
+.ts-open { white-space: normal; line-height: 1.25; max-width: 72px; }
+.ts-goal { min-width: 140px; }
+.timesheet .ts-project { min-width: 150px; }
