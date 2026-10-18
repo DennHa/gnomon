@@ -916,3 +916,8 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .bars.month .bar-value { font-size: 10px; }
 .breakdowns { margin-top: 10px; gap: 32px; }
 .breakdown h4 { margin-top: 18px; }
+.plain-section { padding: 6px 18px 14px; }
+.feed.mode-times .picker-slot { width: 118px; flex: none; }
+/* Summary band: a light tint of the card, not the page background showing through. */
+.timesheet tfoot tr.ts-sum td { background: color-mix(in srgb, var(--field) 55%, var(--surface)); }
+.timesheet tfoot tr.ts-sum td.today { background: color-mix(in srgb, var(--accent) 10%, color-mix(in srgb, var(--field) 55%, var(--surface))); }

@@ -167,7 +167,7 @@ export default function Today({ onOpenDay }: { onOpenDay: (d: string) => void })
         </section>
       )}
       {wd?.end && !wd.off && (
-        <section className="card" id="day-review">
+        <section className="plain-section" id="day-review">
           <DayReview day={today} title={t('today.closeDay')} />
         </section>
       )}

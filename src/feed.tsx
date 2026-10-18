@@ -10,10 +10,11 @@ import { dayKey, entryMs, fmtClock, fmtHM, parseDuration } from './time';
 import { t } from './i18n';
 
 /** Compact Float task picker: an icon and the task name, "—" when none. Hidden when the project has no tasks that day. */
-export function TaskPicker({ projectId, day, value, name, onChange }: { projectId?: string; day: string; value?: number; name?: string; onChange: (id?: number, name?: string) => void }) {
+export function TaskPicker({ projectId, day, value, name, onChange, keepSpace }: { projectId?: string; day: string; value?: number; name?: string; onChange: (id?: number, name?: string) => void; keepSpace?: boolean }) {
   const { data } = useStore();
   const items = projectId ? planItemsOn(data, projectId, day) : [];
-  if (!items.length && !value) return null;
+  // In entry rows an empty slot keeps the columns after it lined up.
+  if (!items.length && !value) return keepSpace ? <span className="picker-slot" /> : null;
   return (
     <label className={`picker ${value ? 'set' : ''}`} title={t('floatTask')}>
       <Icon name="task_alt" size={16} />
@@ -102,7 +103,7 @@ function FeedRow({ entry, mode, showProject, readOnly }: { entry: Entry; mode: '
       <input className="feed-desc" value={entry.description} placeholder={t('feed.whatDidYouDo')} disabled={readOnly} onChange={(e) => set({ description: e.target.value })} />
       <div className="feed-meta">
         {showProject && <ProjectSelect value={entry.projectId} onChange={(projectId) => set({ projectId, taskId: undefined, taskName: undefined })} />}
-        <TaskPicker projectId={entry.projectId} day={day} value={entry.taskId} name={entry.taskName} onChange={(taskId, taskName) => set({ taskId, taskName })} />
+        <TaskPicker keepSpace={mode === 'times'} projectId={entry.projectId} day={day} value={entry.taskId} name={entry.taskName} onChange={(taskId, taskName) => set({ taskId, taskName })} />
         <ActivityPicker value={entry.activityId} onChange={(activityId) => set({ activityId })} />
         <BillableToggle value={entry.billable} onChange={(billable) => set({ billable })} />
       </div>
