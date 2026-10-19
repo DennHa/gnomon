@@ -153,7 +153,12 @@ wanted, keep the folder empty and share the app another way (e.g. a private GitH
 The Mac app looks for updates at `<server>/latest/version.json` of the server it's paired with, or at the `updateUrl`
 or `serverUrl` of a company profile (see `docs/company-setup.md`), so the download can live on any host.
 
-## Web demo (optional)
+## One-page site and web demo (optional)
+
+**`/about`** serves the one-page site from `site/` in the repo: put that folder on the server and point `GNOMON_SITE_DIR`
+at it (in Docker: mount it read-only). Public, static, nothing from other servers.
+
+### Web demo
 
 Show Gnomon to people before they download it: **`/example`** is the Mac app's own interface in the browser, and
 **`/example/phone`** the phone app (in a phone-shaped frame on a computer), both on made-up data. The demo never talks to

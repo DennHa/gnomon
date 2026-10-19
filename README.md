@@ -1,107 +1,79 @@
 <p align="center"><img src="docs/icon.png" width="96" alt="Gnomon icon"></p>
 
-<h1 align="center">Gnomon</h1>
+<h1 align="center">Know where your day went.</h1>
 
-<p align="center"><b>Work hours and project time for your Mac, without the busywork.</b><br>
-Clock in and out, see where your time went, and always know your overtime balance.</p>
+<p align="center"><b>Gnomon</b> keeps your work hours, your projects and your overtime in one calm app for your Mac and your
+phone. It fits the way you work, and once it's set up, it stays out of your way.</p>
 
 <p align="center"><img src="docs/hero/hero-timer.jpg" width="880" alt="Gnomon: a running timer, close up"></p>
 
 <p align="center"><b><a href="https://github.com/DennHa/gnomon/releases/latest">⬇ Download for Mac</a></b> · <a href="CHANGELOG.md">What's new</a></p>
 
-<p align="center"><sub>A gnomon is the pointer on a sundial: the oldest time-tracking tool there is.</sub></p>
+| **Easy** | **Your way** | **Set and forget** | **Every device** |
+|---|---|---|---|
+| One click starts the day. A few letters start a timer, from any app. | Clock in and fill in later, or time every task live. Switch whenever you like. | It lives in the menu bar and only speaks up when something is missing. | Mac and phone, in sync. In the browser soon, too. |
 
-## Why Gnomon
+## Fits the way you already work
 
-Most time trackers make you choose: an attendance clock for HR, or a project timer for invoices, and both expect you
-to remember to press start. Gnomon does both in one place and fits the way you already work.
+Some people clock in and sort out the hours at the end of the day or the week. Others time every task as it happens.
+Gnomon is good at both, asks on the first start which one sounds like you, and lets you switch any time.
 
-- **Works the way you do.** Some people clock in and sort out the details at the end of the day; others time every
-  task live. Gnomon is good at both, and you can switch whenever you like.
-- **Attendance and project time never disagree.** Time on projects always lies inside the hours you were at work.
-  Add an entry outside your hours and your workday adjusts; a day with entries but no clock-in gets one from them.
-- **Your overtime balance, always right.** A work schedule per weekday (part time, a free Friday, a change from
-  July on), vacation and sick days, and time off in lieu all count correctly, month by month.
-- **Out of the way.** It lives in the menu bar, works with keyboard shortcuts from any app, and only reminds you when
-  something is actually missing.
-- **Private by default.** Your data stays on your Mac. No account, no cloud, no analytics. A phone app is optional and
-  runs on your own server.
+- **Clock in, fill in later:** *Start day*, *Break*, *Leave*, then put the hours on projects in the **Week**, a timesheet
+  that shows what's still unassigned. Copy last week or fill it from your plan in one click.
+- **Track live:** start a timer, switch project or activity with a click, no stopping in between. The first timer
+  clocks you in.
 
-## Two ways to work
+Either way, project time always fits the hours you were actually at work.
 
-Gnomon asks on the first start which one sounds like you, and opens on the page that fits. Both are always available.
+<img src="docs/hero/hero-week.jpg" width="880" alt="The week as a timesheet, hours per project and day">
 
-**Clock in, fill in later.** You record when you arrive and leave, and assign the hours afterwards.
-1. **Start day** in the morning, **Break** at lunch, **Leave** in the evening: from the sidebar, the menu bar, a
-   shortcut, or your phone.
-2. Later, with your calendar open, the **Week** view shows what's still unassigned for each day.
-3. Type hours into the week, copy last week, or fill it from your project plan. Entries land inside the hours you
-   were at work.
+## Two seconds, from any app
 
-**Track live.** You time what you're doing as you do it.
-1. Start a timer from the **Track** page or with ⌃⌥P from any app. The first timer of the day clocks you in.
-2. Switch project or activity with a click; there's no stopping in between.
-3. Paused between two timers? Gnomon asks whether that was a break. **Leave** stops the running timer.
-
-## What you get
-
-### A good start to the day
-
-The first time you open Gnomon on a workday, a short sunrise greets you by name, with a line from a Greek philosopher.
-One click starts the day; if you track live, the tracker is right there with today's first planned task.
-
-<img src="docs/hero/hero-welcome.jpg" width="880" alt="The morning welcome: a greeting, a quote and Start the day">
-
-### Clock in and out in a click
-
-Start, pause and end your day from the sidebar, the menu bar or a keyboard shortcut. Forgot to clock out? Gnomon
-closes the day at midnight and suggests when you really left, based on your last timer.
-
-<img src="docs/hero/hero-start-day.jpg" width="880" alt="Start day in the sidebar">
-
-### Project time without friction
-
-Start or switch a timer from any app: press ⌃⌥P and type a few letters. Activities (Design, Call, Workshop…) switch
-without stopping the clock, and ready-made activity sets fit designers, project managers, directors, 3D, UX and UI.
-With **Float** connected, your planned projects for the day are one click away, with progress against the plan.
+Press **⌃⌥P** wherever you are, type a few letters of the project, press Enter: the timer runs. Switch to a call or a
+workshop without stopping the clock. With **Float** connected, today's planned projects are one click away.
 
 <img src="docs/screenshots/quick-switcher.png" width="560" alt="Quick switcher: start or switch a timer from any app">
 
-### A week you can fill in afterwards
+## Set it up once. Then forget it's there
 
-The Week view is a timesheet: hours per project and day, what's still unassigned, and shortcuts to repeat yesterday,
-copy last week, or turn your plan into entries. Mark a week as done when it's complete.
+Gnomon sits quietly in the menu bar. Forgot to clock out? It closes the day at midnight and suggests when you really
+left. Added an entry outside your hours? Your workday adjusts. It only reminds you when something is actually missing.
 
-<img src="docs/hero/hero-week.jpg" width="880" alt="Week timesheet with copy last week and fill from plan">
+<img src="docs/hero/hero-start-day.jpg" width="880" alt="Start day in the sidebar, one click">
 
-### Your overtime balance
+## Always know where you stand
 
-Every workday counts against your target from your own work schedule. Vacation and sick days (from **Personio**, or
-marked by hand) don't count against you; days off in lieu use the balance. Start from the balance your company's system
-shows, and Gnomon carries on from there.
+Every workday counts against your own schedule: part time, a free Friday, a change from July on. Vacation and sick days
+(from **Personio**, or marked by hand) don't count against you. Start from the balance your company shows, and Gnomon
+carries it on, month by month.
 
-<img src="docs/hero/hero-balance.jpg" width="880" alt="Overtime balance per month">
+<img src="docs/hero/hero-balance.jpg" width="880" alt="The overtime balance, month by month">
 
-### On your phone, too
+## On your Mac, on your phone
 
-A small web app on your own server: clock in on the way to work, correct today's times, start a timer, and look at your
-week. It syncs with the Mac. Pair a phone by scanning a QR code. See [server/README.md](server/README.md).
+Clock in on the way to work, correct a time on the train, start a timer from the couch. The phone app runs on your own
+Gnomon server and stays in sync with your Mac; pair it by scanning a QR code ([server/README.md](server/README.md)).
 
-<img src="docs/hero/hero-phone.jpg" width="880" alt="The phone web app: time clock and week">
+**Mac** ✓ · **Phone** ✓ · **Web** coming soon
 
-## Connects to
+<img src="docs/hero/hero-phone.jpg" width="880" alt="The phone app: the time clock and the week">
 
-- **Float**: your planned projects and tasks per day, public holidays and time off. Read-only.
-- **Personio**: approved vacation, sick days and other absences become days off. Read-only.
-- **Your own systems**: a local REST API to read times and push entries, for example from a company tool. See
-  [API.md](API.md).
-- **CSV export** of any week or month, with your name on it.
+<details>
+<summary><b>And a little extra:</b> a good start to every day</summary>
+<br>
+The first time you open Gnomon on a workday, a short sunrise greets you, with one click to get going.
+<br><br>
+<img src="docs/hero/hero-welcome.jpg" width="640" alt="The morning welcome: a greeting, a quote and Start the day">
+</details>
 
-## Privacy
+## Private by default
 
-Everything lives on your Mac in `~/Library/Application Support/Gnomon/`, readable only by your user. Tokens and keys are
-encrypted with the macOS keychain. Gnomon only talks to services you connect yourself (Float, Personio, your own Gnomon
-server), and only checks for updates on your own server. There's no account, no analytics and no tracking.
+- **Your data stays with you.** Everything lives on your Mac in `~/Library/Application Support/Gnomon/`, readable
+  only by your user. No account, no cloud, no analytics.
+- **Secrets in the keychain.** Tokens and keys are encrypted by macOS. Gnomon only talks to services you connect
+  yourself, and only checks for updates on your own server.
+- **Works with what you use**, all optional: **Float** (your plan, read-only), **Personio** (your absences, read-only),
+  **CSV export** of any week or month, and a local REST API for your own tools ([API.md](API.md)).
 
 ## Get started
 
@@ -110,35 +82,18 @@ server), and only checks for updates on your own server. There's no account, no 
 2. Open it and drag **Gnomon** into **Applications**.
 3. First start: **right-click Gnomon → Open**, then confirm. The app isn't signed with an Apple Developer ID yet, so
    macOS asks once.
-4. A short tour shows the basics; connect Float or Personio afterwards under Settings → Connections if you use them.
+4. A short intro asks how you like to work; connect Float or Personio afterwards under Settings → Connections.
 
-To have it ready every morning, add Gnomon under System Settings → General → Login Items. Updating: drag the new
-version over the old one; your data stays where it is.
+To have it ready every morning, add Gnomon under System Settings → General → Login Items. Updating: drag the new version
+over the old one; your data stays where it is.
 
 ## For teams (planned)
 
-Float and Personio hand out company-wide admin tokens, which don't belong on every Mac. For teams, a company-run Gnomon
-server holds those tokens and gives each person only their own plan and absences; people sign in with the company login they
-already have (Microsoft, Google, Okta and others, or by invitation), and IT deploys Gnomon preconfigured with Iru or another Mac management tool. The Mac app already
-supports managed settings; the rest is planned. See [docs/company-setup.md](docs/company-setup.md).
+For teams, a company-run Gnomon server holds the Float and Personio admin tokens and gives each person only their own
+plan and absences. People sign in with the company login they already have, and IT deploys Gnomon preconfigured with a
+Mac management tool. The Mac app already supports managed settings; see [docs/company-setup.md](docs/company-setup.md).
 
-## Screenshots
-
-| | |
-|---|---|
-| <img src="docs/screenshots/track.png" alt="Track: running timer, today's plan and entries"> | <img src="docs/screenshots/morning.png" alt="Morning: not clocked in yet"> |
-| <img src="docs/screenshots/week.png" alt="Week timesheet"> | <img src="docs/screenshots/week-day.png" alt="A day in detail"> |
-| <img src="docs/screenshots/reports.png" alt="Reports with the overtime balance"> | <img src="docs/screenshots/quick-switcher.png" alt="Quick switcher (⌃⌥P from any app)"> |
-
-<p>
-<img src="docs/screenshots/phone-clock.png" width="260" alt="Phone: the time clock with Correct today">
-&nbsp;
-<img src="docs/screenshots/phone-today.png" width="260" alt="Phone: today with a running timer">
-&nbsp;
-<img src="docs/screenshots/phone-week.png" width="260" alt="Phone: this week">
-</p>
-
-<sub>All pictures use made-up demo data.</sub>
+<p align="center"><sub>A <i>gnomon</i> is the pointer on a sundial: the oldest time tracker there is. All pictures use made-up data.</sub></p>
 
 ---
 
@@ -161,6 +116,10 @@ Keep the project outside synced folders such as Nextcloud, which strip the execu
 `npm run dist && npm run release:manifest` and upload the `.dmg`. A Gnomon server can host the download and the
 `version.json` the app's update check reads (see
 [server/README.md](server/README.md#download-page-for-the-mac-app-optional)).
+
+**Site and demo.** `site/` is a one-page site (static files, no build step); `npm run build:demo` builds the web demo
+into `dist-demo/`. A Gnomon server serves them at `/about` and `/example` (see
+[server/README.md](server/README.md#one-page-site-and-web-demo-optional)).
 
 **Pictures.** `sh scripts/screenshots.sh` and `node node_modules/electron/cli.js scripts/phone-screenshots.cjs` retake
 the screenshots with demo data (`scripts/demo-data.cjs`); `scripts/hero-shots.cjs` renders the close-ups; `npm run icon`

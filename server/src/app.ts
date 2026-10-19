@@ -18,7 +18,8 @@ const PAIR_LOCK_MS = 15 * 60_000;
 /** releasesDir: optional folder with version.json and the .dmg for /latest (see releases.ts). */
 /** company: the setup wizard's settings and secrets (company.ts); without it, /setup and /admin aren't served. */
 /** demoDir: optional folder with the web demo (npm run build:demo in the repo root), served at /example. */
-export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string };
+/** siteDir: optional folder with the one-page site (site/ in the repo), served at /about. */
+export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string; siteDir?: string };
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -40,9 +41,13 @@ const MIME: Record<string, string> = {
   '.ico': 'image/x-icon',
   '.jpg': 'image/jpeg',
   '.woff2': 'font/woff2',
+  '.jpeg': 'image/jpeg',
 };
 
 // The web demo (/example) is the Mac app's own interface, which sets some styles inline; it never talks to the server.
+// The one-page site (/about): static, nothing inline, nothing from elsewhere.
+const SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
 // On a computer, the phone view sits in a phone-shaped frame of its own page, so framing by itself is allowed.
 const DEMO_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'";
 
@@ -80,7 +85,7 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
   });
 }
 
-export function createApp({ store, webDir, releasesDir, company, demoDir }: AppOptions) {
+export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
@@ -366,25 +371,28 @@ export function createApp({ store, webDir, releasesDir, company, demoDir }: AppO
   }
 
   /**
-   * The web demo: /example is the Mac app's interface, /example/phone the phone app, both on made-up data that lives
-   * only in the visitor's browser. Public, read-only files; without demoDir it's not served.
+   * A public folder of static files under a path prefix: the web demo (/example: the Mac app's interface, /example/phone
+   * the phone app, both on made-up data that lives only in the visitor's browser) and the one-page site (/about).
+   * Folders are served as their index.html; a folder without its slash is redirected, so relative paths resolve.
    */
-  function serveDemo(req: IncomingMessage, res: ServerResponse, url: URL) {
-    if (!demoDir || (req.method !== 'GET' && req.method !== 'HEAD')) return send(res, 404, { error: 'not_found', message: 'Not found' });
-    let rel = decodeURIComponent(url.pathname).replace(/^\/example/, '') || '/';
-    if (rel === '/' || rel === '/phone' || rel === '/phone/') rel = rel.startsWith('/phone') ? '/phone/index.html' : '/index.html';
-    // /example without the slash: send it to /example/ so the page's relative asset paths resolve.
-    if (url.pathname === '/example' || url.pathname === '/example/phone') {
-      res.writeHead(301, { ...SECURITY_HEADERS, Location: `${url.pathname}/` });
-      return res.end();
+  function serveFolder(req: IncomingMessage, res: ServerResponse, url: URL, prefix: string, dir: string | undefined, headers: Record<string, string>) {
+    if (!dir || (req.method !== 'GET' && req.method !== 'HEAD')) return send(res, 404, { error: 'not_found', message: 'Not found' });
+    const rel = decodeURIComponent(url.pathname).slice(prefix.length) || '/';
+    const root = path.resolve(dir);
+    let file = path.resolve(root, `.${rel}`);
+    if (file !== root && !file.startsWith(root + path.sep)) return send(res, 404, { error: 'not_found', message: 'Not found' });
+    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
+      if (!url.pathname.endsWith('/')) {
+        res.writeHead(301, { ...SECURITY_HEADERS, Location: `${url.pathname}/` });
+        return res.end();
+      }
+      file = path.join(file, 'index.html');
     }
-    const file = path.resolve(demoDir, `.${rel}`);
-    if (!file.startsWith(path.resolve(demoDir) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { error: 'not_found', message: 'Not found' });
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { error: 'not_found', message: 'Not found' });
     const content = fs.readFileSync(file);
     res.writeHead(200, {
       ...SECURITY_HEADERS,
-      'X-Frame-Options': 'SAMEORIGIN',
-      'Content-Security-Policy': DEMO_CSP,
+      ...headers,
       'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream',
       'Content-Length': content.length,
       'Cache-Control': 'no-cache',
@@ -427,7 +435,9 @@ export function createApp({ store, webDir, releasesDir, company, demoDir }: AppO
       if (url.pathname === '/api/v1' || url.pathname.startsWith('/api/v1/')) return await handleApi(req, res, url);
       if (url.pathname.startsWith('/api/')) return send(res, 404, { error: 'not_found', message: 'Use /api/v1/…' });
       if (url.pathname === '/latest' || url.pathname.startsWith('/latest/')) return serveRelease(req, res, url);
-      if (url.pathname === '/example' || url.pathname.startsWith('/example/')) return serveDemo(req, res, url);
+      if (url.pathname === '/example' || url.pathname.startsWith('/example/'))
+        return serveFolder(req, res, url, '/example', demoDir, { 'X-Frame-Options': 'SAMEORIGIN', 'Content-Security-Policy': DEMO_CSP });
+      if (url.pathname === '/about' || url.pathname.startsWith('/about/')) return serveFolder(req, res, url, '/about', siteDir, { 'Content-Security-Policy': SITE_CSP });
       return serveStatic(req, res, url);
     } catch (err) {
       if (err instanceof HttpError) return send(res, err.status, { error: err.code, message: err.message });

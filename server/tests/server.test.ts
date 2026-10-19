@@ -345,6 +345,52 @@ describe('download page (/latest)', () => {
   });
 });
 
+describe('static folders (/about, /example)', () => {
+  test('served from their own folders, with redirects for the slash, and nothing outside them', async () => {
+    const site = path.join(dir, 'site');
+    const demo = path.join(dir, 'demo');
+    fs.mkdirSync(path.join(site, 'img'), { recursive: true });
+    fs.mkdirSync(path.join(demo, 'phone'), { recursive: true });
+    fs.writeFileSync(path.join(site, 'index.html'), '<h1>Gnomon site</h1>');
+    fs.writeFileSync(path.join(site, 'img', 'a.jpg'), Buffer.alloc(10));
+    fs.writeFileSync(path.join(demo, 'index.html'), '<h1>Mac demo</h1>');
+    fs.writeFileSync(path.join(demo, 'phone', 'index.html'), '<h1>Phone demo</h1>');
+    fs.writeFileSync(path.join(dir, 'secret.txt'), 'nope');
+    const app = http.createServer(createApp({ store, webDir, siteDir: site, demoDir: demo }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    try {
+      const noFollow = { redirect: 'manual' as const };
+      assert.equal((await fetch(`${url}/about`, noFollow)).headers.get('location'), '/about/');
+      const page = await fetch(`${url}/about/`);
+      assert.match(await page.text(), /Gnomon site/);
+      assert.match(page.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/);
+      assert.equal((await fetch(`${url}/about/img/a.jpg`)).headers.get('content-type'), 'image/jpeg');
+      assert.equal((await fetch(`${url}/example/phone`, noFollow)).headers.get('location'), '/example/phone/');
+      assert.match(await (await fetch(`${url}/example/phone/`)).text(), /Phone demo/);
+      assert.match(await (await fetch(`${url}/example/`)).text(), /Mac demo/);
+      // Encoded dots can't climb out of the folder.
+      assert.equal((await fetch(`${url}/about/%2e%2e/secret.txt`)).status, 404);
+      assert.equal((await fetch(`${url}/example/%2e%2e/secret.txt`)).status, 404);
+      assert.equal((await fetch(`${url}/about/nothing.html`)).status, 404);
+    } finally {
+      await new Promise((r) => app.close(r));
+    }
+  });
+
+  test('not served without a folder', async () => {
+    const app = http.createServer(createApp({ store, webDir }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    try {
+      assert.equal((await fetch(`${url}/about/`)).status, 404);
+      assert.equal((await fetch(`${url}/example/`)).status, 404);
+    } finally {
+      await new Promise((r) => app.close(r));
+    }
+  });
+});
+
 describe('company setup (wizard API)', () => {
   test('setup code → session → settings, Float and Personio checks, profile, invitation, finish', async () => {
     const { Company } = await import('../src/company');
