@@ -45,6 +45,13 @@ Gnomon asks on the first start which one sounds like you, and opens on the page 
 
 ## What you get
 
+### A good start to the day
+
+The first time you open Gnomon on a workday, a short sunrise greets you by name, with a line from a Greek philosopher.
+One click starts the day; if you track live, the tracker is right there with today's first planned task.
+
+<img src="docs/hero/hero-welcome.jpg" width="880" alt="The morning welcome: a greeting, a quote and Start the day">
+
 ### Clock in and out in a click
 
 Start, pause and end your day from the sidebar, the menu bar or a keyboard shortcut. Forgot to clock out? Gnomon

@@ -18,6 +18,7 @@ const SHOTS = [
   { file: 'hero-start-day.jpg', img: 'morning-dark.png', theme: 'dark', focus: [0.12, 0.76], tilt: [22, 28, -6], zoom: 2.1, sharp: 0.24 },
   { file: 'hero-timer.jpg', img: 'track.png', theme: 'dark', focus: [0.68, 0.2], tilt: [16, -20, 4], zoom: 1.45, sharp: 0.45 },
   { file: 'hero-week.jpg', img: 'week-dark.png', theme: 'dark', focus: [0.55, 0.38], tilt: [26, -18, 6], zoom: 1.6, sharp: 0.32 },
+  { file: 'hero-welcome.jpg', img: 'morning.png', theme: 'light', focus: [0.5, 0.48], tilt: [14, -16, 3], zoom: 1.35, sharp: 0.42 },
   { file: 'hero-balance.jpg', img: 'reports.png', theme: 'dark', focus: [0.7, 0.4], tilt: [20, 26, -5], zoom: 1.7, sharp: 0.3 },
 ];
 
