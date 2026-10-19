@@ -60,22 +60,30 @@ export class ApiError extends Error {
 let onUnauthorized = () => {};
 export const setUnauthorizedHandler = (fn: () => void) => (onUnauthorized = fn);
 
+/** How a request reaches the server: fetch normally; the web demo answers in the browser instead (src/demo). */
+export type Transport = (method: string, path: string, body: unknown, key: string | null) => Promise<{ status: number; json: { message?: string } & Record<string, unknown> }>;
+const fetchTransport: Transport = async (method, path, body, key) => {
+  const res = await fetch(`/api/v1${path}`, {
+    method,
+    headers: { ...(key && { Authorization: `Bearer ${key}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: 'no-store',
+  });
+  return { status: res.status, json: await res.json().catch(() => ({})) };
+};
+let transport = fetchTransport;
+export const setTransport = (t: Transport) => (transport = t);
+
 export async function call<T>(method: string, path: string, body?: unknown, key = getKey()): Promise<T> {
-  let res: Response;
+  let res: Awaited<ReturnType<Transport>>;
   try {
-    res = await fetch(`/api/v1${path}`, {
-      method,
-      headers: { ...(key && { Authorization: `Bearer ${key}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      cache: 'no-store',
-    });
+    res = await transport(method, path, body, key);
   } catch {
     throw new ApiError(0, 'offline');
   }
-  const json = await res.json().catch(() => ({}));
   if (res.status === 401 && path !== '/pair') onUnauthorized();
-  if (!res.ok) throw new ApiError(res.status, json.message ?? res.statusText);
-  return json as T;
+  if (res.status >= 400) throw new ApiError(res.status, res.json.message ?? String(res.status));
+  return res.json as T;
 }
 
 export const api = {

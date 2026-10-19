@@ -153,6 +153,19 @@ wanted, keep the folder empty and share the app another way (e.g. a private GitH
 The Mac app looks for updates at `<server>/latest/version.json` of the server it's paired with, or at the `updateUrl`
 or `serverUrl` of a company profile (see `docs/company-setup.md`), so the download can live on any host.
 
+## Web demo (optional)
+
+Show Gnomon to people before they download it: **`/example`** is the Mac app's own interface in the browser, and
+**`/example/phone`** the phone app (in a phone-shaped frame on a computer), both on made-up data. The demo never talks to
+the server: each visitor's changes stay in their own browser, and *Reset* starts over. It always plays on Wednesday
+of the current week at 14:35, so there's a full week to look at.
+
+1. Build it in the repo root: `npm run build:demo` (writes `dist-demo/`).
+2. Put the contents of `dist-demo/` into a folder on the server and point `GNOMON_DEMO_DIR` at it (in Docker: mount it
+   read-only, like the releases folder).
+
+Without `GNOMON_DEMO_DIR`, `/example` isn't served. Like `/latest`, it's public.
+
 ## API
 
 Everything in [API.md](../API.md) works under `/api/v1` with `Authorization: Bearer <device key>`, same errors and

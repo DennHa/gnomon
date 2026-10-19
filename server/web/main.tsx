@@ -983,4 +983,5 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+// Not in the web demo (/example/phone): it runs on made-up data in the browser and must not replace the real app's cache.
+if ('serviceWorker' in navigator && !(window as { gnomonDemo?: boolean }).gnomonDemo) navigator.serviceWorker.register('/sw.js').catch(() => {});

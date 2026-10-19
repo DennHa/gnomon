@@ -4,10 +4,8 @@ import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { handleApiRequest, type ApiRequest, type ApiResponse } from '../../src/api';
-import { isOnBreak, runningEntry, switchActivity, todayWorkday, toggleBreak, updateWorkday } from '../../src/actions';
-import { atTime, dayKey } from '../../src/time';
-import { targetHoursOn } from '../../src/schedule';
-import type { Data, Entry, Workday } from '../../src/types';
+import { phoneApi } from '../../src/phone';
+import type { Data, Entry } from '../../src/types';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
 import { pickLang, readRelease, releasePage } from './releases';
 import { applyConfigUpdate, mobileconfig, testFloat, testPersonio, type Company } from './company';
@@ -19,7 +17,8 @@ const PAIR_LOCK_MS = 15 * 60_000;
 
 /** releasesDir: optional folder with version.json and the .dmg for /latest (see releases.ts). */
 /** company: the setup wizard's settings and secrets (company.ts); without it, /setup and /admin aren't served. */
-export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company };
+/** demoDir: optional folder with the web demo (npm run build:demo in the repo root), served at /example. */
+export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string };
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -39,7 +38,13 @@ const MIME: Record<string, string> = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.jpg': 'image/jpeg',
+  '.woff2': 'font/woff2',
 };
+
+// The web demo (/example) is the Mac app's own interface, which sets some styles inline; it never talks to the server.
+// On a computer, the phone view sits in a phone-shaped frame of its own page, so framing by itself is allowed.
+const DEMO_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'";
 
 class HttpError extends Error {
   constructor(
@@ -75,54 +80,16 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
   });
 }
 
-export function createApp({ store, webDir, releasesDir, company }: AppOptions) {
+export function createApp({ store, webDir, releasesDir, company, demoDir }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
   const ctx = { get: () => store.get(), commit: (d: Data) => void store.commit(d) };
   /** Run the shared router (src/api.ts), e.g. to serialise an object exactly like API.md describes. */
   const api = (method: string, p: string, query: Record<string, string> = {}, body: unknown = undefined): ApiResponse => handleApiRequest(ctx, { method, path: p, query, body } satisfies ApiRequest);
-  const ok = (r: ApiResponse) => {
-    if (r.status >= 400) throw new HttpError(r.status, (r.body as { error: string }).error, (r.body as { message: string }).message);
-    return r.body;
-  };
+  const phone = phoneApi(ctx, () => ({ cursor: store.cursor() }));
 
   // ---- Server-only routes -------------------------------------------------------------------
-
-  /** Everything the phone's Today screen needs in one request. */
-  function state(device: Device) {
-    const d = store.get();
-    const today = ok(api('GET', '/workdays')) as unknown[];
-    return {
-      device: { id: device.id, name: device.name },
-      serverTime: new Date().toISOString(),
-      timer: (ok(api('GET', '/timer')) as { running: unknown }).running,
-      workday: today[0] ?? null,
-      onBreak: isOnBreak(todayWorkday(d)),
-      // The single breaks of today, so the phone can correct them (the API.md workday only has breakMinutes).
-      breaks: todayWorkday(d)?.breaks.map((b) => ({ start: b.start, end: b.end ?? null })) ?? [],
-      // Today's target from the work schedule (the phone shows progress toward it).
-      dailyTargetHours: targetHoursOn(d, dayKey(new Date())),
-      projects: ok(api('GET', '/projects')),
-      activities: ok(api('GET', '/activities')),
-      cursor: store.cursor(),
-    };
-  }
-
-  function addActivity(body: unknown) {
-    if (!isObj(body)) throw bad('Body must be a JSON object');
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name || name.length > 120) throw bad('name is required (max 120 characters)');
-    const color = body.color;
-    if (color !== undefined && (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color))) throw bad('color must look like #03A9F4');
-    const d = store.get();
-    const existing = d.activities.find((a) => a.name.toLowerCase() === name.toLowerCase());
-    if (existing) return { status: 200, body: { id: existing.id, name: existing.name, color: existing.color } };
-    const palette = ['#E91E63', '#9C27B0', '#009688', '#FF9800', '#3F51B5', '#795548', '#607D8B'];
-    const a = { id: crypto.randomUUID(), name, color: (color as string | undefined) ?? palette[d.activities.length % palette.length] };
-    store.commit({ ...d, activities: [...d.activities, a] });
-    return { status: 201, body: a };
-  }
 
   function pull(query: Record<string, string>) {
     const since = Number(query.since ?? '0');
@@ -195,49 +162,12 @@ export function createApp({ store, webDir, releasesDir, company }: AppOptions) {
     };
   }
 
-  /**
-   * Correct a day's attendance without replacing it: { in: "08:12", out: "17:05" | null, breaks: [{ start, end }] }.
-   * Only the fields you send change; out: null means you're still at work. Times are HH:MM on that day.
-   */
-  function patchWorkday(date: string, body: unknown, device: Device) {
-    if (!isObj(body)) throw bad('Body must be a JSON object');
-    const d = store.get();
-    const w = d.workdays.find((x) => x.date === date);
-    if (!w || w.off) throw new HttpError(404, 'not_found', 'No attendance on this day. Start the day first, or use PUT /workdays/:date.');
-    const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-    const time = (v: unknown, field: string) => {
-      if (typeof v !== 'string' || !TIME.test(v)) throw bad(`${field} must be a time like 08:30`);
-      return atTime(date, v);
-    };
-    const start = body.in !== undefined ? time(body.in, 'in') : w.start;
-    const end = body.out === null ? undefined : body.out !== undefined ? time(body.out, 'out') : w.end;
-    if (end && end <= start) throw bad('out must be after in');
-    if (!end && date !== dayKey(new Date())) throw bad('Only today can stay open (out: null)');
-    let breaks = w.breaks;
-    if (body.breaks !== undefined) {
-      if (!Array.isArray(body.breaks) || body.breaks.length > 20) throw bad('breaks must be a list (at most 20)');
-      breaks = body.breaks.map((b: unknown, i: number) => {
-        if (!isObj(b)) throw bad(`breaks[${i}] must be an object`);
-        const bs = time(b.start, `breaks[${i}].start`);
-        const be = b.end === null || b.end === undefined ? undefined : time(b.end, `breaks[${i}].end`);
-        if (be && be <= bs) throw bad(`breaks[${i}]: end must be after start`);
-        if (bs < start || (end && (be ?? bs) > end)) throw bad(`breaks[${i}] must be between in and out`);
-        if (!be && end) throw bad(`breaks[${i}] needs an end once you've left`);
-        return { start: bs, ...(be && { end: be }) };
-      });
-      if (breaks.filter((b) => !b.end).length > 1) throw bad('Only one break can be open');
-    }
-    store.commit(updateWorkday(d, date, { start, end, breaks }));
-    return state(device);
-  }
-
   function serverRoute(method: string, p: string, query: Record<string, string>, body: unknown, device: Device): ApiResponse | undefined {
     if (method === 'GET' && p === '/me') return { status: 200, body: { id: device.id, name: device.name } };
     if (method === 'DELETE' && p === '/me') {
       store.revokeDevice(device.id);
       return { status: 200, body: { revoked: device.id } };
     }
-    if (method === 'GET' && p === '/state') return { status: 200, body: state(device) };
     if (method === 'POST' && p === '/pair-codes') {
       // A signed-in device (the Mac, or a phone) invites another one, e.g. by showing this code as a QR code.
       const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : 'Phone';
@@ -246,27 +176,10 @@ export function createApp({ store, webDir, releasesDir, company }: AppOptions) {
       const code = store.createPairCode(name, ttl);
       return { status: 201, body: { code: `${code.slice(0, 4)}-${code.slice(4)}`, name, expiresAt: new Date(Date.now() + ttl * 60_000).toISOString() } };
     }
-    if (method === 'POST' && p === '/activities') return addActivity(body);
-    const wd = p.match(/^\/workdays\/(\d{4}-\d{2}-\d{2})$/);
-    if (method === 'PATCH' && wd) return { status: 200, body: patchWorkday(wd[1], body, device) };
-    if (method === 'POST' && p === '/day/break') {
-      const d = store.get();
-      const w: Workday | undefined = todayWorkday(d);
-      if (!w || w.end) throw new HttpError(409, 'not_at_work', 'Start the day before taking a break');
-      store.commit(toggleBreak(d));
-      return { status: 200, body: state(device) };
-    }
-    if (method === 'POST' && p === '/timer/activity') {
-      if (!isObj(body) || typeof body.activityId !== 'string') throw bad('activityId is required');
-      const d = store.get();
-      if (!runningEntry(d)) throw new HttpError(409, 'no_timer', 'No timer is running');
-      if (!d.activities.some((a) => a.id === body.activityId)) throw bad(`Unknown activityId ${body.activityId}`);
-      store.commit(switchActivity(d, body.activityId));
-      return api('GET', '/timer');
-    }
     if (method === 'GET' && p === '/sync') return { status: 200, body: pull(query) };
     if (method === 'POST' && p === '/sync') return { status: 200, body: push(body) };
-    return undefined;
+    // The phone's own routes (state, attendance corrections, breaks, activities) are shared with the web demo.
+    return phone.route(method, p, body, device);
   }
 
   // ---- Request entry point ----------------------------------------------------------------------
@@ -452,6 +365,33 @@ export function createApp({ store, webDir, releasesDir, company }: AppOptions) {
     res.end(req.method === 'HEAD' ? undefined : content);
   }
 
+  /**
+   * The web demo: /example is the Mac app's interface, /example/phone the phone app, both on made-up data that lives
+   * only in the visitor's browser. Public, read-only files; without demoDir it's not served.
+   */
+  function serveDemo(req: IncomingMessage, res: ServerResponse, url: URL) {
+    if (!demoDir || (req.method !== 'GET' && req.method !== 'HEAD')) return send(res, 404, { error: 'not_found', message: 'Not found' });
+    let rel = decodeURIComponent(url.pathname).replace(/^\/example/, '') || '/';
+    if (rel === '/' || rel === '/phone' || rel === '/phone/') rel = rel.startsWith('/phone') ? '/phone/index.html' : '/index.html';
+    // /example without the slash: send it to /example/ so the page's relative asset paths resolve.
+    if (url.pathname === '/example' || url.pathname === '/example/phone') {
+      res.writeHead(301, { ...SECURITY_HEADERS, Location: `${url.pathname}/` });
+      return res.end();
+    }
+    const file = path.resolve(demoDir, `.${rel}`);
+    if (!file.startsWith(path.resolve(demoDir) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { error: 'not_found', message: 'Not found' });
+    const content = fs.readFileSync(file);
+    res.writeHead(200, {
+      ...SECURITY_HEADERS,
+      'X-Frame-Options': 'SAMEORIGIN',
+      'Content-Security-Policy': DEMO_CSP,
+      'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream',
+      'Content-Length': content.length,
+      'Cache-Control': 'no-cache',
+    });
+    res.end(req.method === 'HEAD' ? undefined : content);
+  }
+
   /** The Mac app download: /latest (page), /latest/version.json (update check), /latest/download (.dmg). Public. */
   function serveRelease(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'method_not_allowed', message: 'GET only' });
@@ -487,6 +427,7 @@ export function createApp({ store, webDir, releasesDir, company }: AppOptions) {
       if (url.pathname === '/api/v1' || url.pathname.startsWith('/api/v1/')) return await handleApi(req, res, url);
       if (url.pathname.startsWith('/api/')) return send(res, 404, { error: 'not_found', message: 'Use /api/v1/…' });
       if (url.pathname === '/latest' || url.pathname.startsWith('/latest/')) return serveRelease(req, res, url);
+      if (url.pathname === '/example' || url.pathname.startsWith('/example/')) return serveDemo(req, res, url);
       return serveStatic(req, res, url);
     } catch (err) {
       if (err instanceof HttpError) return send(res, err.status, { error: err.code, message: err.message });

@@ -11,6 +11,7 @@
     "dev": "node node_modules/concurrently/dist/bin/concurrently.js -k -n vite,electron \"node node_modules/vite/bin/vite.js\" \"node node_modules/wait-on/bin/wait-on tcp:5173 && VITE_DEV_SERVER_URL=http://localhost:5173 node node_modules/electron/cli.js .\"",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "build": "node node_modules/typescript/bin/tsc --noEmit && node node_modules/vite/bin/vite.js build",
+    "build:demo": "node node_modules/typescript/bin/tsc --noEmit && node node_modules/vite/bin/vite.js build --config vite.demo.config.ts && node scripts/build-demo-phone.mjs",
     "start": "npm run build && node node_modules/electron/cli.js .",
     "dist": "npm run build && node node_modules/electron-builder/cli.js --mac",
     "icon": "node node_modules/electron/cli.js scripts/make-icon.cjs",

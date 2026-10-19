@@ -16,10 +16,11 @@ const host = process.env.HOST ?? '0.0.0.0';
 const store = new Store(databaseFile(dataDir));
 // Optional download page for the Mac app (/latest); see src/releases.ts.
 const releasesDir = process.env.GNOMON_RELEASES_DIR ? path.resolve(process.env.GNOMON_RELEASES_DIR) : undefined;
+const demoDir = process.env.GNOMON_DEMO_DIR ? path.resolve(process.env.GNOMON_DEMO_DIR) : undefined;
 // Company setup: settings and encrypted tokens for the wizard (src/company.ts).
 const secret = loadSecretKey(dataDir);
 const company = new Company(store, secret.key, secret.source);
-const server = http.createServer(createApp({ store, webDir: path.join(here, 'web'), releasesDir, company }));
+const server = http.createServer(createApp({ store, webDir: path.join(here, 'web'), releasesDir, company, demoDir }));
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
 server.listen(port, host, () => {

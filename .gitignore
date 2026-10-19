@@ -24,3 +24,4 @@ personio-credentials.json
 .vscode/
 .idea/
 .private-patterns
+dist-demo/

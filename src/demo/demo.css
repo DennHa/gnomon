@@ -1,0 +1,17 @@
+/* The web demo's bar: a small pill at the bottom, the same on both views. */
+.demo-bar {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 1000;
+  display: flex; align-items: center; gap: 4px; padding: 5px 6px 5px 14px; border-radius: 999px;
+  font: 500 13px/1.2 -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  color: #f4f1e8; background: rgba(28, 30, 34, 0.92); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); white-space: nowrap;
+}
+.demo-bar strong { margin-right: 6px; font-weight: 600; }
+.demo-bar a, .demo-bar button { border: 0; background: none; color: inherit; font: inherit; padding: 6px 10px; border-radius: 999px; cursor: pointer; text-decoration: none; opacity: 0.85; }
+.demo-bar a:hover, .demo-bar button:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+.demo-bar a.primary { background: #f5b400; color: #1c1e22; opacity: 1; font-weight: 600; }
+.demo-bar a.primary:hover { background: #ffc629; }
+@media (max-width: 520px) {
+  .demo-bar { bottom: auto; top: 8px; font-size: 12px; padding-left: 10px; }
+  .demo-bar strong { display: none; }
+}
