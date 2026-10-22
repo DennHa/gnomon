@@ -80,9 +80,19 @@ describe('auth and pairing', () => {
     const r = await api('POST', '/pair-codes', { name: 'iPad' });
     assert.equal(r.status, 201);
     assert.match(r.body.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    // "iPad" says nothing about which one: the device's own description replaces it.
+    const ipad = 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
     const paired = await api('POST', '/pair', { code: r.body.code }, null);
     assert.equal(paired.status, 201);
-    assert.equal(paired.body.device.name, 'iPad');
+    const named = await req('POST', '/api/v1/pair', { code: (await api('POST', '/pair-codes', { name: 'iPad' })).body.code }, null, { 'User-Agent': ipad });
+    assert.equal(named.body.device.name, 'iPad · Safari');
+    // A name typed on purpose stays; a home-screen app says so; a Mac sends its own name.
+    const kept = await api('POST', '/pair', { code: (await api('POST', '/pair-codes', { name: 'Anna’s iPad' })).body.code }, null);
+    assert.equal(kept.body.device.name, 'Anna’s iPad');
+    const home = await req('POST', '/api/v1/pair', { code: (await api('POST', '/pair-codes', {})).body.code, standalone: true }, null, { 'User-Agent': ipad.replace(/iPad; CPU OS/, 'iPhone; CPU iPhone OS') });
+    assert.equal(home.body.device.name, 'iPhone · home screen app');
+    const mac = await api('POST', '/pair', { code: (await api('POST', '/pair-codes', { name: 'MacBook' })).body.code, client: 'mac', name: 'Alex’s MacBook Pro' }, null);
+    assert.equal(mac.body.device.name, 'Alex’s MacBook Pro');
   });
 
   test('pairing codes for the home-screen hand-over last up to 60 minutes, and the manifest carries them', async () => {
@@ -448,6 +458,52 @@ describe('admin page from a trusted device (no terminal)', () => {
       own.close();
     }
   });
+});
+
+test('admin password: set once while signed in, then sign in from any browser; wrong ones lock for a while', async () => {
+  const { Company } = await import('../src/company');
+  const own = new Store(':memory:');
+  const company = new Company(own, Buffer.alloc(32, 5), 'file');
+  const app = http.createServer(createApp({ store: own, webDir, company }));
+  await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+  const go = async (method: string, p: string, body?: unknown, auth?: string) => {
+    const r = await fetch(`${url}/api/v1/admin${p}`, { method, headers: { ...(auth && { Authorization: `Bearer ${auth}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+    return { status: r.status, body: (await r.json()) as any };
+  };
+  try {
+    assert.deepEqual((await go('GET', '/status')).body, { passwordSet: false });
+    assert.equal((await go('POST', '/login', { password: 'anything at all' })).status, 401, 'no password, no login');
+    // Signed in with a one-time code, set the password.
+    const code = own.createAdminCode('admin', 5);
+    const first = (await go('POST', '/session', { code })).body;
+    assert.equal(first.passwordSet, false);
+    assert.equal((await go('POST', '/password', { password: 'short' }, first.token)).status, 422);
+    assert.equal((await go('POST', '/password', { password: 'correct horse battery' }, first.token)).body.passwordSet, true);
+    assert.equal(own.getMeta('adminPassword')?.includes('correct horse'), false, 'only a hash is kept');
+    // Sign out; the old session is gone.
+    await go('DELETE', '/session', undefined, first.token);
+    assert.equal((await go('GET', '/state', undefined, first.token)).status, 401);
+    // Now straight from the browser.
+    assert.deepEqual((await go('GET', '/status')).body, { passwordSet: true });
+    const login = await go('POST', '/login', { password: 'correct horse battery' });
+    assert.equal(login.status, 201);
+    assert.equal((await go('GET', '/devices', undefined, login.body.token)).status, 200);
+    // Old pairings go with one click; admins stay.
+    const keep = own.addDevice('Alex’s MacBook Pro', 'mac');
+    own.updateDevice(keep.device.id, { admin: true });
+    own.addDevice('iPhone · Safari', 'phone');
+    (own as any).db.prepare('UPDATE devices SET created_at = ? WHERE name = ?').run(new Date(Date.now() - 3 * 86_400_000).toISOString(), 'iPhone · Safari');
+    const cleaned = await go('POST', '/devices/cleanup', undefined, login.body.token);
+    assert.equal(cleaned.body.removed, 1);
+    assert.deepEqual(cleaned.body.devices.map((d: any) => d.name), ['Alex’s MacBook Pro']);
+    // Five wrong passwords lock the login, even for the right one.
+    for (let i = 0; i < 5; i++) assert.equal((await go('POST', '/login', { password: 'wrong guess ' + i })).status, 401);
+    assert.equal((await go('POST', '/login', { password: 'correct horse battery' })).status, 429);
+  } finally {
+    await new Promise((r) => app.close(r));
+    own.close();
+  }
 });
 
 test('a finished company server never hands out the admin right by itself', async () => {

@@ -63,3 +63,11 @@ button.soft.danger { color: var(--danger, #d64545); }
 .a-code { font-size: 22px; font-weight: 700; letter-spacing: 0.08em; }
 @media (max-width: 760px) { .a-device { flex-wrap: wrap; } .a-device-actions { width: 100%; justify-content: flex-end; } .a-group { display: none; } }
 .a-invite code.a-code { font-size: 22px; letter-spacing: 0.08em; word-break: normal; }
+/* Signing in */
+.a-login { max-width: 520px; }
+.a-signout { margin-left: auto; }
+.a-banner { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 16px; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--accent-soft); color: var(--accent-strong); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.a-banner .icon:last-child { margin-left: auto; }
+.a-device.unused { opacity: 0.6; }
+.a-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 600; vertical-align: 2px; }
+.a-cleanup { justify-content: space-between; padding: 10px 14px; border-radius: 12px; background: var(--field); }

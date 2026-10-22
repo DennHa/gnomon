@@ -72,8 +72,8 @@ function App() {
   useEffect(() => {
     if (!key || isStandalone() || handoverPrepared) return;
     handoverPrepared = true;
-    const name = /iPad/.test(navigator.userAgent) ? 'iPad' : /iPhone/.test(navigator.userAgent) ? 'iPhone' : 'Home screen';
-    api.pairCode(`${name} (Home screen)`, 60).then(
+    // No name: the home-screen app names itself when it connects ("iPhone · home screen app").
+    api.pairCode('', 60).then(
       ({ code }) => {
         document.querySelector('link[rel="manifest"]')?.setAttribute('href', `/manifest.webmanifest?pair=${code}`);
         history.replaceState(null, '', `/#pair=${code}`);
@@ -923,7 +923,7 @@ function DeviceView({ onSignOut }: { onSignOut: () => void }) {
 
   async function newInvite() {
     try {
-      const { code } = await api.pairCode('Device');
+      const { code } = await api.pairCode('');
       const qr = qrcode(0, 'M');
       qr.addData(`${location.origin}/#pair=${code}`);
       qr.make();

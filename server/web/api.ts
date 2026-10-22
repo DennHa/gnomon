@@ -88,7 +88,9 @@ export async function call<T>(method: string, path: string, body?: unknown, key 
 
 export const api = {
   state: () => call<State>('GET', '/state'),
-  pair: (code: string) => call<{ key: string; device: { name: string } }>('POST', '/pair', { code }, null),
+  // standalone: opened from the home screen, so the server can name it "iPhone · home screen app".
+  pair: (code: string) =>
+    call<{ key: string; device: { name: string } }>('POST', '/pair', { code, standalone: window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true }, null),
   forgetDevice: () => call('DELETE', '/me'),
   me: (key: string) => call<{ name: string }>('GET', '/me', undefined, key),
   entries: (from: string, to = from) => call<Entry[]>('GET', `/entries?from=${from}&to=${to}`),

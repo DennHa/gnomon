@@ -191,7 +191,7 @@ function ServerSettings() {
   };
 
   const connectPhone = async () => {
-    const r = await window.api.serverPairCode('iPhone');
+    const r = await window.api.serverPairCode(''); // the phone names itself when it connects
     if (!r.ok) return setError(serverError(r.error));
     setError(null);
     const qr = qrcode(0, 'M');

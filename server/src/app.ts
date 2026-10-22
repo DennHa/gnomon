@@ -61,6 +61,16 @@ class HttpError extends Error {
   }
 }
 const bad = (message: string) => new HttpError(422, 'invalid', message);
+
+/** Names that say nothing about which device it is; a device's own description replaces them when it connects. */
+const GENERIC_NAMES = new Set(['', 'phone', 'iphone', 'ipad', 'mac', 'macbook', 'device', 'browser', 'handy', 'gerät']);
+
+/** "iPhone · Safari", "iPhone · home screen app", "Mac · Chrome": what connected, from its browser. */
+export function describeDevice(ua: string, standalone = false): string {
+  const model = /iPad/.test(ua) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android phone' : /Macintosh|Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows PC' : /Linux/.test(ua) ? 'Linux PC' : 'Browser';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /FxiOS|Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'browser';
+  return `${model} · ${standalone ? 'home screen app' : browser}`;
+}
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 function send(res: ServerResponse, status: number, body: unknown) {
@@ -175,7 +185,8 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     }
     if (method === 'POST' && p === '/pair-codes') {
       // A signed-in device (the Mac, or a phone) invites another one, e.g. by showing this code as a QR code.
-      const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : 'Phone';
+      // Without a name, the device names itself when it connects (see describeDevice).
+      const name = isObj(body) && typeof body.name === 'string' ? body.name.trim().slice(0, 60) : '';
       // Up to 60 minutes, for handing the connection over to the home-screen app (added a bit later).
       const ttl = isObj(body) && typeof body.minutes === 'number' ? Math.min(60, Math.max(1, Math.round(body.minutes))) : 10;
       const code = store.createPairCode(name, ttl);
@@ -202,12 +213,21 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   // ---- Request entry point ----------------------------------------------------------------------
 
   // ---- Setup wizard and Admin page (docs/company-setup.md) --------------------------------------
-  // Access: a one-time code from the server log (setup) or from `gnomon-admin admin-link`, traded for a session that
-  // lives in memory for two hours after the last request. A restart signs the admin out.
+  // Access: the admin password (set once, see below), or a one-time code (from the server log, `gnomon-admin admin-link`
+  // or the Mac's "Open server admin"), traded for a session that lives in memory for two hours after the last request.
+  // A restart signs the admin out.
   const adminSessions = new Map<string, number>();
   const ADMIN_SESSION_MS = 2 * 3_600_000;
   let adminFailures = 0;
   let adminLockedUntil = 0;
+  // Wrong passwords: five tries, then 15 minutes of nothing (also for the right one), against guessing.
+  let loginFailures = 0;
+  let loginLockedUntil = 0;
+  const newSession = () => {
+    const token = randomBytes(24).toString('base64url');
+    adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
+    return token;
+  };
 
   function adminSession(req: IncomingMessage): boolean {
     const auth = String(req.headers.authorization ?? '');
@@ -227,11 +247,27 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       keySource: company!.keySource,
       release: release ? { version: release.version, size: release.size } : null,
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
+      passwordSet: store.hasAdminPassword(),
     };
   }
 
   async function adminRoute(req: IncomingMessage, method: string, p: string, body: unknown): Promise<[number, unknown]> {
     if (!company) throw new HttpError(404, 'not_found', 'Company setup isn’t available on this server');
+    // Before signing in: whether a password exists, so the page knows to show the login.
+    if (method === 'GET' && p === '/admin/status') return [200, { passwordSet: store.hasAdminPassword() }];
+    if (method === 'POST' && p === '/admin/login') {
+      if (Date.now() < loginLockedUntil) throw new HttpError(429, 'too_many_attempts', 'Too many wrong passwords. Try again in 15 minutes.');
+      const password = isObj(body) && typeof body.password === 'string' && body.password.length <= 200 ? body.password : '';
+      if (!password || !store.checkAdminPassword(password)) {
+        if (++loginFailures >= 5) {
+          loginFailures = 0;
+          loginLockedUntil = Date.now() + PAIR_LOCK_MS;
+        }
+        throw new HttpError(401, 'wrong_password', 'That password isn’t right');
+      }
+      loginFailures = 0;
+      return [201, { token: newSession(), ...adminState() }];
+    }
     if (method === 'POST' && p === '/admin/session') {
       if (Date.now() < adminLockedUntil) throw new HttpError(429, 'too_many_attempts', 'Too many wrong codes. Try again in 15 minutes.');
       const code = isObj(body) && typeof body.code === 'string' && body.code.length <= 20 ? body.code : '';
@@ -245,11 +281,22 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
         throw new HttpError(401, 'invalid_code', 'This link is wrong, was used already, or has expired');
       }
       adminFailures = 0;
-      const token = randomBytes(24).toString('base64url');
-      adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
-      return [201, { token, ...adminState() }];
+      return [201, { token: newSession(), ...adminState() }];
     }
-    if (!adminSession(req)) throw new HttpError(401, 'unauthorized', 'Open a new setup or admin link');
+    if (!adminSession(req)) throw new HttpError(401, 'unauthorized', 'Sign in again');
+    if (method === 'DELETE' && p === '/admin/session') {
+      const auth = String(req.headers.authorization ?? '');
+      adminSessions.delete(auth.slice(7).trim());
+      return [200, { signedOut: true }];
+    }
+    if (method === 'POST' && p === '/admin/password') {
+      // Set or change the password; being signed in is the proof (a link from the Mac or the log works if it's forgotten).
+      const password = isObj(body) && typeof body.password === 'string' ? body.password : '';
+      if (password.length < 10 || password.length > 200) throw bad('The password needs at least 10 characters');
+      store.setAdminPassword(password);
+      company.save(company.get(), 'Changed the admin password');
+      return [200, adminState()];
+    }
 
     const c = company.get();
     if (method === 'GET' && p === '/admin/state') return [200, adminState()];
@@ -321,13 +368,21 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       company.save(c, `Disconnected ${d.name}`);
       return [200, { devices: store.listDevices().filter((x) => !x.revokedAt) }];
     }
+    if (method === 'POST' && p === '/admin/devices/cleanup') {
+      // Old pairings nobody uses: not seen for 30 days, or never used and older than a day. Admins stay.
+      const cutoff = Date.now() - 30 * 86_400_000;
+      const old = store.listDevices().filter((d) => !d.revokedAt && !d.admin && (d.lastSeenAt ? Date.parse(d.lastSeenAt) < cutoff : Date.parse(d.createdAt) < Date.now() - 86_400_000));
+      for (const d of old) store.revokeDevice(d.id);
+      if (old.length) company.save(c, `Removed ${old.length} unused device${old.length === 1 ? '' : 's'}`);
+      return [200, { removed: old.length, devices: store.listDevices().filter((x) => !x.revokedAt) }];
+    }
     if (method === 'POST' && p === '/admin/pair') {
       // A code for a new device, for 10 minutes; the page shows it as a QR code with the server's address.
-      const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : 'Phone';
+      const name = isObj(body) && typeof body.name === 'string' ? body.name.trim().slice(0, 60) : '';
       const code = store.createPairCode(name, 10);
       const formatted = `${code.slice(0, 4)}-${code.slice(4)}`;
       company.save(c, `Created a pairing code for ${name}`);
-      return [201, { name, code: formatted, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() }];
+      return [201, { name: name || null, code: formatted, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() }];
     }
     if (method === 'POST' && p === '/admin/finish') {
       store.clearAdminCodes('setup'); // the setup link from the log stops working
@@ -360,7 +415,10 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       // What connected, for the device list in the Admin page: the Mac says so; a phone's browser shows it in its user agent.
       const ua = String(req.headers['user-agent'] ?? '');
       const client = isObj(body) && body.client === 'mac' ? 'mac' : /iPhone|iPad|Android|Mobile/i.test(ua) ? 'phone' : 'web';
-      const paired = code.length <= 20 ? store.redeemPairCode(code, client) : undefined;
+      // The name: what the inviter typed, unless that says nothing ("iPhone"); then the device's own: the Mac sends its
+      // name from macOS, a phone is described from its browser.
+      const own = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : describeDevice(ua, isObj(body) && body.standalone === true);
+      const paired = code.length <= 20 ? store.redeemPairCode(code, client, (given) => (GENERIC_NAMES.has(given.trim().toLowerCase()) ? own : given)) : undefined;
       if (!paired) {
         if (++pairFailures >= PAIR_MAX_FAILURES) {
           pairFailures = 0;

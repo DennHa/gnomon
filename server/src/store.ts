@@ -5,7 +5,7 @@
 // writes just the records that changed. Each write gets a new `seq` from a counter: "give me everything after
 // seq N" is how a client (the Mac app) syncs, without trusting clocks. Deletions leave a tombstone row.
 import Database from 'better-sqlite3';
-import { createHash, randomBytes, randomInt } from 'node:crypto';
+import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Activity, Data, Entry, Project, Settings, Workday } from '../../src/types';
@@ -288,13 +288,34 @@ export class Store {
   }
 
   /** Redeem a pairing code: it works once, then a device with its own key exists. */
-  redeemPairCode(code: string, client: string | null = null): { device: Device; key: string } | undefined {
+  redeemPairCode(code: string, client: string | null = null, nameFor: (given: string) => string = (g) => g || 'Device'): { device: Device; key: string } | undefined {
     const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
     const row = this.db.prepare('SELECT device_name, expires_at FROM pair_codes WHERE code_hash = ?').get(sha256(normalized)) as { device_name: string; expires_at: string } | undefined;
     if (!row) return undefined;
     this.db.prepare('DELETE FROM pair_codes WHERE code_hash = ?').run(sha256(normalized));
     if (row.expires_at < new Date().toISOString()) return undefined;
-    return this.addDevice(row.device_name, client);
+    return this.addDevice(nameFor(row.device_name), client);
+  }
+
+  // ---- Admin password (sign in to the Admin page straight from the browser) -------------------
+
+  /** Only a salted scrypt hash is kept; the password itself never is. */
+  setAdminPassword(password: string) {
+    const salt = randomBytes(16);
+    const hash = scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 });
+    this.setMeta('adminPassword', `scrypt$16384$${salt.toString('base64')}$${hash.toString('base64')}`);
+  }
+
+  hasAdminPassword(): boolean {
+    return Boolean(this.getMeta('adminPassword'));
+  }
+
+  checkAdminPassword(password: string): boolean {
+    const [kind, n, salt, hash] = (this.getMeta('adminPassword') ?? '').split('$');
+    if (kind !== 'scrypt' || !salt || !hash) return false;
+    const want = Buffer.from(hash, 'base64');
+    const got = scryptSync(password, Buffer.from(salt, 'base64'), want.length, { N: Number(n), r: 8, p: 1 });
+    return timingSafeEqual(want, got);
   }
 
   // ---- Admin access (setup wizard and Admin page, see company.ts) --------------------------

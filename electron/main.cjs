@@ -1083,6 +1083,14 @@ const serverStatus = () => {
 };
 
 ipcMain.handle('server:status', () => serverStatus());
+/** This Mac's name from System Settings (e.g. "Alex's MacBook Pro"), so the server's device list says which Mac it is. */
+function macName() {
+  try {
+    return require('child_process').execFileSync('/usr/sbin/scutil', ['--get', 'ComputerName'], { encoding: 'utf8', timeout: 2000 }).trim().slice(0, 60);
+  } catch {
+    return require('os').hostname().replace(/\.local$/, '').slice(0, 60);
+  }
+}
 ipcMain.handle('server:connect', async (_e, { url, code }) => {
   const origin = serverOrigin(url);
   if (!origin) return { ok: false, error: 'bad_url' };
@@ -1090,7 +1098,7 @@ ipcMain.handle('server:connect', async (_e, { url, code }) => {
   if (!value) return { ok: false, error: 'no_code' };
   let key = value;
   if (!/^(gnomon|punch)_/.test(value)) {
-    const r = await serverCall(origin, 'POST', '/pair', { code: value, client: 'mac' });
+    const r = await serverCall(origin, 'POST', '/pair', { code: value, client: 'mac', name: macName() });
     if (!r.ok) return { ok: false, error: r.status === 401 ? 'invalid_code' : r.error };
     key = r.data.key;
   }
@@ -1110,7 +1118,7 @@ ipcMain.handle('server:disconnect', async () => {
 ipcMain.handle('server:pairCode', async (_e, name) => {
   const s = readServer();
   if (!s) return { ok: false, error: 'not_connected' };
-  const r = await serverCall(s.url, 'POST', '/pair-codes', { name: String(name || 'iPhone').slice(0, 60) }, s.key);
+  const r = await serverCall(s.url, 'POST', '/pair-codes', { name: String(name ?? '').slice(0, 60) }, s.key);
   if (!r.ok) return r;
   return { ok: true, code: r.data.code, expiresAt: r.data.expiresAt, link: `${s.url}/#pair=${r.data.code}` };
 });

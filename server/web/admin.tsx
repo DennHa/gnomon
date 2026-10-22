@@ -147,6 +147,28 @@ const EN = {
   addButton: 'Show code',
   addValid: 'Valid until {time}',
   setupGroup: 'Company setup',
+  loginTitle: 'Sign in',
+  loginIntro: 'Enter this server’s admin password.',
+  password: 'Password',
+  signIn: 'Sign in',
+  signOut: 'Sign out',
+  noPassword: 'This server has no admin password yet. Open the admin page once from your Mac (Gnomon → Settings → Connections → Open server admin), or with the link from the server log, and set one there.',
+  accountTitle: 'Admin password',
+  pwIntro: 'With a password you sign in here directly, from any browser. At least 10 characters.',
+  pwMissing: 'No password yet: set one so you can sign in here directly next time, without your Mac.',
+  pwNew: 'New password',
+  pwRepeat: 'Repeat it',
+  pwSave: 'Save password',
+  pwSaved: 'Saved. Next time, sign in here with it.',
+  pwMismatch: 'The two passwords don’t match.',
+  pwShort: 'At least 10 characters.',
+  pwForgot: 'Forgot it? Open the admin page from your Mac once more (Settings → Connections → Open server admin) and set a new one.',
+  pwIsSet: 'A password is set.',
+  devUnused: 'unused',
+  devCleanup: 'Remove {n} unused',
+  devCleanupHint: 'Pairings not used for 30 days, or never used. Devices that may open this page stay.',
+  devCleaned: 'Removed {n}.',
+  addAuto: 'Names itself when it connects',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -279,6 +301,28 @@ const DE: Record<Key, string> = {
   addButton: 'Code zeigen',
   addValid: 'Gültig bis {time}',
   setupGroup: 'Firmen-Einrichtung',
+  loginTitle: 'Anmelden',
+  loginIntro: 'Gib das Admin-Passwort dieses Servers ein.',
+  password: 'Passwort',
+  signIn: 'Anmelden',
+  signOut: 'Abmelden',
+  noPassword: 'Dieser Server hat noch kein Admin-Passwort. Öffne die Verwaltung einmal von deinem Mac aus (Gnomon → Einstellungen → Verbindungen → Server-Verwaltung öffnen) oder mit dem Link aus dem Server-Log und lege dort eins fest.',
+  accountTitle: 'Admin-Passwort',
+  pwIntro: 'Mit einem Passwort meldest du dich hier direkt an, aus jedem Browser. Mindestens 10 Zeichen.',
+  pwMissing: 'Noch kein Passwort: Lege eins fest, dann meldest du dich nächstes Mal direkt hier an, ohne deinen Mac.',
+  pwNew: 'Neues Passwort',
+  pwRepeat: 'Wiederholen',
+  pwSave: 'Passwort sichern',
+  pwSaved: 'Gesichert. Melde dich nächstes Mal hier damit an.',
+  pwMismatch: 'Die beiden Passwörter stimmen nicht überein.',
+  pwShort: 'Mindestens 10 Zeichen.',
+  pwForgot: 'Vergessen? Öffne die Verwaltung noch einmal von deinem Mac aus (Einstellungen → Verbindungen → Server-Verwaltung öffnen) und lege ein neues fest.',
+  pwIsSet: 'Ein Passwort ist festgelegt.',
+  devUnused: 'unbenutzt',
+  devCleanup: '{n} unbenutzte entfernen',
+  devCleanupHint: 'Verbindungen, die 30 Tage oder nie benutzt wurden. Geräte, die diese Seite öffnen dürfen, bleiben.',
+  devCleaned: '{n} entfernt.',
+  addAuto: 'Benennt sich beim Verbinden selbst',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -294,7 +338,7 @@ type Config = {
   rules: Record<'managed' | 'allowLocalApi' | 'allowActivityTrail' | 'phoneApp', boolean>;
   audit: { at: string; what: string }[];
 };
-type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number };
+type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean };
 
 let token = '';
 try {
@@ -713,6 +757,9 @@ const kindOf = (d: Device): 'mac' | 'phone' | 'web' | null =>
   (d.client as 'mac' | 'phone' | 'web' | null) ?? (/mac|book|imac/i.test(d.name) ? 'mac' : /phone|handy|pixel|android|ipad/i.test(d.name) ? 'phone' : null);
 const KIND: Record<string, [IconName, Key]> = { mac: ['laptop_mac', 'devMac'], phone: ['mobile', 'devPhone'], web: ['language', 'devWeb'] };
 
+/** Not seen for 30 days, or never used and older than a day (the server removes the same ones). */
+const unused = (d: Device) => !d.admin && (d.lastSeenAt ? Date.now() - Date.parse(d.lastSeenAt) > 30 * 86_400_000 : Date.now() - Date.parse(d.createdAt) > 86_400_000);
+
 function ago(iso: string | null): string {
   if (!iso) return t('devNever');
   const min = Math.round((Date.now() - Date.parse(iso)) / 60_000);
@@ -733,7 +780,7 @@ function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Devic
     }
   };
   return (
-    <li className="a-device">
+    <li className={`a-device ${unused(d) ? 'unused' : ''}`}>
       <span className="a-device-icon" title={t(label)}>
         <Icon name={icon} size={22} />
       </span>
@@ -744,7 +791,9 @@ function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Devic
             <button className="primary">{t('devSave')}</button>
           </form>
         ) : (
-          <strong>{d.name}</strong>
+          <strong>
+            {d.name} {unused(d) && <span className="a-tag">{t('devUnused')}</span>}
+          </strong>
         )}
         <span className="a-hint">
           {t(label)} · {ago(d.lastSeenAt)} · {t('devSince', { date: new Date(d.createdAt).toLocaleDateString() })}
@@ -769,7 +818,7 @@ function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Devic
 
 function AddDevice({ s }: Ctx) {
   const [name, setName] = useState('');
-  const [code, setCode] = useState<{ name: string; code: string; expiresAt: string } | null>(null);
+  const [code, setCode] = useState<{ name: string | null; code: string; expiresAt: string } | null>(null);
   // The phone app connects by itself when opened with #pair=CODE (scanning the QR code does exactly that).
   const base = (s.config.company.publicUrl || location.origin).replace(/\/+$/, '');
   const link = code ? `${base}/#pair=${code.code}` : '';
@@ -787,7 +836,7 @@ function AddDevice({ s }: Ctx) {
         <div className="a-invite">
           <Qr text={link} />
           <div>
-            <strong>{code.name}</strong>
+            <strong>{code.name ?? t('addAuto')}</strong>
             <code className="a-code">{code.code}</code>
             <span className="a-hint">{t('addValid', { time: new Date(code.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</span>
           </div>
@@ -799,6 +848,7 @@ function AddDevice({ s }: Ctx) {
 
 function Devices(ctx: Ctx) {
   const [devices, setDevices] = useState<Device[] | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   useEffect(() => {
     call<{ devices: Device[] }>('GET', '/devices').then((r) => setDevices(r.devices), (e) => ctx.setErr((e as Error).message));
   }, []);
@@ -806,6 +856,21 @@ function Devices(ctx: Ctx) {
     <>
       <p className="a-intro">{t('devicesIntro')}</p>
       {devices && devices.length === 0 && <p className="a-hint">{t('devNone')}</p>}
+      {devices && devices.some(unused) && (
+        <div className="a-inline a-cleanup">
+          <span className="a-hint">{done ?? t('devCleanupHint')}</span>
+          <button
+            className="soft"
+            onClick={async () => {
+              const r = await call<{ removed: number; devices: Device[] }>('POST', '/devices/cleanup');
+              setDevices(r.devices);
+              setDone(t('devCleaned', { n: r.removed }));
+            }}
+          >
+            {t('devCleanup', { n: devices.filter(unused).length })}
+          </button>
+        </div>
+      )}
       {devices && devices.length > 0 && (
         <ul className="a-devices">
           {devices.map((d) => (
@@ -818,10 +883,121 @@ function Devices(ctx: Ctx) {
   );
 }
 
+// ---- Signing in with the admin password ---------------------------------------------------------
+
+const keepToken = (value: string) => {
+  token = value;
+  try {
+    if (value) sessionStorage.setItem('gnomon.admin', value);
+    else sessionStorage.removeItem('gnomon.admin');
+  } catch {
+    /* this tab only */
+  }
+};
+
+function Login({ onIn }: { onIn: (s: State) => void }) {
+  const [password, setPassword] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <main className="a-page a-login">
+      <header className="a-head">
+        <img src="/icon-192.png" alt="" width={44} height={44} />
+        <div>
+          <h1>{t('adminTitle')}</h1>
+          <span className="a-hint">{location.host}</span>
+        </div>
+      </header>
+      <form
+        className="a-panel"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          try {
+            const r = await call<State & { token: string }>('POST', '/login', { password });
+            keepToken(r.token);
+            onIn(r);
+          } catch (e) {
+            setErr((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <h2>
+          <Icon name="lock" size={22} /> {t('loginTitle')}
+        </h2>
+        <p className="a-intro">{t('loginIntro')}</p>
+        {err && (
+          <p className="a-error">
+            <Icon name="warning" size={18} /> {err}
+          </p>
+        )}
+        <Field label={t('password')}>
+          <input type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
+        <footer className="a-foot">
+          <span className="a-hint">{t('pwForgot')}</span>
+          <span className="spacer" />
+          <button className="primary" disabled={busy || !password}>
+            {t('signIn')}
+          </button>
+        </footer>
+      </form>
+    </main>
+  );
+}
+
+function Account({ s, setS, setErr }: Ctx) {
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  const [saved, setSaved] = useState(false);
+  const save = async () => {
+    if (a.length < 10) return setErr(t('pwShort'));
+    if (a !== b) return setErr(t('pwMismatch'));
+    try {
+      setErr(null);
+      setS(await call('POST', '/password', { password: a }));
+      setA('');
+      setB('');
+      setSaved(true);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  return (
+    <>
+      <p className="a-intro">{t('pwIntro')}</p>
+      {s.passwordSet && !saved && (
+        <div className="a-ok">
+          <Icon name="check_circle" /> {t('pwIsSet')}
+        </div>
+      )}
+      <form className="a-card" onSubmit={(e) => (e.preventDefault(), void save())}>
+        <Field label={t('pwNew')}>
+          <input type="password" autoComplete="new-password" value={a} onChange={(e) => (setA(e.target.value), setSaved(false))} />
+        </Field>
+        <Field label={t('pwRepeat')}>
+          <input type="password" autoComplete="new-password" value={b} onChange={(e) => (setB(e.target.value), setSaved(false))} />
+        </Field>
+        <button className="primary a-save" disabled={!a || !b}>
+          {t('pwSave')}
+        </button>
+        {saved && (
+          <div className="a-ok">
+            <Icon name="check_circle" /> {t('pwSaved')}
+          </div>
+        )}
+      </form>
+    </>
+  );
+}
+
 // ---- App ------------------------------------------------------------------------------------------
 
 type Section = { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => ReactNode };
 const DEVICES: Section = { key: 'devices', title: 'devicesTitle', icon: 'devices', view: (c) => <Devices {...c} /> };
+const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
 const STEPS: Section[] = [
   { key: 'before', title: 'beforeTitle', icon: 'check_circle', view: (c) => <Before {...c} /> },
   { key: 'company', title: 'companyTitle', icon: 'apartment', view: (c) => <CompanyStep {...c} /> },
@@ -840,8 +1016,9 @@ function App() {
   const [step, setStep] = useState(0);
   const admin = location.pathname.startsWith('/admin');
   // The Admin page opens on the devices; the company setup follows as its own group.
-  const SECTIONS = admin ? [DEVICES, ...STEPS] : STEPS;
-  const offset = admin ? 1 : 0;
+  const SECTIONS = admin ? [DEVICES, ACCOUNT, ...STEPS] : STEPS;
+  const offset = admin ? 2 : 0;
+  const [login, setLogin] = useState(false);
 
   useEffect(() => {
     // Trade the one-time code from the link for a session, then take the code out of the address bar.
@@ -851,17 +1028,23 @@ function App() {
         if (code) {
           history.replaceState(null, '', location.pathname);
           const r = await call<State & { token: string }>('POST', '/session', { code });
-          token = r.token;
-          try {
-            sessionStorage.setItem('gnomon.admin', token);
-          } catch {
-            /* this tab only */
-          }
+          keepToken(r.token);
           setS(r);
           if (r.config.setupDone && !admin) setStep(STEPS.length - 1);
         } else if (token) setS(await call('GET', '/state'));
-        else setFatal(t('noLink'));
+        else if (admin) {
+          // No link: sign in with the password, if the server has one.
+          const st = await call<{ passwordSet: boolean }>('GET', '/status');
+          if (st.passwordSet) setLogin(true);
+          else setFatal(t('noPassword'));
+        } else setFatal(t('noLink'));
       } catch (e) {
+        // An expired session after a restart: back to the login rather than a dead end.
+        if (!code && admin && token) {
+          keepToken('');
+          const st = await call<{ passwordSet: boolean }>('GET', '/status').catch(() => ({ passwordSet: false }));
+          if (st.passwordSet) return setLogin(true);
+        }
         setFatal(code ? t('linkFailed', { error: (e as Error).message }) : t('noLink'));
       }
     })();
@@ -871,6 +1054,7 @@ function App() {
     document.title = t(admin ? 'adminTitle' : 'title');
   }, []);
 
+  if (login && !s) return <Login onIn={(r) => (setLogin(false), setS(r))} />;
   if (fatal)
     return (
       <main className="a-page">
@@ -896,7 +1080,24 @@ function App() {
           <h1>{t(admin || s.config.setupDone ? 'adminTitle' : 'title')}</h1>
           <span className="a-hint">{s.config.company.name || s.config.company.publicUrl || location.host}</span>
         </div>
+        {admin && (
+          <button
+            className="soft a-signout"
+            onClick={async () => {
+              await call('DELETE', '/session').catch(() => {});
+              keepToken('');
+              location.replace('/admin');
+            }}
+          >
+            {t('signOut')}
+          </button>
+        )}
       </header>
+      {admin && !s.passwordSet && step !== 1 && (
+        <button className="a-banner" onClick={() => (setStep(1), setErr(null))}>
+          <Icon name="lock" size={18} /> {t('pwMissing')} <Icon name="arrow_forward" size={16} />
+        </button>
+      )}
       <div className="a-body">
         <nav className="a-steps">
           {SECTIONS.map((st, i) => (
