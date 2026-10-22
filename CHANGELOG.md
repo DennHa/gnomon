@@ -3,6 +3,14 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.9 · 2026-10-22
+
+- **Your arrival stays where it is.** Gnomon only moves it earlier on its own, to cover an entry that starts before
+  it, and never later. Each time, a note says from when to when, with **Undo**.
+- **Start day makes the day yours:** if Gnomon had made today's workday from your entries, pressing Start day stops it
+  from following them.
+- A break can no longer end before it starts.
+
 ## 0.1.8 · 2026-10-18
 
 - **Labs**: five quick clicks on the icon under Info & feedback open a hidden Settings tab. Play the morning welcome
