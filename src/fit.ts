@@ -1,12 +1,14 @@
 // The workday follows the entries: tracked time always lies inside the time you were clocked in.
 // - A day with entries but no clock-in gets a workday made from them (first start to last end, gaps as breaks),
-//   marked fromEntries until you change it by hand. Today's stays open until you leave.
+//   marked fromEntries until you change it by hand or press Start day. Today's stays open until you leave.
 // - Entries before your arrival or after your leaving move arrival or leaving to cover them.
+// - The arrival never moves later on its own: only earlier, to cover an entry. Every move says so, with Undo.
 // Runs after every change (src/store.tsx) for the days whose entries changed.
 import type { Break, Data, Entry, Workday } from './types';
 import { dayKey } from './time';
 
-export type FitNotice = { kind: 'created' | 'start' | 'end'; date: string; at: string };
+/** What moved, to when, and from when (so it can be undone). */
+export type FitNotice = { kind: 'created' | 'start' | 'end'; date: string; at: string; from?: string };
 
 /** Days whose entries changed between two states (entries compared by identity, like the sync does). */
 function changedDays(prev: Data, next: Data): Set<string> {
@@ -56,11 +58,14 @@ export function fitDay(d: Data, date: string, now = Date.now()): { data: Data; n
     const breaks: Break[] = s.slice(1).map(([a], i) => ({ start: iso(s[i][1]), end: iso(a) }));
     // Today stays open (you may still be at work; Leave closes it); other days end with their last entry.
     const open = running || date === dayKey(now);
-    const made: Workday = { date, start: iso(first), ...(!open && { end: iso(last) }), breaks, fromEntries: true };
+    // An arrival Gnomon already set stays put when the first entry moves later or goes away; it only moves earlier.
+    const start = wd && Date.parse(wd.start) < first ? wd.start : iso(first);
+    const made: Workday = { date, start, ...(!open && { end: iso(last) }), breaks, fromEntries: true };
     const same = wd && JSON.stringify({ ...wd }) === JSON.stringify(made);
     if (same) return { data: d, notices: [] };
     const workdays = wd ? d.workdays.map((w) => (w === wd ? made : w)) : [...d.workdays, made];
-    return { data: { ...d, workdays }, notices: wd ? [] : [{ kind: 'created', date, at: made.start }] };
+    const notices: FitNotice[] = !wd ? [{ kind: 'created', date, at: made.start }] : made.start !== wd.start ? [{ kind: 'start', date, at: made.start, from: wd.start }] : [];
+    return { data: { ...d, workdays }, notices };
   }
 
   // A day you clocked in yourself: only widen it.
@@ -68,11 +73,11 @@ export function fitDay(d: Data, date: string, now = Date.now()): { data: Data; n
   let next = wd;
   if (first < Date.parse(wd.start)) {
     next = { ...next, start: iso(first) };
-    notices.push({ kind: 'start', date, at: next.start });
+    notices.push({ kind: 'start', date, at: next.start, from: wd.start });
   }
   if (wd.end && !running && last > Date.parse(wd.end)) {
     next = { ...next, end: iso(last) };
-    notices.push({ kind: 'end', date, at: next.end! });
+    notices.push({ kind: 'end', date, at: next.end!, from: wd.end });
   }
   if (next === wd) return { data: d, notices };
   return { data: { ...d, workdays: d.workdays.map((w) => (w === wd ? next : w)) }, notices };

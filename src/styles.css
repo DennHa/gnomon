@@ -1061,3 +1061,6 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .labs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
 .labs-row > span { display: flex; flex-direction: column; gap: 2px; }
 .egg .link-btn { color: var(--accent-strong); font-weight: 600; margin: 0; }
+/* The "moved to fit your entries" note: one line each, Undo on the right. */
+.fit-line { display: flex; align-items: baseline; gap: 12px; justify-content: space-between; }
+.fit-undo { flex: none; color: var(--accent-strong); font-weight: 600; margin: 0; }

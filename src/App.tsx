@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store';
-import { activitiesOn, addBreakBetween, breakBeforeRunning, closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
+import { activitiesOn, addBreakBetween, breakBeforeRunning, closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak, updateWorkday } from './actions';
 import { planItemsOn } from './plan';
 import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from './time';
 import { targetHoursOn } from './schedule';
@@ -199,19 +199,34 @@ function useDaylight(on: boolean, previewAt: number | null) {
   }, [on, now, dark, previewAt]);
 }
 
-/** Says when Gnomon moved or created a workday to fit the entries (src/fit.ts). */
+/**
+ * Says when Gnomon moved or created a workday to fit the entries (src/fit.ts). A moved arrival or leaving can be
+ * undone; that puts the old time back and makes the day yours (it stops following the entries).
+ */
 function FitToast() {
-  const { fitNotices, dismissFitNotices } = useStore();
+  const { fitNotices, dismissFitNotices, update } = useStore();
+  const undoable = fitNotices.some((n) => n.from);
   useEffect(() => {
     if (!fitNotices.length) return;
-    const t = setTimeout(dismissFitNotices, 6000);
+    const t = setTimeout(dismissFitNotices, undoable ? 12000 : 6000);
     return () => clearTimeout(t);
   }, [fitNotices]);
   if (!fitNotices.length) return null;
+  const undo = (n: (typeof fitNotices)[number]) => {
+    update((d) => updateWorkday(d, n.date, n.kind === 'start' ? { start: n.from } : { end: n.from }));
+    dismissFitNotices();
+  };
   return (
     <div className="fit-toast" role="status" onClick={dismissFitNotices}>
       {fitNotices.slice(0, 3).map((n) => (
-        <span key={`${n.kind}${n.date}${n.at}`}>{t(`fit.${n.kind}`, { day: fmtDayLabel(n.date), time: fmtTime(n.at) })}</span>
+        <span key={`${n.kind}${n.date}${n.at}`} className="fit-line">
+          <span>{t(n.from && n.kind !== 'created' ? (`fit.${n.kind}From` as const) : (`fit.${n.kind}` as const), { day: fmtDayLabel(n.date), time: fmtTime(n.at), from: n.from ? fmtTime(n.from) : '' })}</span>
+          {n.from && (
+            <button className="link-btn fit-undo" onClick={(e) => (e.stopPropagation(), undo(n))}>
+              {t('fit.undo')}
+            </button>
+          )}
+        </span>
       ))}
     </div>
   );

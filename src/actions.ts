@@ -27,8 +27,9 @@ export function startDay(d: Data): Data {
     const fresh = { date: dayKey(at), start: at, breaks: [] };
     return { ...d, workdays: [...d.workdays.filter((w) => w !== wd), fresh] };
   }
-  if (!wd.end) return d;
-  return mapToday(d, (w) => ({ ...w, end: undefined, breaks: [...w.breaks, { start: w.end!, end: at }] }));
+  // Pressing Start day on a day Gnomon made from your entries makes it yours: it stops following the entries.
+  if (!wd.end) return wd.fromEntries ? mapToday(d, (w) => ({ ...w, fromEntries: undefined })) : d;
+  return mapToday(d, (w) => ({ ...w, end: undefined, fromEntries: undefined, breaks: [...w.breaks, { start: w.end!, end: at }] }));
 }
 
 /** Clock out: stops the timer and any break. */
@@ -99,7 +100,11 @@ export function setOffKind(d: Data, date: string, kind?: 'overtime'): Data {
   return { ...d, workdays: d.workdays.map((w) => (w.date === date && w.off ? { ...w, offKind: kind } : w)) };
 }
 
+/** Change a break's times; a break that would end before (or when) it starts is refused, and nothing changes. */
 export function updateBreak(d: Data, date: string, index: number, patch: Partial<Break>): Data {
+  const b = d.workdays.find((w) => w.date === date)?.breaks[index];
+  const next = b && { ...b, ...patch };
+  if (!next || (next.end && next.end <= next.start)) return d;
   return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, fromEntries: undefined, breaks: w.breaks.map((b, i) => (i === index ? { ...b, ...patch } : b)) } : w)) };
 }
 
