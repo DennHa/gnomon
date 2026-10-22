@@ -183,7 +183,12 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     }
     if (method === 'POST' && p === '/admin-link') {
       // A trusted device (usually the Mac) opens the Admin page without the terminal: a one-time link, 5 minutes.
-      if (!store.isAdminDevice(device.id)) throw new HttpError(403, 'not_admin', 'This device may not open the Admin page. Allow it there first.');
+      const fromMac = isObj(body) && body.client === 'mac';
+      if (fromMac) store.setDeviceClient(device.id, 'mac');
+      // The first Mac to ask gets the right while nobody has it, on a private server (company setup not finished).
+      // A company server's admin hands it out on the page instead.
+      const claim = fromMac && !company?.get().setupDone;
+      if (!store.isAdminDevice(device.id, claim)) throw new HttpError(403, 'not_admin', 'This device may not open the Admin page. Allow it there first.');
       const code = store.createAdminCode('admin', 5);
       company?.save(company.get(), `Admin page opened from ${device.name}`);
       return { status: 201, body: { path: `/admin#code=${code.slice(0, 4)}-${code.slice(4)}`, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() } };

@@ -256,13 +256,19 @@ export class Store {
   }
 
   /**
-   * Whether a device may open the Admin page. When no connected device may yet, the oldest one gets the right: that's
-   * the Mac the server was set up with, so the owner never needs the terminal for it.
+   * Whether a device may open the Admin page. With `claim`, a device asking while no connected device has the right yet
+   * gets it: the server says when that's allowed (a private server, asked from a Mac), so the owner never needs the
+   * terminal for it.
    */
-  isAdminDevice(id: string): boolean {
+  isAdminDevice(id: string, claim = false): boolean {
     const active = this.listDevices().filter((x) => !x.revokedAt);
-    if (!active.some((x) => x.admin) && active[0]) this.db.prepare('UPDATE devices SET is_admin = 1 WHERE id = ?').run(active[0].id);
+    if (claim && !active.some((x) => x.admin) && active.some((x) => x.id === id)) this.db.prepare('UPDATE devices SET is_admin = 1 WHERE id = ?').run(id);
     return (this.db.prepare('SELECT is_admin FROM devices WHERE id = ? AND revoked_at IS NULL').get(id) as { is_admin: number } | undefined)?.is_admin === 1;
+  }
+
+  /** Record what a device is when it says so later (devices paired before this was recorded). */
+  setDeviceClient(id: string, client: string) {
+    this.db.prepare('UPDATE devices SET client = ? WHERE id = ? AND client IS NULL').run(client, id);
   }
 
   revokeDevice(idOrName: string): Device | undefined {

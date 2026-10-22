@@ -3,6 +3,12 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.10 · 2026-10-22
+
+- **Open your server's admin from the Mac:** Settings → Connections → *Open server admin* signs you in in the browser,
+  no terminal needed. There you see every connected device (Mac, phone, browser) with when it was last active, rename
+  or disconnect it, and add a phone by scanning a QR code.
+
 ## 0.1.9 · 2026-10-22
 
 - **Your arrival stays where it is.** Gnomon only moves it earlier on its own, to cover an entry that starts before

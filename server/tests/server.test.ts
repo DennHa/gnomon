@@ -404,11 +404,15 @@ describe('admin page from a trusted device (no terminal)', () => {
       return { status: r.status, body: (await r.json()) as any };
     };
     try {
-      const mac = own.addDevice('MacBook', 'mac');
+      // An old phone pairing is the oldest device: it must not get the right just for that.
       const phone = own.addDevice('iPhone', 'phone');
-      // Only the device the server was set up with (the oldest) may open the page at first.
-      assert.equal((await go('POST', '/admin-link', {}, phone.key)).status, 403);
-      const link = await go('POST', '/admin-link', {}, mac.key);
+      const mac = own.addDevice('MacBook');
+      const otherMac = own.addDevice('Second Mac', 'mac');
+      assert.equal((await go('POST', '/admin-link', {}, phone.key)).status, 403, 'a phone never claims it');
+      // The first Mac to ask (saying it's a Mac) gets it, and is recorded as a Mac from now on.
+      const link = await go('POST', '/admin-link', { client: 'mac' }, mac.key);
+      assert.equal((await go('POST', '/admin-link', { client: 'mac' }, otherMac.key)).status, 403, 'only while nobody has it');
+      own.revokeDevice(otherMac.device.id);
       assert.equal(link.status, 201);
       const code = String(link.body.path).match(/^\/admin#code=([A-Z0-9-]+)$/)?.[1];
       assert.ok(code, 'a one-time link to /admin');
@@ -417,10 +421,10 @@ describe('admin page from a trusted device (no terminal)', () => {
       assert.equal((await go('POST', '/admin/session', { code })).status, 401, 'the link works once');
 
       let list = (await go('GET', '/admin/devices', undefined, session)).body.devices;
-      assert.deepEqual(list.map((d: any) => [d.name, d.client, d.admin]), [['MacBook', 'mac', true], ['iPhone', 'phone', false]]);
+      assert.deepEqual(list.map((d: any) => [d.name, d.client, d.admin]), [['iPhone', 'phone', false], ['MacBook', 'mac', true]]);
       // Rename and allow the phone; then the Mac may give up the right, but the last one can't.
       list = (await go('PATCH', `/admin/devices/${phone.device.id}`, { name: 'Alex iPhone', admin: true }, session)).body.devices;
-      assert.deepEqual(list.map((d: any) => [d.name, d.admin]), [['MacBook', true], ['Alex iPhone', true]]);
+      assert.deepEqual(list.map((d: any) => [d.name, d.admin]), [['Alex iPhone', true], ['MacBook', true]]);
       assert.equal((await go('PATCH', `/admin/devices/${mac.device.id}`, { admin: false }, session)).status, 200);
       assert.equal((await go('PATCH', `/admin/devices/${phone.device.id}`, { admin: false }, session)).status, 422);
       assert.equal((await go('PATCH', `/admin/devices/${phone.device.id}`, { name: '  ' }, session)).status, 422);
@@ -444,6 +448,24 @@ describe('admin page from a trusted device (no terminal)', () => {
       own.close();
     }
   });
+});
+
+test('a finished company server never hands out the admin right by itself', async () => {
+  const { Company } = await import('../src/company');
+  const own = new Store(':memory:');
+  const company = new Company(own, Buffer.alloc(32, 3), 'file');
+  company.save({ ...company.get(), setupDone: true }, 'Finished the setup');
+  const app = http.createServer(createApp({ store: own, webDir, company }));
+  await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+  try {
+    const mac = own.addDevice('Employee Mac', 'mac');
+    const r = await fetch(`${url}/api/v1/admin-link`, { method: 'POST', headers: { Authorization: `Bearer ${mac.key}`, 'Content-Type': 'application/json' }, body: '{"client":"mac"}' });
+    assert.equal(r.status, 403);
+  } finally {
+    await new Promise((r) => app.close(r));
+    own.close();
+  }
 });
 
 describe('company setup (wizard API)', () => {

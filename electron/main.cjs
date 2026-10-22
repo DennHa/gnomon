@@ -1119,7 +1119,7 @@ ipcMain.handle('server:pairCode', async (_e, name) => {
 ipcMain.handle('server:adminLink', async () => {
   const s = readServer();
   if (!s) return { ok: false, error: 'not_connected' };
-  const r = await serverCall(s.url, 'POST', '/admin-link', {}, s.key);
+  const r = await serverCall(s.url, 'POST', '/admin-link', { client: 'mac' }, s.key);
   if (!r.ok) return { ok: false, error: r.status === 403 ? 'not_admin' : r.error };
   const url = `${s.url}${r.data.path}`;
   if (/^https?:\/\/[^\s]+$/i.test(url)) shell.openExternal(url);
