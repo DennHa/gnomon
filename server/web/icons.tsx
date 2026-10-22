@@ -7,6 +7,12 @@ import logout from '@material-symbols/svg-400/rounded/logout.svg';
 import today from '@material-symbols/svg-400/rounded/today.svg';
 import calendar_view_week from '@material-symbols/svg-400/rounded/calendar_view_week.svg';
 import devices from '@material-symbols/svg-400/rounded/devices.svg';
+import laptop_mac from '@material-symbols/svg-400/rounded/laptop_mac.svg';
+import mobile from '@material-symbols/svg-400/rounded/mobile.svg';
+import language from '@material-symbols/svg-400/rounded/language.svg';
+import edit from '@material-symbols/svg-400/rounded/edit.svg';
+import link_off from '@material-symbols/svg-400/rounded/link_off.svg';
+import qr_code_2 from '@material-symbols/svg-400/rounded/qr_code_2.svg';
 import chevron_left from '@material-symbols/svg-400/rounded/chevron_left.svg';
 import chevron_right from '@material-symbols/svg-400/rounded/chevron_right.svg';
 import close from '@material-symbols/svg-400/rounded/close.svg';
@@ -29,7 +35,7 @@ import verified_user from '@material-symbols/svg-400/rounded/verified_user.svg';
 import apartment from '@material-symbols/svg-400/rounded/apartment.svg';
 import group from '@material-symbols/svg-400/rounded/group.svg';
 
-const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group };
+const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group };
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {

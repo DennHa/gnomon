@@ -57,7 +57,11 @@ export const DEFAULT_ACTIVITIES: Omit<Activity, 'id'>[] = [
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-export type Device = { id: string; name: string; createdAt: string; lastSeenAt: string | null; revokedAt: string | null };
+/** client: what connected ('mac', 'phone', or null when unknown); admin: may open the Admin page from the device. */
+export type Device = { id: string; name: string; createdAt: string; lastSeenAt: string | null; revokedAt: string | null; client?: string | null; admin?: boolean };
+type DeviceRow = { id: string; name: string; created_at: string; last_seen_at: string | null; revoked_at: string | null; client: string | null; is_admin: number };
+const DEVICE_COLUMNS = 'id, name, created_at, last_seen_at, revoked_at, client, is_admin';
+const deviceOf = (r: DeviceRow): Device => ({ id: r.id, name: r.name, createdAt: r.created_at, lastSeenAt: r.last_seen_at, revokedAt: r.revoked_at, client: r.client, admin: r.is_admin === 1 });
 
 export class Store {
   private db: Database.Database;
@@ -101,6 +105,10 @@ export class Store {
         expires_at TEXT NOT NULL
       );
     `);
+    // Added later: what kind of device it is, and whether it may open the Admin page.
+    const cols = (this.db.prepare('PRAGMA table_info(devices)').all() as { name: string }[]).map((c) => c.name);
+    if (!cols.includes('client')) this.db.exec('ALTER TABLE devices ADD COLUMN client TEXT');
+    if (!cols.includes('is_admin')) this.db.exec('ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
     if (file !== ':memory:') for (const f of [file, `${file}-wal`, `${file}-shm`]) if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
     this.data = this.load();
     if (!this.getMeta('seeded')) {
@@ -216,35 +224,45 @@ export class Store {
   // ---- Devices & pairing ------------------------------------------------------------------
 
   /** Create a device directly and return its key (shown once). */
-  addDevice(name: string): { device: Device; key: string } {
+  addDevice(name: string, client: string | null = null): { device: Device; key: string } {
     const key = `gnomon_${randomBytes(24).toString('base64url')}`;
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
-    this.db.prepare('INSERT INTO devices (id, name, key_hash, created_at) VALUES (?, ?, ?, ?)').run(id, name, sha256(key), createdAt);
-    return { device: { id, name, createdAt, lastSeenAt: null, revokedAt: null }, key };
+    this.db.prepare('INSERT INTO devices (id, name, key_hash, created_at, client) VALUES (?, ?, ?, ?, ?)').run(id, name, sha256(key), createdAt, client);
+    return { device: { id, name, createdAt, lastSeenAt: null, revokedAt: null, client, admin: false }, key };
   }
 
   /** The device a key belongs to, or undefined when the key is unknown or revoked. */
   authenticate(key: string): Device | undefined {
-    const row = this.db.prepare('SELECT id, name, created_at, last_seen_at, revoked_at FROM devices WHERE key_hash = ?').get(sha256(key)) as
-      | { id: string; name: string; created_at: string; last_seen_at: string | null; revoked_at: string | null }
-      | undefined;
+    const row = this.db.prepare(`SELECT ${DEVICE_COLUMNS} FROM devices WHERE key_hash = ?`).get(sha256(key)) as DeviceRow | undefined;
     if (!row || row.revoked_at) return undefined;
     const now = new Date().toISOString();
     // Only touch the row once a minute, not on every request.
     if (!row.last_seen_at || Date.parse(now) - Date.parse(row.last_seen_at) > 60_000) this.db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').run(now, row.id);
-    return { id: row.id, name: row.name, createdAt: row.created_at, lastSeenAt: now, revokedAt: null };
+    return { ...deviceOf(row), lastSeenAt: now };
   }
 
   listDevices(): Device[] {
-    const rows = this.db.prepare('SELECT id, name, created_at, last_seen_at, revoked_at FROM devices ORDER BY created_at').all() as {
-      id: string;
-      name: string;
-      created_at: string;
-      last_seen_at: string | null;
-      revoked_at: string | null;
-    }[];
-    return rows.map((r) => ({ id: r.id, name: r.name, createdAt: r.created_at, lastSeenAt: r.last_seen_at, revokedAt: r.revoked_at }));
+    return (this.db.prepare(`SELECT ${DEVICE_COLUMNS} FROM devices ORDER BY created_at`).all() as DeviceRow[]).map(deviceOf);
+  }
+
+  /** Rename a device, or allow or forbid it to open the Admin page. */
+  updateDevice(id: string, patch: { name?: string; admin?: boolean }): Device | undefined {
+    const d = this.listDevices().find((x) => x.id === id && !x.revokedAt);
+    if (!d) return undefined;
+    if (patch.name !== undefined) this.db.prepare('UPDATE devices SET name = ? WHERE id = ?').run(patch.name, id);
+    if (patch.admin !== undefined) this.db.prepare('UPDATE devices SET is_admin = ? WHERE id = ?').run(patch.admin ? 1 : 0, id);
+    return this.listDevices().find((x) => x.id === id);
+  }
+
+  /**
+   * Whether a device may open the Admin page. When no connected device may yet, the oldest one gets the right: that's
+   * the Mac the server was set up with, so the owner never needs the terminal for it.
+   */
+  isAdminDevice(id: string): boolean {
+    const active = this.listDevices().filter((x) => !x.revokedAt);
+    if (!active.some((x) => x.admin) && active[0]) this.db.prepare('UPDATE devices SET is_admin = 1 WHERE id = ?').run(active[0].id);
+    return (this.db.prepare('SELECT is_admin FROM devices WHERE id = ? AND revoked_at IS NULL').get(id) as { is_admin: number } | undefined)?.is_admin === 1;
   }
 
   revokeDevice(idOrName: string): Device | undefined {
@@ -264,13 +282,13 @@ export class Store {
   }
 
   /** Redeem a pairing code: it works once, then a device with its own key exists. */
-  redeemPairCode(code: string): { device: Device; key: string } | undefined {
+  redeemPairCode(code: string, client: string | null = null): { device: Device; key: string } | undefined {
     const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
     const row = this.db.prepare('SELECT device_name, expires_at FROM pair_codes WHERE code_hash = ?').get(sha256(normalized)) as { device_name: string; expires_at: string } | undefined;
     if (!row) return undefined;
     this.db.prepare('DELETE FROM pair_codes WHERE code_hash = ?').run(sha256(normalized));
     if (row.expires_at < new Date().toISOString()) return undefined;
-    return this.addDevice(row.device_name);
+    return this.addDevice(row.device_name, client);
   }
 
   // ---- Admin access (setup wizard and Admin page, see company.ts) --------------------------

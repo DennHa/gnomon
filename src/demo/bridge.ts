@@ -39,6 +39,7 @@ window.api = {
   serverConnect: async () => ({ ok: false, error: DEMO_ERROR }),
   serverDisconnect: async () => ({ connected: false }),
   serverPairCode: async () => ({ ok: false, error: DEMO_ERROR }),
+  serverAdminLink: async () => ({ ok: false, error: DEMO_ERROR }),
   serverSyncState: async () => null,
   serverSetSyncState: async () => false,
   serverSyncPull: async () => ({ ok: false, error: DEMO_ERROR }),

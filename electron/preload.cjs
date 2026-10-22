@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('api', {
   serverConnect: (url, code) => ipcRenderer.invoke('server:connect', { url, code }),
   serverDisconnect: () => ipcRenderer.invoke('server:disconnect'),
   serverPairCode: (name) => ipcRenderer.invoke('server:pairCode', name),
+  serverAdminLink: () => ipcRenderer.invoke('server:adminLink'),
   serverSyncState: () => ipcRenderer.invoke('server:syncState'),
   serverSetSyncState: (state) => ipcRenderer.invoke('server:setSyncState', state),
   serverSyncPull: (since) => ipcRenderer.invoke('server:syncPull', since),

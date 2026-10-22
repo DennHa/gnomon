@@ -391,6 +391,61 @@ describe('static folders (/about, /example)', () => {
   });
 });
 
+describe('admin page from a trusted device (no terminal)', () => {
+  test('the first device opens the Admin page; devices can be renamed, allowed, disconnected and added by code', async () => {
+    const { Company } = await import('../src/company');
+    const own = new Store(':memory:');
+    const company = new Company(own, Buffer.alloc(32, 9), 'file');
+    const app = http.createServer(createApp({ store: own, webDir, company }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const go = async (method: string, p: string, body?: unknown, auth?: string, headers: Record<string, string> = {}) => {
+      const r = await fetch(`${url}/api/v1${p}`, { method, headers: { ...(auth && { Authorization: `Bearer ${auth}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+      return { status: r.status, body: (await r.json()) as any };
+    };
+    try {
+      const mac = own.addDevice('MacBook', 'mac');
+      const phone = own.addDevice('iPhone', 'phone');
+      // Only the device the server was set up with (the oldest) may open the page at first.
+      assert.equal((await go('POST', '/admin-link', {}, phone.key)).status, 403);
+      const link = await go('POST', '/admin-link', {}, mac.key);
+      assert.equal(link.status, 201);
+      const code = String(link.body.path).match(/^\/admin#code=([A-Z0-9-]+)$/)?.[1];
+      assert.ok(code, 'a one-time link to /admin');
+      const session = (await go('POST', '/admin/session', { code })).body.token;
+      assert.ok(session);
+      assert.equal((await go('POST', '/admin/session', { code })).status, 401, 'the link works once');
+
+      let list = (await go('GET', '/admin/devices', undefined, session)).body.devices;
+      assert.deepEqual(list.map((d: any) => [d.name, d.client, d.admin]), [['MacBook', 'mac', true], ['iPhone', 'phone', false]]);
+      // Rename and allow the phone; then the Mac may give up the right, but the last one can't.
+      list = (await go('PATCH', `/admin/devices/${phone.device.id}`, { name: 'Alex iPhone', admin: true }, session)).body.devices;
+      assert.deepEqual(list.map((d: any) => [d.name, d.admin]), [['MacBook', true], ['Alex iPhone', true]]);
+      assert.equal((await go('PATCH', `/admin/devices/${mac.device.id}`, { admin: false }, session)).status, 200);
+      assert.equal((await go('PATCH', `/admin/devices/${phone.device.id}`, { admin: false }, session)).status, 422);
+      assert.equal((await go('PATCH', `/admin/devices/${phone.device.id}`, { name: '  ' }, session)).status, 422);
+
+      // A code for a new device; a phone's browser that redeems it shows up as a phone.
+      const pair = await go('POST', '/admin/pair', { name: 'iPad' }, session);
+      assert.equal(pair.status, 201);
+      const added = await go('POST', '/pair', { code: pair.body.code }, undefined, { 'User-Agent': 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)' });
+      assert.equal(added.status, 201);
+      list = (await go('GET', '/admin/devices', undefined, session)).body.devices;
+      assert.deepEqual(list.at(-1).client, 'phone');
+
+      // Disconnecting takes the device's key away at once.
+      list = (await go('DELETE', `/admin/devices/${phone.device.id}`, undefined, session)).body.devices;
+      assert.equal(list.some((d: any) => d.id === phone.device.id), false);
+      assert.equal((await go('GET', '/me', undefined, phone.key)).status, 401);
+      // Without a session, none of it.
+      assert.equal((await go('GET', '/admin/devices')).status, 401);
+    } finally {
+      await new Promise((r) => app.close(r));
+      own.close();
+    }
+  });
+});
+
 describe('company setup (wizard API)', () => {
   test('setup code → session → settings, Float and Personio checks, profile, invitation, finish', async () => {
     const { Company } = await import('../src/company');

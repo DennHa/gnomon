@@ -1090,7 +1090,7 @@ ipcMain.handle('server:connect', async (_e, { url, code }) => {
   if (!value) return { ok: false, error: 'no_code' };
   let key = value;
   if (!/^(gnomon|punch)_/.test(value)) {
-    const r = await serverCall(origin, 'POST', '/pair', { code: value });
+    const r = await serverCall(origin, 'POST', '/pair', { code: value, client: 'mac' });
     if (!r.ok) return { ok: false, error: r.status === 401 ? 'invalid_code' : r.error };
     key = r.data.key;
   }
@@ -1113,6 +1113,17 @@ ipcMain.handle('server:pairCode', async (_e, name) => {
   const r = await serverCall(s.url, 'POST', '/pair-codes', { name: String(name || 'iPhone').slice(0, 60) }, s.key);
   if (!r.ok) return r;
   return { ok: true, code: r.data.code, expiresAt: r.data.expiresAt, link: `${s.url}/#pair=${r.data.code}` };
+});
+// The server's Admin page, opened in the browser with a one-time sign-in link this Mac asks for (only works for a
+// device the server lets open it: the first one connected, or one allowed on the page).
+ipcMain.handle('server:adminLink', async () => {
+  const s = readServer();
+  if (!s) return { ok: false, error: 'not_connected' };
+  const r = await serverCall(s.url, 'POST', '/admin-link', {}, s.key);
+  if (!r.ok) return { ok: false, error: r.status === 403 ? 'not_admin' : r.error };
+  const url = `${s.url}${r.data.path}`;
+  if (/^https?:\/\/[^\s]+$/i.test(url)) shell.openExternal(url);
+  return { ok: true };
 });
 // Sync (src/sync.ts does the merging in the window; here only the HTTP calls with the key, and the sync state:
 // the cursor and the last agreed version of every record, kept next to data.json).

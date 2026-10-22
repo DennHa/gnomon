@@ -42,6 +42,8 @@ declare global {
       serverConnect(url: string, code: string): Promise<ServerResult<ServerStatus>>;
       serverDisconnect(): Promise<ServerStatus>;
       serverPairCode(name: string): Promise<ServerResult<{ code: string; expiresAt: string; link: string }>>;
+      /** Opens the server's Admin page in the browser, signed in. */
+      serverAdminLink(): Promise<ServerResult<object>>;
       serverSyncState(): Promise<import('./sync').SyncState | null>;
       serverSetSyncState(state: import('./sync').SyncState): Promise<boolean>;
       serverSyncPull(since: number): Promise<ServerResult<{ cursor: number; more: boolean; changes: import('./sync').Change[] }>>;

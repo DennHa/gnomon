@@ -1,6 +1,6 @@
 // The setup wizard (/setup) and the Admin page (/admin) for a company's Gnomon server (docs/company-setup.md).
 // Access: the one-time code in the link (#code=…) is traded for a short session, kept in this tab only.
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import qrcode from 'qrcode-generator';
 import { Icon, type IconName } from './icons';
@@ -122,6 +122,31 @@ const EN = {
   copy: 'Copy',
   copied: 'Copied',
   history: 'Recent changes',
+  devicesTitle: 'Devices',
+  devicesIntro: 'Everything connected to this server. Rename a device, let it open this page, or disconnect it.',
+  devMac: 'Mac',
+  devPhone: 'Phone',
+  devWeb: 'Browser',
+  devUnknown: 'Device',
+  devLastSeen: 'last seen {when}',
+  devNever: 'not used yet',
+  devSince: 'connected {date}',
+  devJustNow: 'just now',
+  devMinutes: '{n} min ago',
+  devHours: '{n} h ago',
+  devDays: '{n} days ago',
+  devAdmin: 'Can open this page',
+  devRename: 'Rename',
+  devSave: 'Save',
+  devDisconnect: 'Disconnect',
+  devConfirm: 'Disconnect {name}? It stops syncing right away and needs a new code to connect again.',
+  devNone: 'Nothing is connected yet.',
+  addTitle: 'Add a device',
+  addIntro: 'Scan the code with the phone’s camera, or open this server on the new device and type the code. It works once, for 10 minutes.',
+  addName: 'Name, e.g. iPhone',
+  addButton: 'Show code',
+  addValid: 'Valid until {time}',
+  setupGroup: 'Company setup',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -229,6 +254,31 @@ const DE: Record<Key, string> = {
   copy: 'Kopieren',
   copied: 'Kopiert',
   history: 'Letzte Änderungen',
+  devicesTitle: 'Geräte',
+  devicesIntro: 'Alles, was mit diesem Server verbunden ist. Ein Gerät umbenennen, diese Seite öffnen lassen oder trennen.',
+  devMac: 'Mac',
+  devPhone: 'Handy',
+  devWeb: 'Browser',
+  devUnknown: 'Gerät',
+  devLastSeen: 'zuletzt aktiv {when}',
+  devNever: 'noch nicht benutzt',
+  devSince: 'verbunden am {date}',
+  devJustNow: 'gerade eben',
+  devMinutes: 'vor {n} Min.',
+  devHours: 'vor {n} Std.',
+  devDays: 'vor {n} Tagen',
+  devAdmin: 'Darf diese Seite öffnen',
+  devRename: 'Umbenennen',
+  devSave: 'Sichern',
+  devDisconnect: 'Trennen',
+  devConfirm: '{name} trennen? Es synchronisiert sofort nicht mehr und braucht zum Wiederverbinden einen neuen Code.',
+  devNone: 'Noch nichts verbunden.',
+  addTitle: 'Gerät hinzufügen',
+  addIntro: 'Den Code mit der Handykamera scannen, oder auf dem neuen Gerät diesen Server öffnen und den Code eintippen. Er gilt einmal, 10 Minuten lang.',
+  addName: 'Name, z. B. iPhone',
+  addButton: 'Code zeigen',
+  addValid: 'Gültig bis {time}',
+  setupGroup: 'Firmen-Einrichtung',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -653,9 +703,126 @@ function Done(ctx: Ctx) {
   );
 }
 
+
+// ---- Devices (the Admin page's first section) -----------------------------------------------------
+
+type Device = { id: string; name: string; createdAt: string; lastSeenAt: string | null; client?: string | null; admin?: boolean };
+
+/** Mac, phone or browser: from how it connected, or guessed from the name for devices from before that was recorded. */
+const kindOf = (d: Device): 'mac' | 'phone' | 'web' | null =>
+  (d.client as 'mac' | 'phone' | 'web' | null) ?? (/mac|book|imac/i.test(d.name) ? 'mac' : /phone|handy|pixel|android|ipad/i.test(d.name) ? 'phone' : null);
+const KIND: Record<string, [IconName, Key]> = { mac: ['laptop_mac', 'devMac'], phone: ['mobile', 'devPhone'], web: ['language', 'devWeb'] };
+
+function ago(iso: string | null): string {
+  if (!iso) return t('devNever');
+  const min = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  const when = min < 2 ? t('devJustNow') : min < 60 ? t('devMinutes', { n: min }) : min < 48 * 60 ? t('devHours', { n: Math.round(min / 60) }) : t('devDays', { n: Math.round(min / 1440) });
+  return t('devLastSeen', { when });
+}
+
+function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Device[]) => void; setErr: (e: string | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(d.name);
+  const [icon, label] = KIND[kindOf(d) ?? ''] ?? ['devices', 'devUnknown'];
+  const run = async (method: string, body?: unknown) => {
+    try {
+      setErr(null);
+      setDevices((await call<{ devices: Device[] }>(method, `/devices/${d.id}`, body)).devices);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  return (
+    <li className="a-device">
+      <span className="a-device-icon" title={t(label)}>
+        <Icon name={icon} size={22} />
+      </span>
+      <div className="a-device-main">
+        {editing ? (
+          <form className="a-inline" onSubmit={(e) => (e.preventDefault(), run('PATCH', { name }).then(() => setEditing(false)))}>
+            <input value={name} autoFocus maxLength={60} onChange={(e) => setName(e.target.value)} />
+            <button className="primary">{t('devSave')}</button>
+          </form>
+        ) : (
+          <strong>{d.name}</strong>
+        )}
+        <span className="a-hint">
+          {t(label)} · {ago(d.lastSeenAt)} · {t('devSince', { date: new Date(d.createdAt).toLocaleDateString() })}
+        </span>
+        <label className="a-device-admin">
+          <input type="checkbox" checked={Boolean(d.admin)} onChange={(e) => run('PATCH', { admin: e.target.checked })} /> {t('devAdmin')}
+        </label>
+      </div>
+      <div className="a-device-actions">
+        {!editing && (
+          <button className="soft" title={t('devRename')} onClick={() => setEditing(true)}>
+            <Icon name="edit" size={18} />
+          </button>
+        )}
+        <button className="soft danger" title={t('devDisconnect')} onClick={() => confirm(t('devConfirm', { name: d.name })) && run('DELETE')}>
+          <Icon name="link_off" size={18} /> {t('devDisconnect')}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function AddDevice({ s }: Ctx) {
+  const [name, setName] = useState('');
+  const [code, setCode] = useState<{ name: string; code: string; expiresAt: string } | null>(null);
+  // The phone app connects by itself when opened with #pair=CODE (scanning the QR code does exactly that).
+  const base = (s.config.company.publicUrl || location.origin).replace(/\/+$/, '');
+  const link = code ? `${base}/#pair=${code.code}` : '';
+  return (
+    <div className="a-card">
+      <strong>
+        <Icon name="qr_code_2" size={18} /> {t('addTitle')}
+      </strong>
+      <span className="a-hint">{t('addIntro')}</span>
+      <form className="a-inline" onSubmit={async (e) => (e.preventDefault(), setCode(await call('POST', '/pair', { name })))}>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('addName')} maxLength={60} />
+        <button className="primary">{t('addButton')}</button>
+      </form>
+      {code && (
+        <div className="a-invite">
+          <Qr text={link} />
+          <div>
+            <strong>{code.name}</strong>
+            <code className="a-code">{code.code}</code>
+            <span className="a-hint">{t('addValid', { time: new Date(code.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Devices(ctx: Ctx) {
+  const [devices, setDevices] = useState<Device[] | null>(null);
+  useEffect(() => {
+    call<{ devices: Device[] }>('GET', '/devices').then((r) => setDevices(r.devices), (e) => ctx.setErr((e as Error).message));
+  }, []);
+  return (
+    <>
+      <p className="a-intro">{t('devicesIntro')}</p>
+      {devices && devices.length === 0 && <p className="a-hint">{t('devNone')}</p>}
+      {devices && devices.length > 0 && (
+        <ul className="a-devices">
+          {devices.map((d) => (
+            <DeviceRow key={d.id} d={d} setDevices={setDevices} setErr={ctx.setErr} />
+          ))}
+        </ul>
+      )}
+      <AddDevice {...ctx} />
+    </>
+  );
+}
+
 // ---- App ------------------------------------------------------------------------------------------
 
-const STEPS: { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => ReactNode }[] = [
+type Section = { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => ReactNode };
+const DEVICES: Section = { key: 'devices', title: 'devicesTitle', icon: 'devices', view: (c) => <Devices {...c} /> };
+const STEPS: Section[] = [
   { key: 'before', title: 'beforeTitle', icon: 'check_circle', view: (c) => <Before {...c} /> },
   { key: 'company', title: 'companyTitle', icon: 'apartment', view: (c) => <CompanyStep {...c} /> },
   { key: 'signin', title: 'signInTitle', icon: 'group', view: () => <SignIn /> },
@@ -672,6 +839,9 @@ function App() {
   const [fatal, setFatal] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const admin = location.pathname.startsWith('/admin');
+  // The Admin page opens on the devices; the company setup follows as its own group.
+  const SECTIONS = admin ? [DEVICES, ...STEPS] : STEPS;
+  const offset = admin ? 1 : 0;
 
   useEffect(() => {
     // Trade the one-time code from the link for a session, then take the code out of the address bar.
@@ -688,7 +858,7 @@ function App() {
             /* this tab only */
           }
           setS(r);
-          if (r.config.setupDone) setStep(STEPS.length - 1);
+          if (r.config.setupDone && !admin) setStep(STEPS.length - 1);
         } else if (token) setS(await call('GET', '/state'));
         else setFatal(t('noLink'));
       } catch (e) {
@@ -716,27 +886,31 @@ function App() {
     );
 
   const ctx: Ctx = { s, setS, err, setErr };
-  const cur = STEPS[step];
+  const cur = SECTIONS[step];
+  const isStep = step >= offset;
   return (
     <main className="a-page">
       <header className="a-head">
         <img src="/icon-192.png" alt="" width={44} height={44} />
         <div>
-          <h1>{t(s.config.setupDone ? 'adminTitle' : 'title')}</h1>
+          <h1>{t(admin || s.config.setupDone ? 'adminTitle' : 'title')}</h1>
           <span className="a-hint">{s.config.company.name || s.config.company.publicUrl || location.host}</span>
         </div>
       </header>
       <div className="a-body">
         <nav className="a-steps">
-          {STEPS.map((st, i) => (
-            <button key={st.key} className={`a-step ${i === step ? 'on' : ''} ${i < step ? 'past' : ''}`} onClick={() => (setStep(i), setErr(null))}>
-              <span className="a-num">{i + 1}</span>
-              {t(st.title)}
-            </button>
+          {SECTIONS.map((st, i) => (
+            <Fragment key={st.key}>
+              {admin && i === offset && <span className="a-group">{t('setupGroup')}</span>}
+              <button className={`a-step ${i === step ? 'on' : ''} ${i < step && i >= offset ? 'past' : ''}`} onClick={() => (setStep(i), setErr(null))}>
+                <span className="a-num">{i < offset ? <Icon name={st.icon} size={14} /> : i - offset + 1}</span>
+                {t(st.title)}
+              </button>
+            </Fragment>
           ))}
         </nav>
         <section className="a-panel">
-          <span className="a-hint">{t('step', { n: step + 1, total: STEPS.length })}</span>
+          {isStep && <span className="a-hint">{t('step', { n: step - offset + 1, total: STEPS.length })}</span>}
           <h2>
             <Icon name={cur.icon} size={24} /> {t(cur.title)}
           </h2>
@@ -747,13 +921,13 @@ function App() {
           )}
           {cur.view(ctx)}
           <footer className="a-foot">
-            {step > 0 && (
+            {step > offset && (
               <button className="soft" onClick={() => (setStep(step - 1), setErr(null))}>
                 <Icon name="arrow_back" size={18} /> {t('back')}
               </button>
             )}
             <span className="spacer" />
-            {step < STEPS.length - 1 && (
+            {isStep && step < SECTIONS.length - 1 && (
               <button className="primary" onClick={() => (setStep(step + 1), setErr(null))}>
                 {['float', 'personio'].includes(cur.key) && !s.secrets[cur.key as 'float' | 'personio'] ? t('skip') : t('next')} <Icon name="arrow_forward" size={18} />
               </button>

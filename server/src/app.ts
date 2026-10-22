@@ -181,6 +181,13 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       const code = store.createPairCode(name, ttl);
       return { status: 201, body: { code: `${code.slice(0, 4)}-${code.slice(4)}`, name, expiresAt: new Date(Date.now() + ttl * 60_000).toISOString() } };
     }
+    if (method === 'POST' && p === '/admin-link') {
+      // A trusted device (usually the Mac) opens the Admin page without the terminal: a one-time link, 5 minutes.
+      if (!store.isAdminDevice(device.id)) throw new HttpError(403, 'not_admin', 'This device may not open the Admin page. Allow it there first.');
+      const code = store.createAdminCode('admin', 5);
+      company?.save(company.get(), `Admin page opened from ${device.name}`);
+      return { status: 201, body: { path: `/admin#code=${code.slice(0, 4)}-${code.slice(4)}`, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() } };
+    }
     if (method === 'GET' && p === '/sync') return { status: 200, body: pull(query) };
     if (method === 'POST' && p === '/sync') return { status: 200, body: push(body) };
     // The phone's own routes (state, attendance corrections, breaks, activities) are shared with the web demo.
@@ -290,6 +297,33 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       company.save(c, `Invited ${name}`);
       return [201, { name, code: formatted, link: c.company.publicUrl ? `${c.company.publicUrl}/#pair=${formatted}` : null, expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() }];
     }
+    // Devices: who is connected, renaming, disconnecting, the right to open this page, and adding a phone by QR code.
+    if (method === 'GET' && p === '/admin/devices') return [200, { devices: store.listDevices().filter((d) => !d.revokedAt) }];
+    const dev = p.match(/^\/admin\/devices\/([\w-]{1,64})$/)?.[1];
+    if (method === 'PATCH' && dev) {
+      const name = isObj(body) && typeof body.name === 'string' ? body.name.trim().slice(0, 60) : undefined;
+      const admin = isObj(body) && typeof body.admin === 'boolean' ? body.admin : undefined;
+      if (name === '') throw bad('A device needs a name');
+      if (admin === false && store.listDevices().filter((d) => !d.revokedAt && d.admin && d.id !== dev).length === 0) throw bad('At least one device must be able to open this page');
+      const d = store.updateDevice(dev, { name, admin });
+      if (!d) throw new HttpError(404, 'not_found', 'No such device');
+      company.save(c, name !== undefined ? `Renamed a device to ${name}` : `${admin ? 'Allowed' : 'Stopped'} ${d.name} opening the Admin page`);
+      return [200, { devices: store.listDevices().filter((x) => !x.revokedAt) }];
+    }
+    if (method === 'DELETE' && dev) {
+      const d = store.revokeDevice(dev);
+      if (!d) throw new HttpError(404, 'not_found', 'No such device');
+      company.save(c, `Disconnected ${d.name}`);
+      return [200, { devices: store.listDevices().filter((x) => !x.revokedAt) }];
+    }
+    if (method === 'POST' && p === '/admin/pair') {
+      // A code for a new device, for 10 minutes; the page shows it as a QR code with the server's address.
+      const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : 'Phone';
+      const code = store.createPairCode(name, 10);
+      const formatted = `${code.slice(0, 4)}-${code.slice(4)}`;
+      company.save(c, `Created a pairing code for ${name}`);
+      return [201, { name, code: formatted, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() }];
+    }
     if (method === 'POST' && p === '/admin/finish') {
       store.clearAdminCodes('setup'); // the setup link from the log stops working
       company.save({ ...c, setupDone: true }, 'Finished the setup');
@@ -318,7 +352,10 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     if (method === 'POST' && p === '/pair') {
       if (Date.now() < pairLockedUntil) throw new HttpError(429, 'too_many_attempts', 'Too many wrong codes. Create a new code and try again in 15 minutes.');
       const code = isObj(body) && typeof body.code === 'string' ? body.code : '';
-      const paired = code.length <= 20 ? store.redeemPairCode(code) : undefined;
+      // What connected, for the device list in the Admin page: the Mac says so; a phone's browser shows it in its user agent.
+      const ua = String(req.headers['user-agent'] ?? '');
+      const client = isObj(body) && body.client === 'mac' ? 'mac' : /iPhone|iPad|Android|Mobile/i.test(ua) ? 'phone' : 'web';
+      const paired = code.length <= 20 ? store.redeemPairCode(code, client) : undefined;
       if (!paired) {
         if (++pairFailures >= PAIR_MAX_FAILURES) {
           pairFailures = 0;

@@ -246,6 +246,16 @@ function ServerSettings() {
             <button className="btn" onClick={connectPhone}>
               <Icon name="add" size={18} /> {invite ? t('srv.newCode') : t('srv.connectPhone')}
             </button>
+            <button
+              className="btn ghost small"
+              title={t('srv.adminHint')}
+              onClick={async () => {
+                const r = await window.api.serverAdminLink();
+                setError(r.ok ? null : r.error === 'not_admin' ? t('srv.notAdmin') : serverError(r.error));
+              }}
+            >
+              <Icon name="admin_panel_settings" size={16} /> {t('srv.admin')}
+            </button>
             <button className="btn ghost small" onClick={disconnect}>
               {t('srv.disconnect')}
             </button>

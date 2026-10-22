@@ -50,3 +50,16 @@ body { margin: 0; }
 .spacer { flex: 1; }
 @media (max-width: 760px) { .a-body { grid-template-columns: 1fr; } .a-steps { position: static; flex-direction: row; overflow-x: auto; } .a-step { white-space: nowrap; } }
 .a-card input, .a-card select { background: var(--surface); }
+/* Devices */
+.a-group { margin: 12px 10px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.a-devices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.a-device { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: 12px; background: var(--field); }
+.a-device-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--surface); color: var(--accent-strong); flex: none; }
+.a-device-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.a-device-admin { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; cursor: pointer; }
+.a-device-actions { display: flex; gap: 6px; flex: none; }
+.a-device .a-inline input { background: var(--surface); }
+button.soft.danger { color: var(--danger, #d64545); }
+.a-code { font-size: 22px; font-weight: 700; letter-spacing: 0.08em; }
+@media (max-width: 760px) { .a-device { flex-wrap: wrap; } .a-device-actions { width: 100%; justify-content: flex-end; } .a-group { display: none; } }
+.a-invite code.a-code { font-size: 22px; letter-spacing: 0.08em; word-break: normal; }
