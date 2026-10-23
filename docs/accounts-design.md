@@ -35,8 +35,7 @@ The admin password moves from `meta` to the admin's person record (a person may 
 won't need one). Feedback stays server-wide, with an optional person_id when the sender is signed in.
 
 **Projects and activities:** per person at first, exactly like today. Shared company projects (from Float, or set by
-the admin) come later as a separate, read-only list that every person's projects can link to.
-**Decide:** is "per person first, shared later" fine, or do you want shared projects from the start?
+the admin) come later as a separate, read-only list that every person's projects can link to. *(Decided.)*
 
 ## 2. Who is asking
 
@@ -62,9 +61,8 @@ Admin routes check the person's role instead of today's separate admin flag on t
    Google, Okta, Keycloak…). The settings profile already has `signIn: 'oidc'`, `signInIssuer`, `signInClientId`.
 2. On the Mac, *Sign in* opens the system browser at the identity provider (authorization code flow with PKCE, a
    loopback redirect to the app). The provider confirms the email; the app sends the result to the server.
-3. The server checks the token's signature against the provider's published keys, and the email against `people`
-   (or creates a member automatically when the domain is allowed; **Decide:** auto-create for the company domain, or
-   only invited people?).
+3. The server checks the token's signature against the provider's published keys, and the email against `people`.
+   Only invited people can sign in; nobody gets an account just for having a company address. *(Decided.)*
 4. The Mac gets its device key as today. No password for employees, and leaving the company (disabled in the identity
    provider) stops new sign-ins; the admin disables the person in Gnomon to stop existing devices.
 
@@ -90,8 +88,7 @@ filter is applied on the server before anything leaves it; the apps can't widen 
 
 Your server today has one dataset and several devices. Migration, once, on start:
 
-1. Create a person for the owner: the admin password's owner, email asked on the Admin page the first time
-   (**Decide:** or taken from the company settings?). Role `admin`.
+1. Create a person for the owner, role `admin`. Their email is asked once on the Admin page after the update.
 2. Give every existing record and device to that person.
 3. Old anonymous pairing codes keep working for that person until they expire.
 
@@ -116,11 +113,10 @@ seen; actions: invite again, change role, disable, remove (with their data, afte
 Each step ships on its own, with a backup and a migration test on a copy of a real database before it reaches a
 server.
 
-## Decisions for you
+## Decisions
 
-1. Projects: per person first, shared company projects later?
-2. Company login: create people automatically for the company's email domain, or only invited people?
-3. Your own account: which email should the owner account get?
-4. Can admins see other people's times (for team reports), or only manage accounts? (GDPR: works councils in Germany
-   usually require that individual times are not visible to managers without an agreement. Default proposal: admins
-   manage accounts and connections, but can't see anyone's entries.)
+1. **Projects:** per person first; shared company projects later, read-only. *(Decided.)*
+2. **Company login:** only invited people; no automatic accounts for the company domain. *(Decided.)*
+3. **Admins and times:** admins manage accounts and connections, and never see anyone's entries. Team reports come
+   later as an opt-in with consent (in Germany usually with the works council). *(Decided.)*
+4. **The owner's email:** asked once on the Admin page after the update. *(Decided.)*
