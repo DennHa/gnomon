@@ -506,6 +506,55 @@ test('admin password: set once while signed in, then sign in from any browser; w
   }
 });
 
+test('feedback: anyone can write, only the secret reads the replies, the admin answers; spam is limited', async () => {
+  const { Company } = await import('../src/company');
+  const own = new Store(':memory:');
+  const company = new Company(own, Buffer.alloc(32, 4), 'file');
+  const app = http.createServer(createApp({ store: own, webDir, company }));
+  await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+  const go = async (method: string, p: string, body?: unknown, headers: Record<string, string> = {}) => {
+    const r = await fetch(`${url}/api/v1${p}`, { method, headers: { ...(body !== undefined && { 'Content-Type': 'application/json' }), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+    return { status: r.status, body: (await r.json()) as any };
+  };
+  try {
+    assert.equal((await go('POST', '/feedback', { text: '' })).status, 422);
+    const sent = await go('POST', '/feedback', { text: 'The week view could show holidays', sender: 'Alex', appVersion: '0.1.11', os: 'macOS 26.1' });
+    assert.equal(sent.status, 201);
+    const { id, secret } = sent.body;
+    // Without the secret, nothing; with it, the conversation.
+    assert.equal((await go('GET', `/feedback/${id}`)).status, 404);
+    assert.equal((await go('GET', `/feedback/${id}`, undefined, { 'X-Feedback-Secret': 'nope' })).status, 404);
+    assert.equal((await go('GET', `/feedback/${id}`, undefined, { 'X-Feedback-Secret': secret })).body.messages.length, 1);
+    // The admin sees it as new, reads it, answers and closes it.
+    const session = (await go('POST', '/admin/session', { code: own.createAdminCode('admin', 5) })).body.token;
+    const admin = (method: string, p: string, body?: unknown) => go(method, `/admin${p}`, body, { Authorization: `Bearer ${session}` });
+    assert.equal((await admin('GET', '/state')).body.feedbackUnread, 1);
+    const list = (await admin('GET', '/feedback')).body.threads;
+    assert.deepEqual([list[0].sender, list[0].status, list[0].unread, list[0].first], ['Alex', 'new', true, 'The week view could show holidays']);
+    await admin('GET', `/feedback/${id}`);
+    assert.equal((await admin('GET', '/state')).body.feedbackUnread, 0, 'reading marks it seen');
+    const answered = (await admin('POST', `/feedback/${id}/reply`, { text: 'Good idea, it’s on the list.' })).body;
+    assert.equal(answered.status, 'open');
+    assert.equal((await admin('PATCH', `/feedback/${id}`, { status: 'done' })).body.status, 'done');
+    // The app sees the reply; writing again reopens it and counts as new for the admin.
+    const seen = (await go('GET', `/feedback/${id}`, undefined, { 'X-Feedback-Secret': secret })).body;
+    assert.deepEqual(seen.messages.map((m: any) => m.author), ['user', 'admin']);
+    const more = (await go('POST', `/feedback/${id}`, { text: 'Thanks!' }, { 'X-Feedback-Secret': secret })).body;
+    assert.equal(more.status, 'open');
+    assert.equal((await admin('GET', '/state')).body.feedbackUnread, 1);
+    // Deleted: gone for the sender too.
+    await admin('DELETE', `/feedback/${id}`);
+    assert.equal((await go('GET', `/feedback/${id}`, undefined, { 'X-Feedback-Secret': secret })).status, 404);
+    // Five new conversations an hour per address, then a pause.
+    for (let i = 0; i < 4; i++) assert.equal((await go('POST', '/feedback', { text: `idea ${i}` })).status, 201);
+    assert.equal((await go('POST', '/feedback', { text: 'one too many' })).status, 429);
+  } finally {
+    await new Promise((r) => app.close(r));
+    own.close();
+  }
+});
+
 test('a finished company server never hands out the admin right by itself', async () => {
   const { Company } = await import('../src/company');
   const own = new Store(':memory:');

@@ -62,6 +62,12 @@ class HttpError extends Error {
 }
 const bad = (message: string) => new HttpError(422, 'invalid', message);
 
+/** Who's asking, for rate limits: behind Cloudflare or a proxy its header, otherwise the connection. */
+function clientAddress(req: IncomingMessage): string {
+  const fwd = String(req.headers['cf-connecting-ip'] ?? req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+  return fwd || req.socket.remoteAddress || 'unknown';
+}
+
 /** Names that say nothing about which device it is; a device's own description replaces them when it connects. */
 const GENERIC_NAMES = new Set(['', 'phone', 'iphone', 'ipad', 'mac', 'macbook', 'device', 'browser', 'handy', 'gerät']);
 
@@ -223,6 +229,19 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   // Wrong passwords: five tries, then 15 minutes of nothing (also for the right one), against guessing.
   let loginFailures = 0;
   let loginLockedUntil = 0;
+  // Feedback limits, in memory (a restart forgets them, which is fine for spam protection).
+  const feedbackLog = new Map<string, number[]>();
+  let feedbackDay: number[] = [];
+  function feedbackAllowed(address: string, isNew = true): boolean {
+    const now = Date.now();
+    const key = `${isNew ? 'new' : 'more'}:${address}`; // new conversations and follow-ups count separately
+    const mine = (feedbackLog.get(key) ?? []).filter((t) => now - t < 3_600_000);
+    feedbackDay = feedbackDay.filter((t) => now - t < 86_400_000);
+    if (mine.length >= (isNew ? 5 : 20) || feedbackDay.length >= 200) return false;
+    feedbackLog.set(key, [...mine, now]);
+    feedbackDay.push(now);
+    return true;
+  }
   const newSession = () => {
     const token = randomBytes(24).toString('base64url');
     adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
@@ -248,6 +267,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       release: release ? { version: release.version, size: release.size } : null,
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
       passwordSet: store.hasAdminPassword(),
+      feedbackUnread: store.listFeedback().filter((t) => t.unread).length,
     };
   }
 
@@ -368,6 +388,33 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       company.save(c, `Disconnected ${d.name}`);
       return [200, { devices: store.listDevices().filter((x) => !x.revokedAt) }];
     }
+    // Feedback inbox: conversations, reading one marks it seen, replies, status, deleting.
+    if (method === 'GET' && p === '/admin/feedback') return [200, { threads: store.listFeedback() }];
+    const fid = p.match(/^\/admin\/feedback\/([\w-]{36})(\/reply)?$/);
+    if (fid) {
+      const thread = store.feedbackThread(fid[1]);
+      if (!thread) throw new HttpError(404, 'not_found', 'No such conversation');
+      if (method === 'GET' && !fid[2]) {
+        store.markFeedbackSeen(fid[1]);
+        return [200, store.feedbackThread(fid[1])];
+      }
+      if (method === 'POST' && fid[2]) {
+        const text = isObj(body) && typeof body.text === 'string' ? body.text.trim() : '';
+        if (!text || text.length > 5000) throw bad('Write between 1 and 5000 characters');
+        store.addFeedbackMessage(fid[1], 'admin', text);
+        return [200, store.feedbackThread(fid[1])];
+      }
+      if (method === 'PATCH' && !fid[2]) {
+        const status = isObj(body) ? body.status : undefined;
+        if (status !== 'new' && status !== 'open' && status !== 'done') throw bad('status must be new, open or done');
+        store.setFeedbackStatus(fid[1], status);
+        return [200, store.feedbackThread(fid[1])];
+      }
+      if (method === 'DELETE' && !fid[2]) {
+        store.deleteFeedback(fid[1]);
+        return [200, { threads: store.listFeedback() }];
+      }
+    }
     if (method === 'POST' && p === '/admin/devices/cleanup') {
       // Old pairings nobody uses: not seen for 30 days, or never used and older than a day. Admins stay.
       const cutoff = Date.now() - 30 * 86_400_000;
@@ -409,6 +456,35 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     }
 
     // Pairing is the one route without a key: the phone trades a one-time code for its own key.
+    // Feedback from the app (src/views/About.tsx): no sign-in needed, so a Mac that isn't connected can write too.
+    // Limits against spam: per address 5 new conversations an hour, 200 a day for the whole server, 5000 characters.
+    const fb = p.match(/^\/feedback(?:\/([\w-]{36}))?$/);
+    if (fb) {
+      const text = isObj(body) && typeof body.text === 'string' ? body.text.trim() : '';
+      const opt = (k: string, max: number) => (isObj(body) && typeof body[k] === 'string' && body[k] ? String(body[k]).trim().slice(0, max) : undefined);
+      if (!fb[1] && method === 'POST') {
+        if (!text || text.length > 5000) throw bad('Write between 1 and 5000 characters');
+        if (!feedbackAllowed(clientAddress(req))) throw new HttpError(429, 'too_many', 'Too much feedback at once. Please try again in an hour.');
+        const t = store.createFeedback(text, { sender: opt('sender', 80), appVersion: opt('appVersion', 40), os: opt('os', 80) });
+        return send(res, 201, { id: t.id, secret: t.secret });
+      }
+      const id = fb[1];
+      const secret = String(req.headers['x-feedback-secret'] ?? '');
+      if (!id || !store.feedbackSecretOk(id, secret)) throw new HttpError(404, 'not_found', 'No such conversation');
+      if (method === 'GET') {
+        const t = store.feedbackThread(id)!;
+        return send(res, 200, { id, status: t.status, messages: t.messages });
+      }
+      if (method === 'POST') {
+        if (!text || text.length > 5000) throw bad('Write between 1 and 5000 characters');
+        if (!feedbackAllowed(clientAddress(req), false)) throw new HttpError(429, 'too_many', 'Too many messages at once. Please try again in an hour.');
+        store.addFeedbackMessage(id, 'user', text);
+        const t = store.feedbackThread(id)!;
+        return send(res, 201, { id, status: t.status, messages: t.messages });
+      }
+      throw new HttpError(405, 'method_not_allowed', 'GET or POST');
+    }
+
     if (method === 'POST' && p === '/pair') {
       if (Date.now() < pairLockedUntil) throw new HttpError(429, 'too_many_attempts', 'Too many wrong codes. Create a new code and try again in 15 minutes.');
       const code = isObj(body) && typeof body.code === 'string' ? body.code : '';

@@ -99,6 +99,24 @@ export class Store {
         device_name TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS feedback_threads (
+        id TEXT PRIMARY KEY,
+        secret_hash TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'new',
+        sender TEXT,
+        app_version TEXT,
+        os TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        admin_seen_at TEXT
+      );
+      CREATE TABLE IF NOT EXISTS feedback_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id TEXT NOT NULL REFERENCES feedback_threads(id) ON DELETE CASCADE,
+        author TEXT NOT NULL,
+        text TEXT NOT NULL,
+        at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS admin_codes (
         code_hash TEXT PRIMARY KEY,
         purpose TEXT NOT NULL,
@@ -295,6 +313,63 @@ export class Store {
     this.db.prepare('DELETE FROM pair_codes WHERE code_hash = ?').run(sha256(normalized));
     if (row.expires_at < new Date().toISOString()) return undefined;
     return this.addDevice(nameFor(row.device_name), client);
+  }
+
+  // ---- Feedback (a small help desk: the app writes, the Admin page answers) ----------------------
+
+  /** A new conversation. The secret (shown once, kept by the app) lets the sender read the replies and write more. */
+  createFeedback(text: string, info: { sender?: string; appVersion?: string; os?: string }): { id: string; secret: string } {
+    const id = crypto.randomUUID();
+    const secret = randomBytes(24).toString('base64url');
+    const now = new Date().toISOString();
+    this.db.prepare('INSERT INTO feedback_threads (id, secret_hash, sender, app_version, os, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, sha256(secret), info.sender ?? null, info.appVersion ?? null, info.os ?? null, now, now);
+    this.db.prepare('INSERT INTO feedback_messages (thread_id, author, text, at) VALUES (?, ?, ?, ?)').run(id, 'user', text, now);
+    return { id, secret };
+  }
+
+  /** True when the secret belongs to the conversation. */
+  feedbackSecretOk(id: string, secret: string): boolean {
+    const row = this.db.prepare('SELECT secret_hash FROM feedback_threads WHERE id = ?').get(id) as { secret_hash: string } | undefined;
+    return Boolean(row && secret && timingSafeEqual(Buffer.from(row.secret_hash), Buffer.from(sha256(secret))));
+  }
+
+  /** Add a message; from the sender it reopens a finished conversation. */
+  addFeedbackMessage(id: string, author: 'user' | 'admin', text: string) {
+    const now = new Date().toISOString();
+    this.db.prepare('INSERT INTO feedback_messages (thread_id, author, text, at) VALUES (?, ?, ?, ?)').run(id, author, text, now);
+    if (author === 'user') this.db.prepare("UPDATE feedback_threads SET updated_at = ?, status = CASE status WHEN 'done' THEN 'open' ELSE status END WHERE id = ?").run(now, id);
+    else this.db.prepare("UPDATE feedback_threads SET updated_at = ?, admin_seen_at = ?, status = CASE status WHEN 'new' THEN 'open' ELSE status END WHERE id = ?").run(now, now, id);
+  }
+
+  setFeedbackStatus(id: string, status: 'new' | 'open' | 'done') {
+    this.db.prepare('UPDATE feedback_threads SET status = ? WHERE id = ?').run(status, id);
+  }
+
+  markFeedbackSeen(id: string) {
+    this.db.prepare('UPDATE feedback_threads SET admin_seen_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+  }
+
+  feedbackThread(id: string) {
+    const t = this.db.prepare('SELECT id, status, sender, app_version, os, created_at, updated_at, admin_seen_at FROM feedback_threads WHERE id = ?').get(id) as
+      | { id: string; status: string; sender: string | null; app_version: string | null; os: string | null; created_at: string; updated_at: string; admin_seen_at: string | null }
+      | undefined;
+    if (!t) return undefined;
+    const messages = this.db.prepare('SELECT author, text, at FROM feedback_messages WHERE thread_id = ? ORDER BY id').all(id) as { author: 'user' | 'admin'; text: string; at: string }[];
+    return { id: t.id, status: t.status, sender: t.sender, appVersion: t.app_version, os: t.os, createdAt: t.created_at, updatedAt: t.updated_at, unread: !t.admin_seen_at || messages.some((m) => m.author === 'user' && m.at > t.admin_seen_at!), messages };
+  }
+
+  /** All conversations, newest activity first, with their first and last message for the list. */
+  listFeedback() {
+    const ids = this.db.prepare('SELECT id FROM feedback_threads ORDER BY updated_at DESC').all() as { id: string }[];
+    return ids.map(({ id }) => {
+      const t = this.feedbackThread(id)!;
+      return { ...t, messages: undefined, first: t.messages[0]?.text ?? '', last: t.messages.at(-1) ?? null, count: t.messages.length };
+    });
+  }
+
+  deleteFeedback(id: string) {
+    this.db.prepare('DELETE FROM feedback_messages WHERE thread_id = ?').run(id);
+    this.db.prepare('DELETE FROM feedback_threads WHERE id = ?').run(id);
   }
 
   // ---- Admin password (sign in to the Admin page straight from the browser) -------------------

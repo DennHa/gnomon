@@ -1064,3 +1064,18 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 /* The "moved to fit your entries" note: one line each, Undo on the right. */
 .fit-line { display: flex; align-items: baseline; gap: 12px; justify-content: space-between; }
 .fit-undo { flex: none; color: var(--accent-strong); font-weight: 600; margin: 0; }
+.nav-dot { width: 8px; height: 8px; margin-left: auto; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+/* Feedback help desk (Info & feedback) */
+.feedback .fb-text { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; line-height: 1.45; margin-top: 4px; }
+.fb-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.fb-threads { margin-top: 18px; display: flex; flex-direction: column; gap: 14px; }
+.fb-threads h4 { margin: 0; }
+.fb-thread { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--bg); }
+.fb-thread.unread { box-shadow: inset 3px 0 0 var(--accent); }
+.fb-msg { display: flex; flex-direction: column; gap: 3px; max-width: 85%; }
+.fb-msg.admin { align-self: flex-end; align-items: flex-end; }
+.fb-bubble { white-space: pre-wrap; padding: 8px 12px; border-radius: 12px; background: var(--field); line-height: 1.45; }
+.fb-msg.admin .fb-bubble { background: var(--accent-soft); }
+.fb-thread > .link-btn { align-self: flex-start; color: var(--accent-strong); }
+.fb-reply { display: flex; gap: 8px; align-items: flex-end; }
+.fb-reply textarea { flex: 1; font: inherit; resize: vertical; }

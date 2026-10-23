@@ -3,7 +3,8 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useStore } from '../store';
 import { Burst } from '../motion';
 import { Icon } from '../icons';
-import { t } from '../i18n';
+import { locale, t } from '../i18n';
+import type { FeedbackThread } from '../global';
 import changelog from '../../CHANGELOG.md?raw';
 import credits from '../credits.json';
 import appIcon from '../assets/app-icon.png';
@@ -97,6 +98,117 @@ function Updates({ info }: { info: Info }) {
   );
 }
 
+/**
+ * Feedback as a small help desk: write here, it goes to the maker's Gnomon server, replies show up below (and as a
+ * notification). Without a server to send to, the mail program opens instead.
+ */
+function FeedbackCard() {
+  const { data } = useStore();
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [text, setText] = useState('');
+  const [withInfo, setWithInfo] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [threads, setThreads] = useState<FeedbackThread[]>([]);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [reply, setReply] = useState('');
+  const load = async () => {
+    const list = await window.api.feedbackThreads();
+    setThreads(list);
+    // Showing them is reading them.
+    for (const th of list) if (th.unread) void window.api.feedbackSeen(th.id, th.messages.filter((m) => m.author === 'admin').length);
+  };
+  useEffect(() => {
+    window.api.feedbackAvailable().then((ok) => (setAvailable(ok), ok && void load()));
+  }, []);
+  const name = data.settings.userName?.trim();
+
+  if (available === false)
+    return (
+      <section className="card onb-entry">
+        <span className="onb-entry-text">
+          <strong>{t('about.feedback')}</strong>
+          <span className="muted small">{t('about.feedbackText')}</span>
+        </span>
+        <button className="btn" onClick={() => window.api.openFeedback()}>
+          <Icon name="mail" size={18} /> {t('about.write')}
+        </button>
+      </section>
+    );
+  return (
+    <section className="card feedback">
+      <h3>{t('about.feedback')}</h3>
+      <p className="muted small">{t('fb.intro')}</p>
+      <textarea className="fb-text" rows={4} maxLength={5000} value={text} placeholder={t('fb.placeholder')} onChange={(e) => (setText(e.target.value), setSent(false))} />
+      <div className="fb-row">
+        <label className="check-row small">
+          <input type="checkbox" checked={withInfo} onChange={(e) => setWithInfo(e.target.checked)} />
+          <span>{name ? t('fb.withInfoName', { name }) : t('fb.withInfo')}</span>
+        </label>
+        <span className="spacer" />
+        {sent && <span className="pos small">{t('fb.sent')}</span>}
+        <button
+          className="btn primary"
+          disabled={busy || !text.trim()}
+          onClick={async () => {
+            setBusy(true);
+            const r = await window.api.feedbackSend({ text, sender: name, withInfo });
+            setBusy(false);
+            if (!r.ok) return setError(r.error === 'unreachable' ? t('fb.offline') : r.error);
+            setError(null);
+            setText('');
+            setSent(true);
+            void load();
+          }}
+        >
+          <Icon name="send" size={18} /> {t('fb.send')}
+        </button>
+      </div>
+      {error && <p className="error small">{error}</p>}
+      {threads.length > 0 && (
+        <div className="fb-threads">
+          <h4>{t('fb.yours')}</h4>
+          {threads.map((th) => (
+            <div key={th.id} className={`fb-thread ${th.unread ? 'unread' : ''}`}>
+              {th.messages.map((m, i) => (
+                <div key={i} className={`fb-msg ${m.author}`}>
+                  <span className="fb-bubble">{m.text}</span>
+                  <span className="muted small">
+                    {m.author === 'admin' ? t('fb.answer') : t('fb.you')} · {new Date(m.at).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+              {replyTo === th.id ? (
+                <div className="fb-reply">
+                  <textarea rows={2} maxLength={5000} autoFocus value={reply} onChange={(e) => setReply(e.target.value)} />
+                  <button
+                    className="btn small"
+                    disabled={!reply.trim()}
+                    onClick={async () => {
+                      const r = await window.api.feedbackReply(th.id, reply);
+                      if (!r.ok) return setError(r.error === 'unreachable' ? t('fb.offline') : r.error);
+                      setReply('');
+                      setReplyTo(null);
+                      void load();
+                    }}
+                  >
+                    <Icon name="send" size={16} /> {t('fb.send')}
+                  </button>
+                </div>
+              ) : (
+                <button className="link-btn small" onClick={() => (setReplyTo(th.id), setReply(''))}>
+                  {th.status === 'done' ? t('fb.reopen') : t('fb.writeMore')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function About({ onOpenLabs }: { onOpenLabs: () => void }) {
   const { data, update } = useStore();
   const [info, setInfo] = useState<Info | null>(null);
@@ -143,15 +255,7 @@ export default function About({ onOpenLabs }: { onOpenLabs: () => void }) {
         {info && <Updates info={info} />}
       </section>
 
-      <section className="card onb-entry">
-        <span className="onb-entry-text">
-          <strong>{t('about.feedback')}</strong>
-          <span className="muted small">{t('about.feedbackText')}</span>
-        </span>
-        <button className="btn" onClick={() => window.api.openFeedback()}>
-          <Icon name="mail" size={18} /> {t('about.write')}
-        </button>
-      </section>
+      <FeedbackCard />
 
       <section className="card">
         <h3>{t('about.changes')}</h3>

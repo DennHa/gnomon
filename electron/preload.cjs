@@ -66,6 +66,17 @@ contextBridge.exposeInMainWorld('api', {
   serverDisconnect: () => ipcRenderer.invoke('server:disconnect'),
   serverPairCode: (name) => ipcRenderer.invoke('server:pairCode', name),
   serverAdminLink: () => ipcRenderer.invoke('server:adminLink'),
+  feedbackAvailable: () => ipcRenderer.invoke('feedback:available'),
+  feedbackSend: (msg) => ipcRenderer.invoke('feedback:send', msg),
+  feedbackThreads: () => ipcRenderer.invoke('feedback:threads'),
+  feedbackReply: (id, text) => ipcRenderer.invoke('feedback:reply', { id, text }),
+  feedbackSeen: (id, replies) => ipcRenderer.invoke('feedback:seen', { id, replies }),
+  feedbackUnread: () => ipcRenderer.invoke('feedback:unread'),
+  onFeedbackUnread: (cb) => {
+    const fn = (_e, n) => cb(n);
+    ipcRenderer.on('feedback:unread', fn);
+    return () => ipcRenderer.removeListener('feedback:unread', fn);
+  },
   serverSyncState: () => ipcRenderer.invoke('server:syncState'),
   serverSetSyncState: (state) => ipcRenderer.invoke('server:setSyncState', state),
   serverSyncPull: (since) => ipcRenderer.invoke('server:syncPull', since),

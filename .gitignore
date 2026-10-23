@@ -25,3 +25,4 @@ personio-credentials.json
 .idea/
 .private-patterns
 dist-demo/
+electron/home.json

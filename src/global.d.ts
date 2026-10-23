@@ -4,6 +4,9 @@ import type { CompanyProfile, TrayAction, TrayState } from './types';
 type ServerStatus = { connected: boolean; url?: string; name?: string };
 type ServerResult<T> = ({ ok: true } & T) | { ok: false; error: string; status?: number };
 
+/** A feedback conversation with the maker's server (see About.tsx). */
+export type FeedbackThread = { id: string; status: 'new' | 'open' | 'done'; unread: number; messages: { author: 'user' | 'admin'; text: string; at: string }[] };
+
 type ApiRequest = { id: string; method: string; path: string; query: Record<string, string>; body: unknown };
 
 declare global {
@@ -44,6 +47,13 @@ declare global {
       serverPairCode(name: string): Promise<ServerResult<{ code: string; expiresAt: string; link: string }>>;
       /** Opens the server's Admin page in the browser, signed in. */
       serverAdminLink(): Promise<ServerResult<object>>;
+      feedbackAvailable(): Promise<boolean>;
+      feedbackSend(msg: { text: string; sender?: string; withInfo: boolean }): Promise<ServerResult<object>>;
+      feedbackThreads(): Promise<FeedbackThread[]>;
+      feedbackReply(id: string, text: string): Promise<ServerResult<object>>;
+      feedbackSeen(id: string, replies: number): Promise<void>;
+      feedbackUnread(): Promise<number>;
+      onFeedbackUnread(cb: (n: number) => void): () => void;
       serverSyncState(): Promise<import('./sync').SyncState | null>;
       serverSetSyncState(state: import('./sync').SyncState): Promise<boolean>;
       serverSyncPull(since: number): Promise<ServerResult<{ cursor: number; more: boolean; changes: import('./sync').Change[] }>>;

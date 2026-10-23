@@ -171,6 +171,7 @@ function useTrayBridge(onShowReview: () => void) {
         if (action.type === 'resume') update(resumeLast);
         if (action.type === 'idle') update((d) => resolveIdle(d, action.since, action.choice));
         if (action.type === 'show-review') showReviewRef.current();
+        if (action.type === 'show-feedback') window.dispatchEvent(new Event('gnomon:show-feedback'));
         if (action.type === 'switch-activity') update((d) => switchActivity(d, action.activityId));
       }),
     [update],
@@ -425,6 +426,15 @@ export default function App() {
   const [view, setView] = useState<View>(() => initialView(data.settings.workStyle));
   const [day, setDay] = useState(initialDay);
   const [dayModal, setDayModal] = useState<string | null>(() => (hashParts()[2] === 'day' ? initialDay() : null));
+  // A reply to your feedback: a dot on Info & feedback until you've read it; the notification opens the page.
+  const [feedbackUnread, setFeedbackUnread] = useState(0);
+  useEffect(() => {
+    window.api.feedbackUnread().then(setFeedbackUnread);
+    const off = window.api.onFeedbackUnread(setFeedbackUnread);
+    const show = () => setView('about');
+    window.addEventListener('gnomon:show-feedback', show);
+    return () => (off(), window.removeEventListener('gnomon:show-feedback', show));
+  }, []);
   // Settings → Labs can play the morning welcome on request.
   const [morningPreview, setMorningPreview] = useState(false);
   useEffect(() => {
@@ -524,6 +534,7 @@ export default function App() {
     <button key={v.id} className={`nav-item ${view === v.id ? 'active' : ''}`} onClick={() => setView(v.id)}>
       <Icon name={v.icon} size={20} />
       {t(v.label)}
+      {v.id === 'about' && feedbackUnread > 0 && <span className="nav-dot" aria-label={t('fb.newReply')} />}
     </button>
   );
 

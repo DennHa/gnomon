@@ -94,6 +94,7 @@ ipcMain.handle('profile:get', () => companyProfile);
 // profile's updateUrl, the company server, or the server this Mac is paired with. Not tied to GitHub or one host.
 function updateSource() {
   if (process.env.UPDATE_URL) return process.env.UPDATE_URL;
+  const home = homeServer();
   if (companyProfile?.updateUrl) return companyProfile.updateUrl;
   // Only the paired server's address, not its key: reading the key could ask for keychain access.
   let paired = null;
@@ -102,8 +103,21 @@ function updateSource() {
   } catch {
     /* not paired */
   }
-  const server = companyProfile?.serverUrl || paired;
+  const server = companyProfile?.serverUrl || paired || home;
   return server ? `${server}/latest/version.json` : null;
+}
+
+/**
+ * The maker's Gnomon server, for feedback and, when nothing else is set, updates. Comes from electron/home.json at
+ * build time ({ "url": "https://…" }), which isn't in the repository; without it there's no default.
+ */
+function homeServer() {
+  try {
+    const url = JSON.parse(fs.readFileSync(path.join(__dirname, 'home.json'), 'utf8')).url;
+    return /^https:\/\/[^\s/]+$/i.test(String(url)) ? String(url) : null;
+  } catch {
+    return null;
+  }
 }
 
 ipcMain.handle('app:info', () => ({
@@ -1122,6 +1136,101 @@ ipcMain.handle('server:pairCode', async (_e, name) => {
   if (!r.ok) return r;
   return { ok: true, code: r.data.code, expiresAt: r.data.expiresAt, link: `${s.url}/#pair=${r.data.code}` };
 });
+// ---- Feedback, as a small help desk: written in Info & feedback, answered on the server's Admin page ----------------
+// It goes to the maker's server (homeServer), else the server this Mac is paired with. Each conversation's id and secret
+// are kept in feedback.json; the secret lets this Mac read the replies and write more.
+const feedbackFile = () => path.join(app.getPath('userData'), 'feedback.json');
+function feedbackServer() {
+  if (process.env.FEEDBACK_URL) return process.env.FEEDBACK_URL; // tests and screenshots
+  if (homeServer()) return homeServer();
+  try {
+    return JSON.parse(fs.readFileSync(serverFile(), 'utf8')).url || null;
+  } catch {
+    return null;
+  }
+}
+function readFeedback() {
+  try {
+    return JSON.parse(fs.readFileSync(feedbackFile(), 'utf8'));
+  } catch {
+    return [];
+  }
+}
+const writeFeedback = (list) => fs.writeFileSync(feedbackFile(), JSON.stringify(list, null, 2), { mode: 0o600 });
+async function feedbackCall(server, method, apiPath, body, secret) {
+  try {
+    const res = await fetch(`${server}/api/v1${apiPath}`, {
+      method,
+      headers: { ...(secret && { 'X-Feedback-Secret': secret }), ...(body !== undefined && { 'Content-Type': 'application/json' }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
+    });
+    const json = await res.json().catch(() => ({}));
+    return res.ok ? { ok: true, data: json } : { ok: false, status: res.status, error: json.message || `HTTP ${res.status}` };
+  } catch {
+    return { ok: false, error: 'unreachable' };
+  }
+}
+/** Every conversation with its messages; `unread` counts replies this Mac hasn't shown yet. */
+async function feedbackThreads() {
+  const list = readFeedback();
+  const out = [];
+  for (const f of list) {
+    const r = await feedbackCall(f.server, 'GET', `/feedback/${f.id}`, undefined, f.secret);
+    if (!r.ok) {
+      if (r.status === 404) f.gone = true; // deleted on the server
+      continue;
+    }
+    const replies = r.data.messages.filter((m) => m.author === 'admin').length;
+    out.push({ id: f.id, status: r.data.status, messages: r.data.messages, unread: Math.max(0, replies - (f.seenReplies ?? 0)) });
+  }
+  const kept = list.filter((f) => !f.gone);
+  if (kept.length !== list.length) writeFeedback(kept);
+  return out.sort((a, b) => (b.messages.at(-1)?.at ?? '').localeCompare(a.messages.at(-1)?.at ?? ''));
+}
+ipcMain.handle('feedback:available', () => Boolean(feedbackServer()));
+ipcMain.handle('feedback:send', async (_e, { text, sender, withInfo }) => {
+  const server = feedbackServer();
+  if (!server) return { ok: false, error: 'no_server' };
+  const info = withInfo ? { sender: sender || undefined, appVersion: app.getVersion(), os: `macOS ${process.getSystemVersion()}` } : {};
+  const r = await feedbackCall(server, 'POST', '/feedback', { text: String(text ?? '').slice(0, 5000), ...info });
+  if (!r.ok) return r;
+  writeFeedback([...readFeedback(), { id: r.data.id, secret: r.data.secret, server, createdAt: new Date().toISOString(), seenReplies: 0 }]);
+  return { ok: true };
+});
+ipcMain.handle('feedback:threads', () => feedbackThreads());
+ipcMain.handle('feedback:reply', async (_e, { id, text }) => {
+  const f = readFeedback().find((x) => x.id === id);
+  if (!f) return { ok: false, error: 'not_found' };
+  return feedbackCall(f.server, 'POST', `/feedback/${id}`, { text: String(text ?? '').slice(0, 5000) }, f.secret);
+});
+/** The replies of a conversation were shown: they no longer count as new. */
+ipcMain.handle('feedback:seen', (_e, { id, replies }) => {
+  writeFeedback(readFeedback().map((f) => (f.id === id ? { ...f, seenReplies: Math.max(f.seenReplies ?? 0, Number(replies) || 0) } : f)));
+  feedbackUnread = 0;
+  if (win) win.webContents.send('feedback:unread', 0);
+});
+// Look for replies now and then; a new one gets a notification and a dot on Info & feedback.
+let feedbackUnread = 0;
+let feedbackNotified = 0;
+async function checkFeedback() {
+  if (!readFeedback().length) return;
+  const threads = await feedbackThreads();
+  feedbackUnread = threads.reduce((sum, t) => sum + t.unread, 0);
+  if (win) win.webContents.send('feedback:unread', feedbackUnread);
+  if (feedbackUnread > feedbackNotified && Notification.isSupported()) {
+    const n = new Notification({ title: 'Gnomon', body: 'There’s a reply to your feedback.', silent: false });
+    n.on('click', () => {
+      showWindow();
+      if (win) win.webContents.send('tray:action', { type: 'show-feedback' });
+    });
+    n.show();
+  }
+  feedbackNotified = feedbackUnread;
+}
+ipcMain.handle('feedback:unread', () => feedbackUnread);
+
 // The server's Admin page, opened in the browser with a one-time sign-in link this Mac asks for (only works for a
 // device the server lets open it: the first one connected, or one allowed on the page).
 ipcMain.handle('server:adminLink', async () => {
@@ -1219,6 +1328,8 @@ app.whenReady().then(() => {
   createWindow();
   setInterval(checkIdle, 20_000);
   setInterval(sampleTrail, 60_000);
+  setTimeout(() => void checkFeedback(), 30_000);
+  setInterval(() => void checkFeedback(), 2 * 3_600_000);
   app.on('activate', showWindow);
 });
 

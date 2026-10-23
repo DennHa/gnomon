@@ -243,4 +243,5 @@ export type TrayAction =
   | { type: 'switch-activity'; activityId: string }
   | { type: 'resume' }
   | { type: 'idle'; since: string; choice: 'keep' | 'discard' | 'break' | 'leave' }
-  | { type: 'show-review' };
+  | { type: 'show-review' }
+  | { type: 'show-feedback' };

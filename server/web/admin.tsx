@@ -169,6 +169,20 @@ const EN = {
   devCleanupHint: 'Pairings not used for 30 days, or never used. Devices that may open this page stay.',
   devCleaned: 'Removed {n}.',
   addAuto: 'Names itself when it connects',
+  fbTitle: 'Feedback',
+  fbIntro: 'What people write from the app (Info & feedback). Your reply appears in their app.',
+  fbNone: 'No feedback yet.',
+  fbNew: 'New',
+  fbOpen: 'Open',
+  fbDone: 'Done',
+  fbAnonymous: 'Someone',
+  fbReplyPlaceholder: 'Write a reply…',
+  fbSend: 'Send reply',
+  fbYou: 'You',
+  fbDelete: 'Delete',
+  fbDeleteConfirm: 'Delete this conversation? The sender can’t see it any more either.',
+  fbBack: 'All conversations',
+  fbMessages: '{n} messages',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -323,6 +337,20 @@ const DE: Record<Key, string> = {
   devCleanupHint: 'Verbindungen, die 30 Tage oder nie benutzt wurden. Geräte, die diese Seite öffnen dürfen, bleiben.',
   devCleaned: '{n} entfernt.',
   addAuto: 'Benennt sich beim Verbinden selbst',
+  fbTitle: 'Feedback',
+  fbIntro: 'Was Leute aus der App schreiben (Info & Feedback). Deine Antwort erscheint in ihrer App.',
+  fbNone: 'Noch kein Feedback.',
+  fbNew: 'Neu',
+  fbOpen: 'Offen',
+  fbDone: 'Erledigt',
+  fbAnonymous: 'Jemand',
+  fbReplyPlaceholder: 'Antwort schreiben …',
+  fbSend: 'Antwort senden',
+  fbYou: 'Du',
+  fbDelete: 'Löschen',
+  fbDeleteConfirm: 'Dieses Gespräch löschen? Auch der Absender sieht es dann nicht mehr.',
+  fbBack: 'Alle Gespräche',
+  fbMessages: '{n} Nachrichten',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -338,7 +366,7 @@ type Config = {
   rules: Record<'managed' | 'allowLocalApi' | 'allowActivityTrail' | 'phoneApp', boolean>;
   audit: { at: string; what: string }[];
 };
-type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean };
+type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number };
 
 let token = '';
 try {
@@ -883,6 +911,123 @@ function Devices(ctx: Ctx) {
   );
 }
 
+// ---- Feedback inbox -----------------------------------------------------------------------------
+
+type FbMessage = { author: 'user' | 'admin'; text: string; at: string };
+type FbThread = { id: string; status: 'new' | 'open' | 'done'; sender: string | null; appVersion: string | null; os: string | null; createdAt: string; updatedAt: string; unread: boolean; messages?: FbMessage[]; first?: string; last?: FbMessage | null; count?: number };
+const STATUS: Record<FbThread['status'], Key> = { new: 'fbNew', open: 'fbOpen', done: 'fbDone' };
+const when = (iso: string) => new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+function Conversation({ id, back, setErr }: { id: string; back: () => void; setErr: (e: string | null) => void }) {
+  const [th, setTh] = useState<FbThread | null>(null);
+  const [reply, setReply] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    call<FbThread>('GET', `/feedback/${id}`).then(setTh, (e) => setErr((e as Error).message));
+  }, [id]);
+  if (!th) return null;
+  const run = async (method: string, path: string, body?: unknown) => {
+    try {
+      setErr(null);
+      setTh(await call<FbThread>(method, path, body));
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  return (
+    <div className="a-convo">
+      <button className="soft" onClick={back}>
+        <Icon name="arrow_back" size={18} /> {t('fbBack')}
+      </button>
+      <div className="a-convo-head">
+        <strong>{th.sender || t('fbAnonymous')}</strong>
+        <span className="a-hint">{[th.appVersion && `Gnomon ${th.appVersion}`, th.os, when(th.createdAt)].filter(Boolean).join(' · ')}</span>
+        <span className="spacer" />
+        <div className="a-seg">
+          {(['open', 'done'] as const).map((st) => (
+            <button key={st} className={th.status === st ? 'on' : ''} onClick={() => run('PATCH', `/feedback/${id}`, { status: st })}>
+              {t(STATUS[st])}
+            </button>
+          ))}
+        </div>
+      </div>
+      <ol className="a-messages">
+        {th.messages!.map((m, i) => (
+          <li key={i} className={m.author}>
+            <span className="a-bubble">{m.text}</span>
+            <span className="a-hint">
+              {m.author === 'admin' ? t('fbYou') : th.sender || t('fbAnonymous')} · {when(m.at)}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <form
+        className="a-reply"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          await run('POST', `/feedback/${id}/reply`, { text: reply });
+          setReply('');
+          setBusy(false);
+        }}
+      >
+        <textarea value={reply} onChange={(e) => setReply(e.target.value)} placeholder={t('fbReplyPlaceholder')} rows={3} maxLength={5000} />
+        <div className="a-inline">
+          <button
+            type="button"
+            className="soft danger"
+            onClick={async () => {
+              if (!confirm(t('fbDeleteConfirm'))) return;
+              await call('DELETE', `/feedback/${id}`);
+              back();
+            }}
+          >
+            <Icon name="delete" size={18} /> {t('fbDelete')}
+          </button>
+          <span className="spacer" />
+          <button className="primary" disabled={busy || !reply.trim()}>
+            <Icon name="send" size={18} /> {t('fbSend')}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function Feedback(ctx: Ctx) {
+  const [threads, setThreads] = useState<FbThread[] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const load = () => call<{ threads: FbThread[] }>('GET', '/feedback').then((r) => setThreads(r.threads), (e) => ctx.setErr((e as Error).message));
+  useEffect(() => {
+    if (!open) void load();
+  }, [open]);
+  if (open) return <Conversation id={open} back={() => (setOpen(null), call<State>('GET', '/state').then(ctx.setS))} setErr={ctx.setErr} />;
+  return (
+    <>
+      <p className="a-intro">{t('fbIntro')}</p>
+      {threads && threads.length === 0 && <p className="a-hint">{t('fbNone')}</p>}
+      <ul className="a-threads">
+        {threads?.map((th) => (
+          <li key={th.id}>
+            <button className={`a-thread ${th.unread ? 'unread' : ''} ${th.status}`} onClick={() => setOpen(th.id)}>
+              <span className="a-thread-top">
+                <strong>{th.sender || t('fbAnonymous')}</strong>
+                <span className={`a-status ${th.status}`}>{t(STATUS[th.status])}</span>
+                <span className="spacer" />
+                <span className="a-hint">{when(th.updatedAt)}</span>
+              </span>
+              <span className="a-thread-text">{th.first}</span>
+              <span className="a-hint">
+                {[th.appVersion && `Gnomon ${th.appVersion}`, th.count && th.count > 1 ? t('fbMessages', { n: th.count }) : null].filter(Boolean).join(' · ')}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 // ---- Signing in with the admin password ---------------------------------------------------------
 
 const keepToken = (value: string) => {
@@ -997,6 +1142,7 @@ function Account({ s, setS, setErr }: Ctx) {
 
 type Section = { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => ReactNode };
 const DEVICES: Section = { key: 'devices', title: 'devicesTitle', icon: 'devices', view: (c) => <Devices {...c} /> };
+const FEEDBACK: Section = { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} /> };
 const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
 const STEPS: Section[] = [
   { key: 'before', title: 'beforeTitle', icon: 'check_circle', view: (c) => <Before {...c} /> },
@@ -1016,8 +1162,8 @@ function App() {
   const [step, setStep] = useState(0);
   const admin = location.pathname.startsWith('/admin');
   // The Admin page opens on the devices; the company setup follows as its own group.
-  const SECTIONS = admin ? [DEVICES, ACCOUNT, ...STEPS] : STEPS;
-  const offset = admin ? 2 : 0;
+  const SECTIONS = admin ? [DEVICES, FEEDBACK, ACCOUNT, ...STEPS] : STEPS;
+  const offset = admin ? 3 : 0;
   const [login, setLogin] = useState(false);
 
   useEffect(() => {
@@ -1093,8 +1239,8 @@ function App() {
           </button>
         )}
       </header>
-      {admin && !s.passwordSet && step !== 1 && (
-        <button className="a-banner" onClick={() => (setStep(1), setErr(null))}>
+      {admin && !s.passwordSet && step !== 2 && (
+        <button className="a-banner" onClick={() => (setStep(2), setErr(null))}>
           <Icon name="lock" size={18} /> {t('pwMissing')} <Icon name="arrow_forward" size={16} />
         </button>
       )}
@@ -1106,6 +1252,7 @@ function App() {
               <button className={`a-step ${i === step ? 'on' : ''} ${i < step && i >= offset ? 'past' : ''}`} onClick={() => (setStep(i), setErr(null))}>
                 <span className="a-num">{i < offset ? <Icon name={st.icon} size={14} /> : i - offset + 1}</span>
                 {t(st.title)}
+                {st.key === 'feedback' && s.feedbackUnread > 0 && <span className="a-badge">{s.feedbackUnread}</span>}
               </button>
             </Fragment>
           ))}
