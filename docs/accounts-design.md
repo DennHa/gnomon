@@ -47,13 +47,38 @@ Admin routes check the person's role instead of today's separate admin flag on t
 
 ## 3. Getting people in
 
-**Step A, invitations (no company login needed):**
+**The first screen of the app** asks once: *How do you want to use Gnomon?*
 
-1. Admin → People → *Invite*: enter email and name. The server creates the person (`invited`) and a one-time code,
-   shown as a link and QR code, valid 7 days.
-2. The person opens the link on their Mac (or types the code in Gnomon → Settings → Connections). The Mac becomes their
-   first device; the person becomes `active`.
-3. From the Mac they can add their phone (QR code), as today; the phone joins the same person.
+- **On this Mac only:** no account, everything stays local, as Gnomon is today. No phone, no web. An account can
+  still be created later in Settings → Account; the local data then moves into it.
+- **With an account:** Mac, phone and web, in sync. *Sign in* (server, email, password) or *Register*. Phone and web
+  sign in with the same email and password; the QR code is no longer needed (at most a shortcut that fills in the
+  server and email).
+- A **company Mac** (with a settings profile from IT) skips the choice and goes straight to the company's sign-in.
+
+**Register** asks for the server's address first (the company's, or one you run). Each server decides who may
+register, under Admin → Settings → People:
+
+- **Invited only** (the default, and for company servers): register with the invitation link or code; the email
+  comes from the invitation.
+- **With approval:** anyone can ask; the account works once an admin approves it.
+- **Anyone:** for a server you run for friends or a team you trust.
+
+Registering: name, email, password, then a confirmation link to that email (which also proves the address). Changing
+the email later sends a confirmation to the new address first, so a typo never locks anyone out.
+
+**Two areas, strictly apart:**
+
+- **Admin area (`/admin`)**, admins only: People (each with their devices), invitations, approvals, disabling a person,
+  sending a password reset, Settings, Feedback. Admins never set anything up *for* someone and never see their times.
+- **Account area (`/account`)**, every person for themselves: name, email, password, their own devices, sign out
+  everywhere. The Mac's Settings → Account shows who is signed in where, *Manage account* and *Sign out*.
+
+The server's first person creates their account in the setup wizard (*Create your admin account*: name, email,
+password); that replaces today's admin password and the email prompt on the Admin page.
+
+**Without an email server** an invitation is a link to pass on by hand, and confirming an email is skipped for
+invited people (the invitation is the proof); open registration needs the email server.
 
 **Step B, company login (OpenID Connect):**
 
@@ -125,8 +150,9 @@ seen; actions: invite again, change role, disable, remove (with their data, afte
 
 1. **People and per-person data** (sections 1, 2, 5): the biggest change; the apps keep working unchanged. Tests:
    two people never see each other's entries, through every route and the sync. *(Built.)*
-2. **Invitations** (section 3A) and the People page.
-3. **Email server, member passwords and password reset** (section 3b).
+2. **Accounts and sign-in:** the account area, registration (invitations; who may register), email and password
+   sign-in for the Mac and the phone, the People page, and the app's first screen (section 3).
+3. **Email server, confirmation and password reset** (section 3b).
 4. **Web app with sign-in** (section 3b).
 5. **Float and Personio per person** (section 4).
 6. **Company login** (section 3B).
@@ -135,6 +161,9 @@ Each step ships on its own, with a backup and a migration test on a copy of a re
 server.
 
 ## Decisions
+
+0. **First screen:** *On this Mac only* or *With an account*; registering asks for the server; each server decides who
+   may register (invited only by default). *(Decided.)*
 
 1. **Projects:** per person first; shared company projects later, read-only. *(Decided.)*
 2. **Company login:** only invited people; no automatic accounts for the company domain. *(Decided.)*
