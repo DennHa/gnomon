@@ -66,6 +66,25 @@ Admin routes check the person's role instead of today's separate admin flag on t
 4. The Mac gets its device key as today. No password for employees, and leaving the company (disabled in the identity
    provider) stops new sign-ins; the admin disables the person in Gnomon to stop existing devices.
 
+## 3b. The account is the centre: passwords, email and the web
+
+The account, not a particular Mac, is what everything hangs on: a person's data lives in their account on the server,
+and the Mac, the phone and a browser are ways in. The Mac keeps what only it can do (menu bar, shortcuts, working
+offline, the activity trail), but signing in no longer depends on it.
+
+- **Email server (Settings → Email):** host, port, user, password (stored encrypted like the Float and Personio
+  tokens), sender address, and *Send a test email*. Used for invitations and password resets. Without it, invitations
+  are shown as links and QR codes to pass on by hand, as today.
+- **Passwords for members:** when the company has no single sign-on, a person sets a password from their invitation.
+  Only a salted scrypt hash is stored, wrong tries lock for a while (as for the admin today).
+- **Password reset:** *Forgot your password?* sends a link valid once for 30 minutes to the account's email. The
+  answer is the same whether the email exists or not, so nobody can probe for accounts.
+- **Web app:** the Mac app's interface in the browser (the web demo already runs it on made-up data), signed in with
+  email and password or the company login, reading and writing the account's data on the server. Sessions are
+  cookies scoped to the server, with a sign-out on every device from the account page.
+- With company login (OIDC), passwords and resets are the identity provider's job; the email server is then only
+  needed for invitations.
+
 ## 4. Float and Personio, per person
 
 - The tokens are entered once in the admin's Settings (that part exists) and live only on the server, encrypted.
@@ -105,10 +124,12 @@ seen; actions: invite again, change role, disable, remove (with their data, afte
 ## 7. Order of building
 
 1. **People and per-person data** (sections 1, 2, 5): the biggest change; the apps keep working unchanged. Tests:
-   two people never see each other's entries, through every route and the sync.
+   two people never see each other's entries, through every route and the sync. *(Built.)*
 2. **Invitations** (section 3A) and the People page.
-3. **Float and Personio per person** (section 4).
-4. **Company login** (section 3B).
+3. **Email server, member passwords and password reset** (section 3b).
+4. **Web app with sign-in** (section 3b).
+5. **Float and Personio per person** (section 4).
+6. **Company login** (section 3B).
 
 Each step ships on its own, with a backup and a migration test on a copy of a real database before it reaches a
 server.
