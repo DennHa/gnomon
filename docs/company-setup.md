@@ -4,7 +4,7 @@
 > setup wizard and Admin page (without company sign-in yet: people connect with invitation links). See "What's still
 > to build" at the end. Today every person connects Float and Personio themselves, with tokens
 > stored in their own Mac's keychain. This document describes how a company-wide setup would work and what's
-> still to build.
+> still to build. The concrete plan for people, accounts and sign-in is in [accounts-design.md](accounts-design.md).
 
 ## Why the server has to do it
 

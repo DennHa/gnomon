@@ -183,6 +183,11 @@ const EN = {
   fbDeleteConfirm: 'Delete this conversation? The sender can’t see it any more either.',
   fbBack: 'All conversations',
   fbMessages: '{n} messages',
+  manageGroup: 'Manage',
+  settingsGroup: 'Settings',
+  overviewTitle: 'Overview',
+  rerunSetup: 'Run the setup again',
+  backToSettings: 'Back to settings',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -351,6 +356,11 @@ const DE: Record<Key, string> = {
   fbDeleteConfirm: 'Dieses Gespräch löschen? Auch der Absender sieht es dann nicht mehr.',
   fbBack: 'Alle Gespräche',
   fbMessages: '{n} Nachrichten',
+  manageGroup: 'Verwalten',
+  settingsGroup: 'Einstellungen',
+  overviewTitle: 'Übersicht',
+  rerunSetup: 'Einrichtung erneut durchlaufen',
+  backToSettings: 'Zurück zu den Einstellungen',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -1144,6 +1154,8 @@ type Section = { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => Re
 const DEVICES: Section = { key: 'devices', title: 'devicesTitle', icon: 'devices', view: (c) => <Devices {...c} /> };
 const FEEDBACK: Section = { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} /> };
 const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
+/** After the setup, these steps are Settings pages of their own (the others only make sense in the wizard). */
+const SETTINGS_KEYS = ['company', 'float', 'personio', 'rules', 'rollout', 'done'];
 const STEPS: Section[] = [
   { key: 'before', title: 'beforeTitle', icon: 'check_circle', view: (c) => <Before {...c} /> },
   { key: 'company', title: 'companyTitle', icon: 'apartment', view: (c) => <CompanyStep {...c} /> },
@@ -1161,10 +1173,9 @@ function App() {
   const [fatal, setFatal] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const admin = location.pathname.startsWith('/admin');
-  // The Admin page opens on the devices; the company setup follows as its own group.
-  const SECTIONS = admin ? [DEVICES, FEEDBACK, ACCOUNT, ...STEPS] : STEPS;
-  const offset = admin ? 3 : 0;
   const [login, setLogin] = useState(false);
+  // The wizard again, on request, after the setup is finished.
+  const [wizard, setWizard] = useState(false);
 
   useEffect(() => {
     // Trade the one-time code from the link for a session, then take the code out of the address bar.
@@ -1215,9 +1226,18 @@ function App() {
       </main>
     );
 
+  // The Admin page: Manage (everyday: devices, feedback, account), then either the setup wizard (numbered steps, until
+  // it's finished or when run again) or Settings (the same pages, each on its own, without steps). /setup is the wizard.
+  const setupMode = !admin || !s.config.setupDone || wizard;
+  const MANAGE = admin ? [DEVICES, FEEDBACK, ACCOUNT] : [];
+  const rest = setupMode ? STEPS : STEPS.filter((x) => SETTINGS_KEYS.includes(x.key));
+  const SECTIONS = [...MANAGE, ...rest];
+  const offset = MANAGE.length;
   const ctx: Ctx = { s, setS, err, setErr };
-  const cur = SECTIONS[step];
-  const isStep = step >= offset;
+  const cur = SECTIONS[Math.min(step, SECTIONS.length - 1)];
+  const isStep = setupMode && step >= offset;
+  const titleOf = (x: Section) => (!setupMode && x.key === 'done' ? 'overviewTitle' : x.title);
+  const switchMode = (on: boolean) => (setWizard(on), setStep(offset), setErr(null));
   return (
     <main className="a-page">
       <header className="a-head">
@@ -1248,19 +1268,28 @@ function App() {
         <nav className="a-steps">
           {SECTIONS.map((st, i) => (
             <Fragment key={st.key}>
-              {admin && i === offset && <span className="a-group">{t('setupGroup')}</span>}
-              <button className={`a-step ${i === step ? 'on' : ''} ${i < step && i >= offset ? 'past' : ''}`} onClick={() => (setStep(i), setErr(null))}>
-                <span className="a-num">{i < offset ? <Icon name={st.icon} size={14} /> : i - offset + 1}</span>
-                {t(st.title)}
+              {admin && i === 0 && <span className="a-group">{t('manageGroup')}</span>}
+              {admin && i === offset && <span className="a-group">{t(setupMode ? 'setupGroup' : 'settingsGroup')}</span>}
+              <button className={`a-step ${i === step ? 'on' : ''} ${setupMode && i < step && i >= offset ? 'past' : ''}`} onClick={() => (setStep(i), setErr(null))}>
+                <span className="a-num">{i < offset || !setupMode ? <Icon name={st.icon} size={14} /> : i - offset + 1}</span>
+                {t(titleOf(st))}
                 {st.key === 'feedback' && s.feedbackUnread > 0 && <span className="a-badge">{s.feedbackUnread}</span>}
               </button>
             </Fragment>
           ))}
+          {admin && s.config.setupDone && (
+            <button className="a-step a-mode" onClick={() => switchMode(!wizard)}>
+              <span className="a-num">
+                <Icon name={wizard ? 'arrow_back' : 'rocket_launch'} size={14} />
+              </span>
+              {t(wizard ? 'backToSettings' : 'rerunSetup')}
+            </button>
+          )}
         </nav>
         <section className="a-panel">
           {isStep && <span className="a-hint">{t('step', { n: step - offset + 1, total: STEPS.length })}</span>}
           <h2>
-            <Icon name={cur.icon} size={24} /> {t(cur.title)}
+            <Icon name={cur.icon} size={24} /> {t(titleOf(cur))}
           </h2>
           {err && (
             <p className="a-error">
@@ -1269,7 +1298,7 @@ function App() {
           )}
           {cur.view(ctx)}
           <footer className="a-foot">
-            {step > offset && (
+            {isStep && step > offset && (
               <button className="soft" onClick={() => (setStep(step - 1), setErr(null))}>
                 <Icon name="arrow_back" size={18} /> {t('back')}
               </button>
