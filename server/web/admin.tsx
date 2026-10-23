@@ -188,6 +188,11 @@ const EN = {
   overviewTitle: 'Overview',
   rerunSetup: 'Run the setup again',
   backToSettings: 'Back to settings',
+  ownerTitle: 'Your account',
+  ownerIntro: 'Everything on this server so far is yours: your times, projects and devices. Which email belongs to your account? It finds you in Float and Personio later, and for the company login.',
+  ownerEmail: 'Your email',
+  ownerName: 'Your name',
+  ownerSave: 'Save',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -361,6 +366,11 @@ const DE: Record<Key, string> = {
   overviewTitle: 'Übersicht',
   rerunSetup: 'Einrichtung erneut durchlaufen',
   backToSettings: 'Zurück zu den Einstellungen',
+  ownerTitle: 'Dein Konto',
+  ownerIntro: 'Alles auf diesem Server gehört bisher dir: deine Zeiten, Projekte und Geräte. Welche E-Mail gehört zu deinem Konto? Darüber findet der Server dich später in Float und Personio und beim Firmen-Login.',
+  ownerEmail: 'Deine E-Mail',
+  ownerName: 'Dein Name',
+  ownerSave: 'Sichern',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -376,7 +386,7 @@ type Config = {
   rules: Record<'managed' | 'allowLocalApi' | 'allowActivityTrail' | 'phoneApp', boolean>;
   audit: { at: string; what: string }[];
 };
-type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number };
+type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; owner: { id: string; email: string | null; name: string } };
 
 let token = '';
 try {
@@ -1038,6 +1048,44 @@ function Feedback(ctx: Ctx) {
   );
 }
 
+// ---- The owner's account: asked once after the update to people (docs/accounts-design.md) -----------------
+
+function OwnerPrompt({ s, setS }: { s: State; setS: (s: State) => void }) {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState(s.owner.name === 'Owner' ? '' : s.owner.name);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <form
+      className="a-card a-owner"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        try {
+          setS(await call('PATCH', '/owner', { email, name: name || undefined }));
+        } catch (e) {
+          setErr((e as Error).message);
+        }
+      }}
+    >
+      <strong>
+        <Icon name="person" size={18} /> {t('ownerTitle')}
+      </strong>
+      <span className="a-hint">{t('ownerIntro')}</span>
+      {err && <p className="a-error">{err}</p>}
+      <div className="a-row">
+        <Field label={t('ownerEmail')}>
+          <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        <Field label={t('ownerName')}>
+          <input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+      </div>
+      <button className="primary a-save" disabled={!email.trim()}>
+        {t('ownerSave')}
+      </button>
+    </form>
+  );
+}
+
 // ---- Signing in with the admin password ---------------------------------------------------------
 
 const keepToken = (value: string) => {
@@ -1259,6 +1307,7 @@ function App() {
           </button>
         )}
       </header>
+      {admin && !s.owner.email && <OwnerPrompt s={s} setS={setS} />}
       {admin && !s.passwordSet && step !== 2 && (
         <button className="a-banner" onClick={() => (setStep(2), setErr(null))}>
           <Icon name="lock" size={18} /> {t('pwMissing')} <Icon name="arrow_forward" size={16} />

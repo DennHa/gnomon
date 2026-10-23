@@ -1,9 +1,11 @@
-// SQLite storage for one person's Gnomon data.
+// SQLite storage for the people on a Gnomon server and each person's own data (docs/accounts-design.md).
 //
 // The REST logic is the Mac app's own (src/api.ts + src/actions.ts), which works on a whole `Data` object.
-// So the store keeps the current Data in memory (this process is the only writer) and, on every commit,
-// writes just the records that changed. Each write gets a new `seq` from a counter: "give me everything after
-// seq N" is how a client (the Mac app) syncs, without trusting clocks. Deletions leave a tombstone row.
+// So the store keeps each person's current Data in memory (this process is the only writer) and, on every commit,
+// writes just the records that changed. Each write gets a new `seq` from one counter: "give me everything of mine
+// after seq N" is how a client (the Mac app) syncs, without trusting clocks. Deletions leave a tombstone row.
+// Every device belongs to a person, and every read and write goes through that person: nobody sees anyone else's
+// records. A server set up before people existed gets one person, the owner, who keeps all its data.
 import Database from 'better-sqlite3';
 import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
@@ -33,6 +35,11 @@ export const keyOf = (kind: Kind, r: AnyRecord): string => (kind === 'workdays' 
 
 export type Change = { kind: Kind; id: string; seq: number; updatedAt: string; deleted: boolean; data: AnyRecord | null };
 
+/** A person with their own data and devices. role: what they may do on the Admin page later (step 2 of the design). */
+export type Person = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'active' | 'disabled'; createdAt: string; lastSeenAt: string | null };
+type PersonRow = { id: string; email: string | null; name: string; role: Person['role']; status: Person['status']; created_at: string; last_seen_at: string | null };
+const personOf = (r: PersonRow): Person => ({ id: r.id, email: r.email, name: r.name, role: r.role, status: r.status, createdAt: r.created_at, lastSeenAt: r.last_seen_at });
+
 const DEFAULT_SETTINGS = {
   dailyTargetHours: 8,
   autoStartDay: false,
@@ -57,17 +64,21 @@ export const DEFAULT_ACTIVITIES: Omit<Activity, 'id'>[] = [
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-/** client: what connected ('mac', 'phone', or null when unknown); admin: may open the Admin page from the device. */
-export type Device = { id: string; name: string; createdAt: string; lastSeenAt: string | null; revokedAt: string | null; client?: string | null; admin?: boolean };
-type DeviceRow = { id: string; name: string; created_at: string; last_seen_at: string | null; revoked_at: string | null; client: string | null; is_admin: number };
-const DEVICE_COLUMNS = 'id, name, created_at, last_seen_at, revoked_at, client, is_admin';
-const deviceOf = (r: DeviceRow): Device => ({ id: r.id, name: r.name, createdAt: r.created_at, lastSeenAt: r.last_seen_at, revokedAt: r.revoked_at, client: r.client, admin: r.is_admin === 1 });
+/** client: what connected ('mac', 'phone', or null when unknown); admin: may open the Admin page from the device; personId: whose device it is. */
+export type Device = { id: string; name: string; createdAt: string; lastSeenAt: string | null; revokedAt: string | null; client?: string | null; admin?: boolean; personId: string };
+type DeviceRow = { id: string; name: string; created_at: string; last_seen_at: string | null; revoked_at: string | null; client: string | null; is_admin: number; person_id: string };
+const DEVICE_COLUMNS = 'id, name, created_at, last_seen_at, revoked_at, client, is_admin, person_id';
+const deviceOf = (r: DeviceRow): Device => ({ id: r.id, name: r.name, createdAt: r.created_at, lastSeenAt: r.last_seen_at, revokedAt: r.revoked_at, client: r.client, admin: r.is_admin === 1, personId: r.person_id });
+
+/** One person's data as it is in memory, and the last committed JSON of each record (to find what changed). */
+type Slot = { data: Data; snapshot: Map<string, string> };
 
 export class Store {
   private db: Database.Database;
-  private data: Data;
-  /** The last committed version of each record, as JSON, to find what changed. */
-  private snapshot = new Map<string, string>();
+  /** Each person's data, loaded when first asked for. */
+  private slots = new Map<string, Slot>();
+  /** The person a server had before there were people, and who a single-person server's devices belong to. */
+  readonly ownerId: string;
 
   constructor(file: string) {
     if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -75,16 +86,15 @@ export class Store {
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS records (
-        kind TEXT NOT NULL,
-        id TEXT NOT NULL,
-        data TEXT,
-        seq INTEGER NOT NULL,
-        updated_at TEXT NOT NULL,
-        deleted INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY (kind, id)
+      CREATE TABLE IF NOT EXISTS people (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'member',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        last_seen_at TEXT
       );
-      CREATE INDEX IF NOT EXISTS records_seq ON records(seq);
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS devices (
         id TEXT PRIMARY KEY,
@@ -124,17 +134,66 @@ export class Store {
       );
     `);
     // Added later: what kind of device it is, and whether it may open the Admin page.
-    const cols = (this.db.prepare('PRAGMA table_info(devices)').all() as { name: string }[]).map((c) => c.name);
-    if (!cols.includes('client')) this.db.exec('ALTER TABLE devices ADD COLUMN client TEXT');
-    if (!cols.includes('is_admin')) this.db.exec('ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
+    const cols = (table: string) => (this.db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+    if (!cols('devices').includes('client')) this.db.exec('ALTER TABLE devices ADD COLUMN client TEXT');
+    if (!cols('devices').includes('is_admin')) this.db.exec('ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
+    this.ownerId = this.migrateToPeople(cols);
     if (file !== ':memory:') for (const f of [file, `${file}-wal`, `${file}-shm`]) if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
-    this.data = this.load();
-    if (!this.getMeta('seeded')) {
-      // A fresh server gets a few activities so the phone has chips to tap; the Mac's list replaces them on first sync.
-      const activities = DEFAULT_ACTIVITIES.map((a) => ({ id: crypto.randomUUID(), ...a }));
-      this.commit({ ...this.data, activities });
-      this.setMeta('seeded', '1');
-    }
+    this.seed(this.ownerId);
+  }
+
+  /**
+   * People came later. In one transaction: create the owner (role admin; the email is asked on the Admin page), and
+   * give them every record, device and open pairing code there is. A fresh database just gets its owner. Runs on
+   * every start and does nothing once done.
+   */
+  private migrateToPeople(cols: (table: string) => string[]): string {
+    let owner = this.getMeta('owner');
+    this.db.transaction(() => {
+      if (!owner) {
+        owner = crypto.randomUUID();
+        this.db.prepare("INSERT INTO people (id, email, name, role, status, created_at) VALUES (?, NULL, 'Owner', 'admin', 'active', ?)").run(owner, new Date().toISOString());
+        this.setMeta('owner', owner);
+      }
+      const hasRecords = (this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'records'").get() as unknown) !== undefined;
+      if (!hasRecords || !cols('records').includes('person_id')) {
+        this.db.exec(`
+          CREATE TABLE records_people (
+            person_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            id TEXT NOT NULL,
+            data TEXT,
+            seq INTEGER NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (person_id, kind, id)
+          );
+        `);
+        if (hasRecords) {
+          this.db.prepare('INSERT INTO records_people (person_id, kind, id, data, seq, updated_at, deleted) SELECT ?, kind, id, data, seq, updated_at, deleted FROM records').run(owner);
+          this.db.exec('DROP TABLE records');
+        }
+        this.db.exec('ALTER TABLE records_people RENAME TO records; CREATE INDEX IF NOT EXISTS records_seq ON records(seq); CREATE INDEX IF NOT EXISTS records_person ON records(person_id, seq);');
+      }
+      if (!cols('devices').includes('person_id')) this.db.exec('ALTER TABLE devices ADD COLUMN person_id TEXT');
+      this.db.prepare('UPDATE devices SET person_id = ? WHERE person_id IS NULL').run(owner);
+      if (!cols('pair_codes').includes('person_id')) this.db.exec('ALTER TABLE pair_codes ADD COLUMN person_id TEXT');
+      // Settings and the "seeded" mark were the server's; now they're the owner's.
+      for (const key of ['settings', 'seeded']) {
+        const v = this.getMeta(key);
+        if (v !== undefined && this.getMeta(`${key}:${owner}`) === undefined) this.setMeta(`${key}:${owner}`, v);
+        this.db.prepare('DELETE FROM meta WHERE key = ?').run(key);
+      }
+    })();
+    return owner!;
+  }
+
+  /** A new person gets a few activities, so the phone has chips to tap; the Mac's list replaces them on first sync. */
+  private seed(personId: string) {
+    if (this.getMeta(`seeded:${personId}`)) return;
+    const d = this.get(personId);
+    this.commit({ ...d, activities: DEFAULT_ACTIVITIES.map((a) => ({ id: crypto.randomUUID(), ...a })) }, undefined, personId);
+    this.setMeta(`seeded:${personId}`, '1');
   }
 
   close() {
@@ -148,34 +207,41 @@ export class Store {
 
   // ---- Data -------------------------------------------------------------------------------
 
-  private load(): Data {
+  private slot(personId: string): Slot {
+    let slot = this.slots.get(personId);
+    if (slot) return slot;
     const data: Data = { version: 1, projects: [], activities: [], entries: [], workdays: [], plan: [], reviewedWeeks: [], settings: { ...DEFAULT_SETTINGS } };
-    const rows = this.db.prepare('SELECT kind, id, data FROM records WHERE deleted = 0').all() as { kind: Kind; id: string; data: string }[];
+    const snapshot = new Map<string, string>();
+    const rows = this.db.prepare('SELECT kind, id, data FROM records WHERE person_id = ? AND deleted = 0').all(personId) as { kind: Kind; id: string; data: string }[];
     for (const r of rows) {
       if (!KINDS.includes(r.kind)) continue;
       (data[r.kind] as AnyRecord[]).push(JSON.parse(r.data));
-      this.snapshot.set(`${r.kind}:${r.id}`, r.data);
+      snapshot.set(`${r.kind}:${r.id}`, r.data);
     }
-    const settings = this.getMeta('settings');
+    const settings = this.getMeta(`settings:${personId}`);
     if (settings) data.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(settings) };
-    return data;
+    slot = { data, snapshot };
+    this.slots.set(personId, slot);
+    return slot;
   }
 
-  get(): Data {
-    return this.data;
+  /** A person's data (the owner's when no person is named: a single-person server, the command line, tests). */
+  get(personId: string = this.ownerId): Data {
+    return this.slot(personId).data;
   }
 
   /**
-   * Persist a new Data, writing only the records that changed. Returns how many rows were written.
+   * Persist a person's new Data, writing only the records that changed. Returns how many rows were written.
    * `stamp` is when each change happened: now, or (for changes pushed by a syncing client) the client's own time.
    */
-  commit(next: Data, stamp: string | ((kind: Kind, id: string) => string) = new Date().toISOString()): number {
+  commit(next: Data, stamp: string | ((kind: Kind, id: string) => string) = new Date().toISOString(), personId: string = this.ownerId): number {
     const at = typeof stamp === 'string' ? () => stamp : stamp;
+    const slot = this.slot(personId);
     let written = 0;
     const tx = this.db.transaction(() => {
-      if (JSON.stringify(next.settings) !== JSON.stringify(this.data.settings)) this.setMeta('settings', JSON.stringify(next.settings));
-      const upsert = this.db.prepare('INSERT INTO records (kind, id, data, seq, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data, seq = excluded.seq, updated_at = excluded.updated_at, deleted = 0');
-      const tomb = this.db.prepare('UPDATE records SET data = NULL, seq = ?, updated_at = ?, deleted = 1 WHERE kind = ? AND id = ?');
+      if (JSON.stringify(next.settings) !== JSON.stringify(slot.data.settings)) this.setMeta(`settings:${personId}`, JSON.stringify(next.settings));
+      const upsert = this.db.prepare('INSERT INTO records (person_id, kind, id, data, seq, updated_at, deleted) VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(person_id, kind, id) DO UPDATE SET data = excluded.data, seq = excluded.seq, updated_at = excluded.updated_at, deleted = 0');
+      const tomb = this.db.prepare('UPDATE records SET data = NULL, seq = ?, updated_at = ?, deleted = 1 WHERE person_id = ? AND kind = ? AND id = ?');
       for (const kind of KINDS) {
         const seen = new Set<string>();
         for (const r of next[kind] as AnyRecord[]) {
@@ -183,22 +249,22 @@ export class Store {
           const k = `${kind}:${id}`;
           seen.add(k);
           const json = JSON.stringify(r);
-          if (this.snapshot.get(k) === json) continue;
-          upsert.run(kind, id, json, this.nextSeq(), at(kind, id));
-          this.snapshot.set(k, json);
+          if (slot.snapshot.get(k) === json) continue;
+          upsert.run(personId, kind, id, json, this.nextSeq(), at(kind, id));
+          slot.snapshot.set(k, json);
           written++;
         }
-        for (const k of [...this.snapshot.keys()]) {
+        for (const k of [...slot.snapshot.keys()]) {
           if (!k.startsWith(`${kind}:`) || seen.has(k)) continue;
           const id = k.slice(kind.length + 1);
-          tomb.run(this.nextSeq(), at(kind, id), kind, id);
-          this.snapshot.delete(k);
+          tomb.run(this.nextSeq(), at(kind, id), personId, kind, id);
+          slot.snapshot.delete(k);
           written++;
         }
       }
     });
     tx();
-    this.data = next;
+    slot.data = next;
     return written;
   }
 
@@ -212,9 +278,9 @@ export class Store {
     return Number(this.getMeta('seq') ?? '0');
   }
 
-  /** Everything written after `since`, oldest first. */
-  changesSince(since: number, limit = 5000): Change[] {
-    const rows = this.db.prepare('SELECT kind, id, data, seq, updated_at, deleted FROM records WHERE seq > ? ORDER BY seq LIMIT ?').all(since, limit) as {
+  /** Everything of a person's written after `since`, oldest first. */
+  changesSince(since: number, limit = 5000, personId: string = this.ownerId): Change[] {
+    const rows = this.db.prepare('SELECT kind, id, data, seq, updated_at, deleted FROM records WHERE person_id = ? AND seq > ? ORDER BY seq LIMIT ?').all(personId, since, limit) as {
       kind: Kind;
       id: string;
       data: string | null;
@@ -226,8 +292,8 @@ export class Store {
   }
 
   /** When a record was last written (also for deleted ones), for last-writer-wins on push. */
-  updatedAt(kind: Kind, id: string): string | undefined {
-    const row = this.db.prepare('SELECT updated_at FROM records WHERE kind = ? AND id = ?').get(kind, id) as { updated_at: string } | undefined;
+  updatedAt(kind: Kind, id: string, personId: string = this.ownerId): string | undefined {
+    const row = this.db.prepare('SELECT updated_at FROM records WHERE person_id = ? AND kind = ? AND id = ?').get(personId, kind, id) as { updated_at: string } | undefined;
     return row?.updated_at;
   }
 
@@ -239,24 +305,59 @@ export class Store {
     this.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
   }
 
+  // ---- People -----------------------------------------------------------------------------
+
+  person(id: string): Person | undefined {
+    const row = this.db.prepare('SELECT id, email, name, role, status, created_at, last_seen_at FROM people WHERE id = ?').get(id) as PersonRow | undefined;
+    return row && personOf(row);
+  }
+
+  listPeople(): Person[] {
+    return (this.db.prepare('SELECT id, email, name, role, status, created_at, last_seen_at FROM people ORDER BY created_at').all() as PersonRow[]).map(personOf);
+  }
+
+  /** Add a person (step 2 of the design invites them); they start with a few activities like a new server. */
+  addPerson(p: { email: string | null; name: string; role?: Person['role']; status?: Person['status'] }): Person {
+    const id = crypto.randomUUID();
+    this.db.prepare('INSERT INTO people (id, email, name, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, p.email?.trim().toLowerCase() || null, p.name, p.role ?? 'member', p.status ?? 'invited', new Date().toISOString());
+    this.seed(id);
+    return this.person(id)!;
+  }
+
+  /** Change a person's email, name, role or status. An email is unique and kept lowercase. */
+  updatePerson(id: string, patch: { email?: string | null; name?: string; role?: Person['role']; status?: Person['status'] }): Person | undefined {
+    if (!this.person(id)) return undefined;
+    if (patch.email !== undefined) this.db.prepare('UPDATE people SET email = ? WHERE id = ?').run(patch.email?.trim().toLowerCase() || null, id);
+    if (patch.name !== undefined) this.db.prepare('UPDATE people SET name = ? WHERE id = ?').run(patch.name, id);
+    if (patch.role !== undefined) this.db.prepare('UPDATE people SET role = ? WHERE id = ?').run(patch.role, id);
+    if (patch.status !== undefined) this.db.prepare('UPDATE people SET status = ? WHERE id = ?').run(patch.status, id);
+    return this.person(id);
+  }
+
   // ---- Devices & pairing ------------------------------------------------------------------
 
   /** Create a device directly and return its key (shown once). */
-  addDevice(name: string, client: string | null = null): { device: Device; key: string } {
+  addDevice(name: string, client: string | null = null, personId: string = this.ownerId): { device: Device; key: string } {
     const key = `gnomon_${randomBytes(24).toString('base64url')}`;
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
-    this.db.prepare('INSERT INTO devices (id, name, key_hash, created_at, client) VALUES (?, ?, ?, ?, ?)').run(id, name, sha256(key), createdAt, client);
-    return { device: { id, name, createdAt, lastSeenAt: null, revokedAt: null, client, admin: false }, key };
+    this.db.prepare('INSERT INTO devices (id, name, key_hash, created_at, client, person_id) VALUES (?, ?, ?, ?, ?, ?)').run(id, name, sha256(key), createdAt, client, personId);
+    return { device: { id, name, createdAt, lastSeenAt: null, revokedAt: null, client, admin: false, personId }, key };
   }
 
   /** The device a key belongs to, or undefined when the key is unknown or revoked. */
   authenticate(key: string): Device | undefined {
     const row = this.db.prepare(`SELECT ${DEVICE_COLUMNS} FROM devices WHERE key_hash = ?`).get(sha256(key)) as DeviceRow | undefined;
     if (!row || row.revoked_at) return undefined;
+    // A disabled person's devices stop working at once.
+    const person = this.person(row.person_id);
+    if (!person || person.status === 'disabled') return undefined;
     const now = new Date().toISOString();
-    // Only touch the row once a minute, not on every request.
-    if (!row.last_seen_at || Date.parse(now) - Date.parse(row.last_seen_at) > 60_000) this.db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').run(now, row.id);
+    // Only touch the rows once a minute, not on every request.
+    if (!row.last_seen_at || Date.parse(now) - Date.parse(row.last_seen_at) > 60_000) {
+      this.db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').run(now, row.id);
+      this.db.prepare("UPDATE people SET last_seen_at = ?, status = CASE status WHEN 'invited' THEN 'active' ELSE status END WHERE id = ?").run(now, row.person_id);
+    }
     return { ...deviceOf(row), lastSeenAt: now };
   }
 
@@ -297,22 +398,23 @@ export class Store {
   }
 
   /** A short one-time code that a phone exchanges for a device key (POST /api/v1/pair). */
-  createPairCode(deviceName: string, ttlMinutes = 10): string {
+  createPairCode(deviceName: string, ttlMinutes = 10, personId: string = this.ownerId): string {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
     const code = Array.from({ length: 8 }, () => alphabet[randomInt(alphabet.length)]).join('');
     this.db.prepare('DELETE FROM pair_codes WHERE expires_at < ?').run(new Date().toISOString());
-    this.db.prepare('INSERT INTO pair_codes (code_hash, device_name, expires_at) VALUES (?, ?, ?)').run(sha256(code), deviceName, new Date(Date.now() + ttlMinutes * 60_000).toISOString());
+    this.db.prepare('INSERT INTO pair_codes (code_hash, device_name, expires_at, person_id) VALUES (?, ?, ?, ?)').run(sha256(code), deviceName, new Date(Date.now() + ttlMinutes * 60_000).toISOString(), personId);
     return code;
   }
 
   /** Redeem a pairing code: it works once, then a device with its own key exists. */
   redeemPairCode(code: string, client: string | null = null, nameFor: (given: string) => string = (g) => g || 'Device'): { device: Device; key: string } | undefined {
     const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const row = this.db.prepare('SELECT device_name, expires_at FROM pair_codes WHERE code_hash = ?').get(sha256(normalized)) as { device_name: string; expires_at: string } | undefined;
+    const row = this.db.prepare('SELECT device_name, expires_at, person_id FROM pair_codes WHERE code_hash = ?').get(sha256(normalized)) as { device_name: string; expires_at: string; person_id: string | null } | undefined;
     if (!row) return undefined;
     this.db.prepare('DELETE FROM pair_codes WHERE code_hash = ?').run(sha256(normalized));
     if (row.expires_at < new Date().toISOString()) return undefined;
-    return this.addDevice(nameFor(row.device_name), client);
+    // The code's person gets the device (a code from before people existed: the owner).
+    return this.addDevice(nameFor(row.device_name), client, row.person_id ?? this.ownerId);
   }
 
   // ---- Feedback (a small help desk: the app writes, the Admin page answers) ----------------------

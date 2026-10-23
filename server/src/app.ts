@@ -105,18 +105,23 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
-  const ctx = { get: () => store.get(), commit: (d: Data) => void store.commit(d) };
-  /** Run the shared router (src/api.ts), e.g. to serialise an object exactly like API.md describes. */
-  const api = (method: string, p: string, query: Record<string, string> = {}, body: unknown = undefined): ApiResponse => handleApiRequest(ctx, { method, path: p, query, body } satisfies ApiRequest);
-  const phone = phoneApi(ctx, () => ({ cursor: store.cursor() }));
+  /**
+   * Everything a request may touch, for the person whose device is asking: their data through the shared router
+   * (src/api.ts) and the phone's routes (src/phone.ts). There is no way from here to anyone else's records.
+   */
+  function scoped(personId: string) {
+    const ctx = { get: () => store.get(personId), commit: (d: Data) => void store.commit(d, undefined, personId) };
+    const api = (method: string, p: string, query: Record<string, string> = {}, body: unknown = undefined): ApiResponse => handleApiRequest(ctx, { method, path: p, query, body } satisfies ApiRequest);
+    return { api, phone: phoneApi(ctx, () => ({ cursor: store.cursor() })) };
+  }
 
   // ---- Server-only routes -------------------------------------------------------------------
 
-  function pull(query: Record<string, string>) {
+  function pull(query: Record<string, string>, personId: string) {
     const since = Number(query.since ?? '0');
     if (!Number.isInteger(since) || since < 0) throw bad('since must be a cursor (a whole number) from an earlier response');
     const limit = Math.min(Number(query.limit ?? '5000') || 5000, 5000);
-    const changes = store.changesSince(since, limit + 1);
+    const changes = store.changesSince(since, limit + 1, personId);
     const more = changes.length > limit;
     const page = changes.slice(0, limit);
     return { cursor: page.length ? page[page.length - 1].seq : Math.max(since, 0), more, changes: page.map(({ seq: _seq, ...c }) => c) };
@@ -136,10 +141,10 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
    * Apply changes from a syncing client. Each change wins only if it is newer than what the server has
    * (last writer wins, per record), so pushing the same batch twice is harmless.
    */
-  function push(body: unknown) {
+  function push(body: unknown, personId: string) {
     if (!isObj(body) || !Array.isArray(body.changes)) throw bad('Send { "changes": [ { kind, id, updatedAt, deleted, data } ] }');
     if (body.changes.length > 20_000) throw bad('At most 20000 changes per request');
-    const d = store.get();
+    const d = store.get(personId);
     const lists = Object.fromEntries(KINDS.map((k) => [k, new Map((d[k] as { id?: string; date?: string }[]).map((r) => [keyOf(k, r as never), r]))])) as Record<Kind, Map<string, unknown>>;
     const stamps = new Map<string, string>();
     const skipped: { kind: string; id: string; reason: string }[] = [];
@@ -154,7 +159,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       const updatedAt = new Date(c.updatedAt).toISOString();
       if (updatedAt > new Date(Date.now() + 5 * 60_000).toISOString()) throw bad(`changes[${i}].updatedAt is in the future; check the device clock`);
       if (!c.deleted && !validRecord(kind, id, c.data)) throw bad(`changes[${i}].data is not a valid ${kind.slice(0, -1)} with id ${id}`);
-      const current = stamps.get(`${kind}:${id}`) ?? store.updatedAt(kind, id);
+      const current = stamps.get(`${kind}:${id}`) ?? store.updatedAt(kind, id, personId);
       if (current && current > updatedAt) return void skipped.push({ kind, id, reason: 'server_newer' });
       if (c.deleted) lists[kind].delete(id);
       else lists[kind].set(id, c.data);
@@ -163,7 +168,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     });
     let next = { ...d, ...Object.fromEntries(KINDS.map((k) => [k, [...lists[k].values()]])) } as Data;
     next = oneRunningTimer(next, stamps);
-    store.commit(next, (kind, id) => stamps.get(`${kind}:${id}`) ?? new Date().toISOString());
+    store.commit(next, (kind, id) => stamps.get(`${kind}:${id}`) ?? new Date().toISOString(), personId);
     return { applied, skipped, cursor: store.cursor() };
   }
 
@@ -195,7 +200,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       const name = isObj(body) && typeof body.name === 'string' ? body.name.trim().slice(0, 60) : '';
       // Up to 60 minutes, for handing the connection over to the home-screen app (added a bit later).
       const ttl = isObj(body) && typeof body.minutes === 'number' ? Math.min(60, Math.max(1, Math.round(body.minutes))) : 10;
-      const code = store.createPairCode(name, ttl);
+      const code = store.createPairCode(name, ttl, device.personId); // the new device joins the same person
       return { status: 201, body: { code: `${code.slice(0, 4)}-${code.slice(4)}`, name, expiresAt: new Date(Date.now() + ttl * 60_000).toISOString() } };
     }
     if (method === 'POST' && p === '/admin-link') {
@@ -210,10 +215,10 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       company?.save(company.get(), `Admin page opened from ${device.name}`);
       return { status: 201, body: { path: `/admin#code=${code.slice(0, 4)}-${code.slice(4)}`, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() } };
     }
-    if (method === 'GET' && p === '/sync') return { status: 200, body: pull(query) };
-    if (method === 'POST' && p === '/sync') return { status: 200, body: push(body) };
+    if (method === 'GET' && p === '/sync') return { status: 200, body: pull(query, device.personId) };
+    if (method === 'POST' && p === '/sync') return { status: 200, body: push(body, device.personId) };
     // The phone's own routes (state, attendance corrections, breaks, activities) are shared with the web demo.
-    return phone.route(method, p, body, device);
+    return scoped(device.personId).phone.route(method, p, body, device);
   }
 
   // ---- Request entry point ----------------------------------------------------------------------
@@ -268,6 +273,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
       passwordSet: store.hasAdminPassword(),
       feedbackUnread: store.listFeedback().filter((t) => t.unread).length,
+      owner: (({ id, email, name }) => ({ id, email, name }))(store.person(store.ownerId)!),
     };
   }
 
@@ -387,6 +393,16 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       if (!d) throw new HttpError(404, 'not_found', 'No such device');
       company.save(c, `Disconnected ${d.name}`);
       return [200, { devices: store.listDevices().filter((x) => !x.revokedAt) }];
+    }
+    if (method === 'PATCH' && p === '/admin/owner') {
+      // The owner's account (everything this server had before people existed): their email, asked once.
+      const email = isObj(body) && typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      const name = isObj(body) && typeof body.name === 'string' ? body.name.trim().slice(0, 80) : undefined;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) throw bad('Enter an email address like name@example.com');
+      if (store.listPeople().some((x) => x.email === email && x.id !== store.ownerId)) throw bad('Another person already has this email');
+      store.updatePerson(store.ownerId, { email, ...(name && { name }) });
+      company.save(c, 'Set the owner’s email');
+      return [200, adminState()];
     }
     // Feedback inbox: conversations, reading one marks it seen, replies, status, deleting.
     if (method === 'GET' && p === '/admin/feedback') return [200, { threads: store.listFeedback() }];
@@ -516,7 +532,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
 
     const query = Object.fromEntries(url.searchParams);
     const own = serverRoute(method, p, query, body, device);
-    const r = own ?? api(method, p, query, body);
+    const r = own ?? scoped(device.personId).api(method, p, query, body);
     if (r.status === 200 && p === '/health') (r.body as Record<string, unknown>).server = true;
     send(res, r.status, r.body);
   }

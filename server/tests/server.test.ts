@@ -573,6 +573,100 @@ test('a finished company server never hands out the admin right by itself', asyn
   }
 });
 
+describe('people: each person only ever sees their own data', () => {
+  test('entries, workdays, timer, state and sync stay apart, also for the same date; a disabled person is locked out', async () => {
+    const own = new Store(':memory:');
+    const app = http.createServer(createApp({ store: own, webDir }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const as = (key: string) => async (method: string, p: string, body?: unknown) => {
+      const r = await fetch(`${url}/api/v1${p}`, { method, headers: { Authorization: `Bearer ${key}`, ...(body !== undefined && { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+      return { status: r.status, body: (await r.json()) as any };
+    };
+    try {
+      const anna = own.addPerson({ email: 'anna@example.com', name: 'Anna', status: 'active' });
+      const ben = own.addPerson({ email: 'ben@example.com', name: 'Ben', status: 'active' });
+      const a = as(own.addDevice('Anna Mac', 'mac', anna.id).key);
+      const b = as(own.addDevice('Ben Mac', 'mac', ben.id).key);
+      const day = '2026-10-15';
+      // Both write on the same day: an entry each, and a workday keyed by the same date.
+      assert.equal((await a('POST', '/entries', { description: 'Anna secret client', start: `${day}T09:00:00Z`, end: `${day}T10:00:00Z` })).status, 201);
+      assert.equal((await b('POST', '/entries', { description: 'Ben work', start: `${day}T11:00:00Z`, end: `${day}T12:00:00Z` })).status, 201);
+      await a('PUT', `/workdays/${day}`, { in: '08:00', out: '16:00' });
+      await b('PUT', `/workdays/${day}`, { in: '10:00', out: '18:00' });
+      const aEntries = (await a('GET', `/entries?from=${day}`)).body;
+      const bEntries = (await b('GET', `/entries?from=${day}`)).body;
+      assert.deepEqual(aEntries.map((e: any) => e.description), ['Anna secret client']);
+      assert.deepEqual(bEntries.map((e: any) => e.description), ['Ben work']);
+      const hour = (iso: string) => new Date(iso).getHours();
+      assert.equal(hour((await a('GET', `/workdays?from=${day}`)).body[0].in), 8);
+      assert.equal(hour((await b('GET', `/workdays?from=${day}`)).body[0].in), 10);
+      // Someone else's entry id is simply not there.
+      const annaId = aEntries[0].id;
+      assert.equal((await b('PATCH', `/entries/${annaId}`, { description: 'hijacked' })).status, 404);
+      assert.equal((await b('DELETE', `/entries/${annaId}`)).status, 404);
+      assert.equal((await a('GET', `/entries?from=${day}`)).body[0].description, 'Anna secret client');
+      // A running timer is per person.
+      await a('POST', '/timer/start', { description: 'Anna timer' });
+      assert.equal((await b('GET', '/timer')).body.running, null);
+      assert.equal((await b('GET', '/state')).body.timer, null);
+      // The sync only hands out your own changes, and a push only writes yours.
+      const pulled = (await b('GET', '/sync?since=0')).body.changes;
+      assert.equal(pulled.some((c: any) => JSON.stringify(c).includes('Anna')), false);
+      await b('POST', '/sync', { changes: [{ kind: 'entries', id: annaId, updatedAt: new Date().toISOString(), deleted: true, data: null }] });
+      assert.equal((await a('GET', `/entries?from=${day}`)).body.length, 1, "Ben's push can't delete Anna's entry");
+      // A pairing code from Anna's Mac brings a phone into Anna's account.
+      const code = (await a('POST', '/pair-codes', {})).body.code;
+      const phone = await fetch(`${url}/api/v1/pair`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) }).then((r) => r.json() as Promise<any>);
+      assert.equal((await as(phone.key)('GET', `/entries?from=${day}`)).body[0].description, 'Anna secret client');
+      // Disabled: every device of that person stops at once.
+      own.updatePerson(ben.id, { status: 'disabled' });
+      assert.equal((await b('GET', '/state')).status, 401);
+      assert.equal((await a('GET', '/state')).status, 200);
+    } finally {
+      await new Promise((r) => app.close(r));
+      own.close();
+    }
+  });
+
+  test('a database from before people: everything becomes the owner\'s, once, and keeps working', async () => {
+    const file = path.join(dir, 'old-layout.db');
+    const Database = (await import('better-sqlite3')).default;
+    const old = new Database(file);
+    old.exec(`
+      CREATE TABLE records (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT, seq INTEGER NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (kind, id));
+      CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL, key_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, last_seen_at TEXT, revoked_at TEXT);
+      CREATE TABLE pair_codes (code_hash TEXT PRIMARY KEY, device_name TEXT NOT NULL, expires_at TEXT NOT NULL);
+    `);
+    const entry = { id: 'e-old', description: 'From before', start: '2026-10-01T09:00:00.000Z', end: '2026-10-01T10:00:00.000Z' };
+    old.prepare('INSERT INTO records VALUES (?, ?, ?, ?, ?, 0)').run('entries', 'e-old', JSON.stringify(entry), 7, '2026-10-01T10:00:00.000Z');
+    old.prepare('INSERT INTO meta VALUES (?, ?)').run('seq', '7');
+    old.prepare('INSERT INTO meta VALUES (?, ?)').run('seeded', '1');
+    old.prepare('INSERT INTO meta VALUES (?, ?)').run('settings', JSON.stringify({ dailyTargetHours: 6 }));
+    const key = 'gnomon_oldkey';
+    old.prepare('INSERT INTO devices (id, name, key_hash, created_at) VALUES (?, ?, ?, ?)').run('d-old', 'Old Mac', (await import('node:crypto')).createHash('sha256').update(key).digest('hex'), '2026-10-01T08:00:00.000Z');
+    old.close();
+
+    const migrated = new Store(file);
+    const owner = migrated.person(migrated.ownerId)!;
+    assert.deepEqual([owner.role, owner.email], ['admin', null]);
+    assert.deepEqual(migrated.get().entries.map((e) => e.description), ['From before']);
+    assert.equal(migrated.get().settings.dailyTargetHours, 6);
+    assert.equal(migrated.get().activities.length, 0, 'no second set of default activities');
+    assert.equal(migrated.authenticate(key)?.personId, migrated.ownerId, 'old device keys keep working, as the owner');
+    assert.equal(migrated.changesSince(0).length, 1);
+    assert.equal(migrated.cursor(), 7);
+    migrated.close();
+    // Opening it again changes nothing.
+    const again = new Store(file);
+    assert.equal(again.ownerId, owner.id);
+    assert.equal(again.listPeople().length, 1);
+    assert.equal(again.get().entries.length, 1);
+    again.close();
+  });
+});
+
 describe('company setup (wizard API)', () => {
   test('setup code → session → settings, Float and Personio checks, profile, invitation, finish', async () => {
     const { Company } = await import('../src/company');
