@@ -3,6 +3,13 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.12 · 2026-10-23
+
+- **Connect your phone** from the sidebar: while your Mac is connected to a Gnomon server and no phone is yet, a small
+  tile offers it. Click it, scan the QR code, and Gnomon tells you when your phone is in. The × hides it for good.
+- **Your own account on the server:** a Gnomon server now keeps each person's times and devices apart. Everything
+  that was on your server is now your account; the admin page asks once for your email.
+
 ## 0.1.11 · 2026-10-23
 
 - **Feedback right in the app:** under Info & feedback, write your idea or bug and press Send. It goes straight to the
