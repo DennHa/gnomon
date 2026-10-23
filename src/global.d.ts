@@ -47,6 +47,7 @@ declare global {
       serverPairCode(name: string): Promise<ServerResult<{ code: string; expiresAt: string; link: string }>>;
       /** Opens the server's Admin page in the browser, signed in. */
       serverAdminLink(): Promise<ServerResult<object>>;
+      serverMyDevices(): Promise<ServerResult<{ devices: { id: string; name: string; client: string | null; lastSeenAt: string | null; current: boolean }[] }>>;
       feedbackAvailable(): Promise<boolean>;
       feedbackSend(msg: { text: string; sender?: string; withInfo: boolean }): Promise<ServerResult<object>>;
       feedbackThreads(): Promise<FeedbackThread[]>;

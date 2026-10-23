@@ -619,6 +619,9 @@ describe('people: each person only ever sees their own data', () => {
       const code = (await a('POST', '/pair-codes', {})).body.code;
       const phone = await fetch(`${url}/api/v1/pair`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) }).then((r) => r.json() as Promise<any>);
       assert.equal((await as(phone.key)('GET', `/entries?from=${day}`)).body[0].description, 'Anna secret client');
+      // Your device list is yours only.
+      assert.deepEqual((await a('GET', '/me/devices')).body.map((d: any) => d.name).sort(), ['Anna Mac', phone.device.name].sort());
+      assert.deepEqual((await b('GET', '/me/devices')).body.map((d: any) => d.name), ['Ben Mac']);
       // Disabled: every device of that person stops at once.
       own.updatePerson(ben.id, { status: 'disabled' });
       assert.equal((await b('GET', '/state')).status, 401);

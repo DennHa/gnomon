@@ -19,6 +19,7 @@ import Projects from './views/Projects';
 import Settings from './views/Settings';
 import Onboarding from './views/Onboarding';
 import Morning, { morningDue } from './views/Morning';
+import PhoneTile from './views/PhoneTile';
 import Tour from './views/Tour';
 import About from './views/About';
 import { locale, t, trayStrings, type MsgKey } from './i18n';
@@ -546,6 +547,7 @@ export default function App() {
         <nav>{topViews(data.settings.workStyle).map(navButton)}</nav>
         <span className="spacer" />
         <Attendance onOpenDay={openDay} />
+        <PhoneTile />
         <nav className="nav-bottom">
           {VIEWS.filter((v) => v.bottom).map(navButton)}
         </nav>

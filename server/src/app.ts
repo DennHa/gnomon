@@ -190,6 +190,9 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
 
   function serverRoute(method: string, p: string, query: Record<string, string>, body: unknown, device: Device): ApiResponse | undefined {
     if (method === 'GET' && p === '/me') return { status: 200, body: { id: device.id, name: device.name } };
+    // Your own devices (never anyone else's), e.g. so the Mac knows whether a phone is connected yet.
+    if (method === 'GET' && p === '/me/devices')
+      return { status: 200, body: store.listDevices().filter((d) => !d.revokedAt && d.personId === device.personId).map((d) => ({ id: d.id, name: d.name, client: d.client ?? null, lastSeenAt: d.lastSeenAt, current: d.id === device.id })) };
     if (method === 'DELETE' && p === '/me') {
       store.revokeDevice(device.id);
       return { status: 200, body: { revoked: device.id } };

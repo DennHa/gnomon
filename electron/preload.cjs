@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('api', {
   serverDisconnect: () => ipcRenderer.invoke('server:disconnect'),
   serverPairCode: (name) => ipcRenderer.invoke('server:pairCode', name),
   serverAdminLink: () => ipcRenderer.invoke('server:adminLink'),
+  serverMyDevices: () => ipcRenderer.invoke('server:myDevices'),
   feedbackAvailable: () => ipcRenderer.invoke('feedback:available'),
   feedbackSend: (msg) => ipcRenderer.invoke('feedback:send', msg),
   feedbackThreads: () => ipcRenderer.invoke('feedback:threads'),

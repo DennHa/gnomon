@@ -1136,6 +1136,13 @@ ipcMain.handle('server:pairCode', async (_e, name) => {
   if (!r.ok) return r;
   return { ok: true, code: r.data.code, expiresAt: r.data.expiresAt, link: `${s.url}/#pair=${r.data.code}` };
 });
+/** This account's devices on the server (only its own), e.g. whether a phone is connected yet. */
+ipcMain.handle('server:myDevices', async () => {
+  const s = readServer();
+  if (!s) return { ok: false, error: 'not_connected' };
+  const r = await serverCall(s.url, 'GET', '/me/devices', undefined, s.key);
+  return r.ok ? { ok: true, devices: r.data } : r;
+});
 // ---- Feedback, as a small help desk: written in Info & feedback, answered on the server's Admin page ----------------
 // It goes to the maker's server (homeServer), else the server this Mac is paired with. Each conversation's id and secret
 // are kept in feedback.json; the secret lets this Mac read the replies and write more.

@@ -40,6 +40,7 @@ window.api = {
   serverDisconnect: async () => ({ connected: false }),
   serverPairCode: async () => ({ ok: false, error: DEMO_ERROR }),
   serverAdminLink: async () => ({ ok: false, error: DEMO_ERROR }),
+  serverMyDevices: async () => ({ ok: false, error: DEMO_ERROR }),
   feedbackAvailable: async () => false,
   feedbackSend: async () => ({ ok: false, error: DEMO_ERROR }),
   feedbackThreads: async () => [],

@@ -128,6 +128,8 @@ export type Settings = {
   celebratedDay?: string;
   /** The morning welcome (src/views/Morning.tsx); on unless switched off. */
   morningWelcome?: boolean;
+  /** The sidebar's "Connect your phone" tile was closed (it doesn't come back). */
+  phoneTileDismissed?: boolean;
   /** The day the morning welcome last showed (once per day). */
   welcomedDay?: string;
   /** Highlight colour (see ACCENTS in src/views/Settings.tsx and the [data-accent] rules in styles.css). */
