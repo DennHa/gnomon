@@ -3,6 +3,13 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.11 · 2026-10-23
+
+- **Feedback right in the app:** under Info & feedback, write your idea or bug and press Send. It goes straight to the
+  people who make Gnomon, and the answer shows up right below, with a notification when it arrives.
+- **Devices name themselves** on your Gnomon server ("Alex's MacBook Pro", "iPhone · Safari"), and the server's
+  admin page has its own sign-in with a password.
+
 ## 0.1.10 · 2026-10-22
 
 - **Open your server's admin from the Mac:** Settings → Connections → *Open server admin* signs you in in the browser,
