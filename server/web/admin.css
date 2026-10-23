@@ -98,3 +98,18 @@ button.soft.danger { color: var(--danger, #d64545); }
 .a-reply textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--field); color: var(--text); font: inherit; resize: vertical; }
 .a-mode { margin-top: 14px; color: var(--muted); font-weight: 500; }
 .a-owner { margin-bottom: 16px; border: 1px solid var(--accent); }
+/* Account pages */
+.a-account { max-width: 640px; }
+.a-steps-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
+.a-button { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; text-decoration: none; padding: 9px 16px; border-radius: 10px; font-weight: 600; }
+a.primary.a-button { background: var(--accent); color: var(--on-accent); }
+/* People */
+.a-people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.a-person { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--field); }
+.a-person.disabled { opacity: 0.55; }
+.a-person.pending { box-shadow: inset 3px 0 0 var(--accent); }
+.a-person-head { display: flex; align-items: center; gap: 12px; }
+.a-person .a-devices { padding-left: 52px; }
+.a-person .a-device { background: var(--surface); padding: 8px 12px; }
+.a-person-actions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.a-row > input, .a-row > select { flex: 1; min-width: 140px; }

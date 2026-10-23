@@ -1122,6 +1122,38 @@ ipcMain.handle('server:connect', async (_e, { url, code }) => {
   fs.rmSync(syncStateFile(), { force: true }); // a new connection starts with a first sync
   return { ok: true, ...serverStatus() };
 });
+// Signing in with the account (docs/accounts-design.md, section 3): email and password give this Mac its own key.
+async function signInWith(url, path, body) {
+  const origin = serverOrigin(url);
+  if (!origin) return { ok: false, error: 'bad_url' };
+  const r = await serverCall(origin, 'POST', path, { ...body, client: 'mac', deviceName: macName(), device: true });
+  if (!r.ok) return { ok: false, error: r.status === 401 ? 'wrong_login' : r.status === 403 ? 'invite_only' : r.error, status: r.status };
+  if (r.data.pending) return { ok: true, pending: true };
+  writeServer({ url: origin, name: r.data.device.name, key: r.data.key });
+  fs.rmSync(syncStateFile(), { force: true }); // a new connection starts with a first sync
+  return { ok: true, ...serverStatus() };
+}
+ipcMain.handle('server:signIn', (_e, { url, email, password }) => signInWith(url, '/account/device', { email: String(email ?? ''), password: String(password ?? '') }));
+ipcMain.handle('server:register', (_e, { url, invite, name, email, password }) =>
+  signInWith(url, '/account/register', { invite: invite ? String(invite).replace(/^.*#invite=/, '') : undefined, name: String(name ?? ''), email: String(email ?? ''), password: String(password ?? '') }),
+);
+/** Who this Mac is signed in as (name, email, role), or null. */
+ipcMain.handle('server:account', async () => {
+  const s = readServer();
+  if (!s) return null;
+  const r = await serverCall(s.url, 'GET', '/me/account', undefined, s.key);
+  return r.ok ? r.data : null;
+});
+/** The account page in the browser, signed in (a one-time link from the server). */
+ipcMain.handle('server:accountLink', async () => {
+  const s = readServer();
+  if (!s) return { ok: false, error: 'not_connected' };
+  const r = await serverCall(s.url, 'POST', '/account-link', { client: 'mac' }, s.key);
+  if (!r.ok) return r;
+  const url = `${s.url}${r.data.path}`;
+  if (/^https?:\/\/[^\s]+$/i.test(url)) shell.openExternal(url);
+  return { ok: true };
+});
 ipcMain.handle('server:disconnect', async () => {
   const s = readServer();
   if (s) await serverCall(s.url, 'DELETE', '/me', undefined, s.key); // revoke this Mac's key; ignore if offline

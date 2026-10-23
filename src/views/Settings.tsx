@@ -2,6 +2,7 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { FloatConnect, PersonioConnect } from './integrations';
+import AccountForm from './AccountForm';
 import { Icon, type IconName } from '../icons';
 import type { Settings as S } from '../types';
 import { dayKey, fmtDate, useNow } from '../time';
@@ -9,7 +10,6 @@ import { workStyleDefaults } from '../actions';
 import { removeSchedule, SCHEDULE_PRESETS, scheduleOn, schedulesOf, setSchedule, SINCE_ALWAYS, weekTotal } from '../schedule';
 import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel, type LayoutMap } from '../shortcuts';
 import { LANGUAGE_NAMES, locale, resolveLanguage, t, type MsgKey } from '../i18n';
-import qrcode from 'qrcode-generator';
 
 /** "Recording · 47 minutes today", so you can see the trail is working. */
 function TrailStatus() {
@@ -151,81 +151,34 @@ const serverError = (code: string) => (SERVER_ERRORS.includes(code) ? t(`srv.err
 function ServerSettings() {
   const { serverSync, runServerSync, refreshServer } = useStore();
   const [status, setStatus] = useState<{ connected: boolean; url?: string; name?: string } | null>(null);
-  const [url, setUrl] = useState('');
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [account, setAccount] = useState<{ name: string; email: string | null; role: 'admin' | 'member' } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [invite, setInvite] = useState<{ code: string; svg: string; expiresAt: string } | null>(null);
-
+  const load = () => window.api.serverStatus().then((st) => (setStatus(st), st.connected ? window.api.serverAccount().then(setAccount) : setAccount(null)));
   useEffect(() => {
-    window.api.serverStatus().then(setStatus);
+    void load();
   }, []);
 
-  // A pasted pairing link (https://…/#pair=ABCD-EFGH, from the server log or a phone) carries both address and code.
-  const link = (() => {
-    try {
-      const u = new URL(code.trim());
-      const c = u.hash.match(/pair=([A-Za-z0-9-]{8,10})/)?.[1];
-      return c ? { url: u.origin, code: c } : null;
-    } catch {
-      return null;
-    }
-  })();
-
-  const connect = async () => {
-    setBusy(true);
-    const r = await window.api.serverConnect(link?.url ?? url, link?.code ?? code);
-    setBusy(false);
-    if (!r.ok) return setError(serverError(r.error));
-    setError(null);
-    setCode('');
-    setStatus(r);
-    await refreshServer(); // starts the first sync
-  };
-
-  const disconnect = async () => {
+  const signOut = async () => {
     if (!confirm(t('srv.disconnectConfirm'))) return;
     setStatus(await window.api.serverDisconnect());
-    setInvite(null);
+    setAccount(null);
     await refreshServer();
-  };
-
-  const connectPhone = async () => {
-    const r = await window.api.serverPairCode(''); // the phone names itself when it connects
-    if (!r.ok) return setError(serverError(r.error));
-    setError(null);
-    const qr = qrcode(0, 'M');
-    qr.addData(r.link);
-    qr.make();
-    setInvite({ code: r.code, expiresAt: r.expiresAt, svg: qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true }) });
   };
 
   if (!status) return null;
   return (
     <section className="card">
-      <h3>{t('srv.title')}</h3>
-      <p className="muted small">{t('srv.intro')}</p>
+      <h3>{t('acc.title')}</h3>
       {!status.connected ? (
         <>
-          <label className="field">
-            <span>{t('srv.url')}</span>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://gnomon.example.com" spellCheck={false} />
-          </label>
-          <label className="field">
-            <span>{t('srv.code')}</span>
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="ABCD-EFGH" spellCheck={false} />
-          </label>
-          <p className="muted small">{t('srv.codeHint')}</p>
-          <div className="add-row">
-            <button className="btn" onClick={connect} disabled={busy || !code.trim() || (!link && !url.trim())}>
-              <Icon name="sync" size={18} /> {busy ? t('srv.connecting') : t('srv.connect')}
-            </button>
-          </div>
+          <p className="muted small">{t('acc.intro')}</p>
+          <AccountForm onDone={() => void load()} />
         </>
       ) : (
         <>
-          <p className="small">{t('srv.connectedAs', { url: status.url ?? '', name: status.name ?? '' })}</p>
-          <p className="muted small">{t('srv.syncIntro')}</p>
+          <p className="small">
+            {account ? t('acc.signedInAs', { name: account.name, email: account.email ?? '—', url: status.url ?? '' }) : t('srv.connectedAs', { url: status.url ?? '', name: status.name ?? '' })}
+          </p>
           <div className="add-row">
             <button className="btn ghost small" onClick={() => void runServerSync()} disabled={serverSync.busy}>
               <Icon name="sync" size={16} /> {serverSync.busy ? t('srv.syncing') : t('srv.syncNow')}
@@ -233,31 +186,30 @@ function ServerSettings() {
             {serverSync.at && !serverSync.busy && <span className="muted small">{t('srv.syncedAt', { time: new Date(serverSync.at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</span>}
           </div>
           {serverSync.error && <p className="error small">{t('srv.syncFailed', { error: SERVER_ERRORS.includes(serverSync.error) ? serverError(serverSync.error) : serverSync.error })}</p>}
-          {invite && (
-            <div className="server-invite">
-              <div className="qr" dangerouslySetInnerHTML={{ __html: invite.svg }} />
-              <div>
-                <p className="invite-code">{invite.code}</p>
-                <p className="muted small">{t('srv.scan', { time: new Date(invite.expiresAt).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</p>
-              </div>
-            </div>
-          )}
           <div className="add-row">
-            <button className="btn" onClick={connectPhone}>
-              <Icon name="add" size={18} /> {invite ? t('srv.newCode') : t('srv.connectPhone')}
-            </button>
             <button
-              className="btn ghost small"
-              title={t('srv.adminHint')}
+              className="btn"
               onClick={async () => {
-                const r = await window.api.serverAdminLink();
-                setError(r.ok ? null : r.error === 'not_admin' ? t('srv.notAdmin') : serverError(r.error));
+                const r = await window.api.serverAccountLink();
+                setError(r.ok ? null : serverError(r.error));
               }}
             >
-              <Icon name="admin_panel_settings" size={16} /> {t('srv.admin')}
+              <Icon name="person" size={18} /> {t('acc.manage')}
             </button>
-            <button className="btn ghost small" onClick={disconnect}>
-              {t('srv.disconnect')}
+            {account?.role === 'admin' && (
+              <button
+                className="btn ghost small"
+                title={t('srv.adminHint')}
+                onClick={async () => {
+                  const r = await window.api.serverAdminLink();
+                  setError(r.ok ? null : r.error === 'not_admin' ? t('srv.notAdmin') : serverError(r.error));
+                }}
+              >
+                <Icon name="admin_panel_settings" size={16} /> {t('srv.admin')}
+              </button>
+            )}
+            <button className="btn ghost small" onClick={signOut}>
+              {t('acc.signOut')}
             </button>
           </div>
         </>
@@ -755,6 +707,7 @@ export default function Settings() {
 
       {tab === 'connections' && !profile?.managed && (
         <>
+      <ServerSettings />
       <section className="card onb-entry">
         <span className="onb-entry-text">
           <strong>{t('onb.open')}</strong>
@@ -772,7 +725,6 @@ export default function Settings() {
         <h3>Personio</h3>
         <PersonioConnect />
       </section>
-          <ServerSettings />
           {profile?.allowLocalApi === false ? <p className="muted small">{t('managed.apiOff')}</p> : <ApiSettings />}
         </>
       )}

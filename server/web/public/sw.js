@@ -19,7 +19,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   // The download page (/latest), the web demo (/example), the site (/about) and the setup/admin pages are separate pages, never cached as the app shell.
-  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/latest') || url.pathname.startsWith('/example') || url.pathname.startsWith('/about') || /^\/(setup|admin)/.test(url.pathname)) return;
+  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/latest') || url.pathname.startsWith('/example') || url.pathname.startsWith('/about') || url.pathname.startsWith('/account') || /^\/(setup|admin)/.test(url.pathname)) return;
   // Network first, so a new deploy shows up right away; the cache is the fallback.
   e.respondWith(
     fetch(e.request)

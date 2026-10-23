@@ -36,7 +36,7 @@ export const keyOf = (kind: Kind, r: AnyRecord): string => (kind === 'workdays' 
 export type Change = { kind: Kind; id: string; seq: number; updatedAt: string; deleted: boolean; data: AnyRecord | null };
 
 /** A person with their own data and devices. role: what they may do on the Admin page later (step 2 of the design). */
-export type Person = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'active' | 'disabled'; createdAt: string; lastSeenAt: string | null };
+export type Person = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'pending' | 'active' | 'disabled'; createdAt: string; lastSeenAt: string | null };
 type PersonRow = { id: string; email: string | null; name: string; role: Person['role']; status: Person['status']; created_at: string; last_seen_at: string | null };
 const personOf = (r: PersonRow): Person => ({ id: r.id, email: r.email, name: r.name, role: r.role, status: r.status, createdAt: r.created_at, lastSeenAt: r.last_seen_at });
 
@@ -127,6 +127,11 @@ export class Store {
         text TEXT NOT NULL,
         at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS invites (
+        code_hash TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS admin_codes (
         code_hash TEXT PRIMARY KEY,
         purpose TEXT NOT NULL,
@@ -178,6 +183,13 @@ export class Store {
       if (!cols('devices').includes('person_id')) this.db.exec('ALTER TABLE devices ADD COLUMN person_id TEXT');
       this.db.prepare('UPDATE devices SET person_id = ? WHERE person_id IS NULL').run(owner);
       if (!cols('pair_codes').includes('person_id')) this.db.exec('ALTER TABLE pair_codes ADD COLUMN person_id TEXT');
+      // Passwords are per person now; the server's admin password becomes the owner's.
+      if (!cols('people').includes('password_hash')) this.db.exec('ALTER TABLE people ADD COLUMN password_hash TEXT');
+      const adminPassword = this.getMeta('adminPassword');
+      if (adminPassword) {
+        this.db.prepare('UPDATE people SET password_hash = COALESCE(password_hash, ?) WHERE id = ?').run(adminPassword, owner);
+        this.db.prepare("DELETE FROM meta WHERE key = 'adminPassword'").run();
+      }
       // Settings and the "seeded" mark were the server's; now they're the owner's.
       for (const key of ['settings', 'seeded']) {
         const v = this.getMeta(key);
@@ -351,7 +363,7 @@ export class Store {
     if (!row || row.revoked_at) return undefined;
     // A disabled person's devices stop working at once.
     const person = this.person(row.person_id);
-    if (!person || person.status === 'disabled') return undefined;
+    if (!person || person.status !== 'active') return undefined;
     const now = new Date().toISOString();
     // Only touch the rows once a minute, not on every request.
     if (!row.last_seen_at || Date.parse(now) - Date.parse(row.last_seen_at) > 60_000) {
@@ -474,31 +486,81 @@ export class Store {
     this.db.prepare('DELETE FROM feedback_threads WHERE id = ?').run(id);
   }
 
-  // ---- Admin password (sign in to the Admin page straight from the browser) -------------------
+  // ---- Passwords, invitations and who may register (docs/accounts-design.md, step 2) ------------
 
-  /** Only a salted scrypt hash is kept; the password itself never is. */
-  setAdminPassword(password: string) {
+  /** A person's password. Only a salted scrypt hash is kept; the password itself never is. */
+  setPassword(personId: string, password: string) {
     const salt = randomBytes(16);
     const hash = scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 });
-    this.setMeta('adminPassword', `scrypt$16384$${salt.toString('base64')}$${hash.toString('base64')}`);
+    this.db.prepare('UPDATE people SET password_hash = ? WHERE id = ?').run(`scrypt$16384$${salt.toString('base64')}$${hash.toString('base64')}`, personId);
   }
 
-  hasAdminPassword(): boolean {
-    return Boolean(this.getMeta('adminPassword'));
+  hasPassword(personId: string): boolean {
+    return Boolean((this.db.prepare('SELECT password_hash FROM people WHERE id = ?').get(personId) as { password_hash: string | null } | undefined)?.password_hash);
   }
 
-  checkAdminPassword(password: string): boolean {
-    const [kind, n, salt, hash] = (this.getMeta('adminPassword') ?? '').split('$');
+  checkPassword(personId: string, password: string): boolean {
+    const stored = (this.db.prepare('SELECT password_hash FROM people WHERE id = ?').get(personId) as { password_hash: string | null } | undefined)?.password_hash;
+    const [kind, n, salt, hash] = (stored ?? '').split('$');
     if (kind !== 'scrypt' || !salt || !hash) return false;
     const want = Buffer.from(hash, 'base64');
     const got = scryptSync(password, Buffer.from(salt, 'base64'), want.length, { N: Number(n), r: 8, p: 1 });
     return timingSafeEqual(want, got);
   }
 
+  personByEmail(email: string): Person | undefined {
+    const row = this.db.prepare('SELECT id FROM people WHERE email = ?').get(email.trim().toLowerCase()) as { id: string } | undefined;
+    return row && this.person(row.id);
+  }
+
+  /** An invitation for a person: a one-time code (in a link), 7 days by default. A new one replaces older ones. */
+  createInvite(personId: string, days = 7): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const code = Array.from({ length: 10 }, () => alphabet[randomInt(alphabet.length)]).join('');
+    this.db.prepare('DELETE FROM invites WHERE person_id = ? OR expires_at < ?').run(personId, new Date().toISOString());
+    this.db.prepare('INSERT INTO invites (code_hash, person_id, expires_at) VALUES (?, ?, ?)').run(sha256(code), personId, new Date(Date.now() + days * 86_400_000).toISOString());
+    return code;
+  }
+
+  /** Who an invitation is for (without using it up), or undefined when unknown or expired. */
+  inviteFor(code: string): Person | undefined {
+    const row = this.db.prepare('SELECT person_id, expires_at FROM invites WHERE code_hash = ?').get(sha256(code.toUpperCase().replace(/[^A-Z0-9]/g, ''))) as { person_id: string; expires_at: string } | undefined;
+    return row && row.expires_at > new Date().toISOString() ? this.person(row.person_id) : undefined;
+  }
+
+  useInvite(code: string) {
+    this.db.prepare('DELETE FROM invites WHERE code_hash = ?').run(sha256(code.toUpperCase().replace(/[^A-Z0-9]/g, '')));
+  }
+
+  /** Who may register: invited people only (the default), anyone with an admin's approval, or anyone. */
+  registration(): 'invite' | 'approval' | 'open' {
+    const v = this.getMeta('registration');
+    return v === 'approval' || v === 'open' ? v : 'invite';
+  }
+
+  setRegistration(v: 'invite' | 'approval' | 'open') {
+    this.setMeta('registration', v);
+  }
+
+  /** Remove a person and everything that's theirs: records, devices, invitations. The owner can't be removed. */
+  removePerson(id: string): boolean {
+    if (id === this.ownerId || !this.person(id)) return false;
+    this.db.transaction(() => {
+      for (const t of ['records', 'devices', 'pair_codes', 'invites']) this.db.prepare(`DELETE FROM ${t} WHERE person_id = ?`).run(id);
+      this.db.prepare('DELETE FROM meta WHERE key IN (?, ?)').run(`settings:${id}`, `seeded:${id}`);
+      this.db.prepare('DELETE FROM people WHERE id = ?').run(id);
+    })();
+    this.slots.delete(id);
+    return true;
+  }
+
   // ---- Admin access (setup wizard and Admin page, see company.ts) --------------------------
 
-  /** A one-time code for the setup wizard ('setup') or the Admin page ('admin'), shown as a link in the log. */
-  createAdminCode(purpose: 'setup' | 'admin', ttlMinutes = 60): string {
+  /**
+   * A one-time code for the setup wizard ('setup'), the Admin page ('admin', or 'admin:<person>' for that person) or
+   * someone's account page ('account:<person>'), shown as a link.
+   */
+  createAdminCode(purpose: string, ttlMinutes = 60): string {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const code = Array.from({ length: 8 }, () => alphabet[randomInt(alphabet.length)]).join('');
     this.db.prepare('DELETE FROM admin_codes WHERE expires_at < ?').run(new Date().toISOString());
@@ -507,16 +569,16 @@ export class Store {
   }
 
   /** Redeem an admin code once; returns its purpose, or undefined when unknown or expired. */
-  redeemAdminCode(code: string): 'setup' | 'admin' | undefined {
+  redeemAdminCode(code: string): string | undefined {
     const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const row = this.db.prepare('SELECT purpose, expires_at FROM admin_codes WHERE code_hash = ?').get(sha256(normalized)) as { purpose: 'setup' | 'admin'; expires_at: string } | undefined;
+    const row = this.db.prepare('SELECT purpose, expires_at FROM admin_codes WHERE code_hash = ?').get(sha256(normalized)) as { purpose: string; expires_at: string } | undefined;
     if (!row) return undefined;
     this.db.prepare('DELETE FROM admin_codes WHERE code_hash = ?').run(sha256(normalized));
     return row.expires_at < new Date().toISOString() ? undefined : row.purpose;
   }
 
   /** Setup codes stop working once the wizard is finished. */
-  clearAdminCodes(purpose?: 'setup' | 'admin') {
+  clearAdminCodes(purpose?: string) {
     if (purpose) this.db.prepare('DELETE FROM admin_codes WHERE purpose = ?').run(purpose);
     else this.db.prepare('DELETE FROM admin_codes').run();
   }

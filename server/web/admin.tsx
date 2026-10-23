@@ -193,6 +193,39 @@ const EN = {
   ownerEmail: 'Your email',
   ownerName: 'Your name',
   ownerSave: 'Save',
+  peopleTitle: 'People',
+  pIntro: 'Everyone with an account on this server, and their devices. Admins manage accounts here; nobody sees anyone’s times.',
+  pInviteTitle: 'Invite someone',
+  pInviteIntro: 'They get a link to create their account (name and password). Pass it on by message or email.',
+  pEmail: 'Email',
+  pName: 'Name (optional)',
+  pMember: 'Member',
+  pAdmin: 'Admin',
+  pInvite: 'Invite',
+  pInviteFor: 'Invitation for {email}',
+  pInviteHow: 'Send them this link. It works once, until {date}.',
+  pRegTitle: 'Who may create an account',
+  pRegInvite: 'Invited only',
+  pRegApproval: 'With approval',
+  pRegOpen: 'Anyone',
+  pRegInviteHint: 'Only people with an invitation link can sign up.',
+  pRegApprovalHint: 'Anyone can sign up at /account/register; the account works once an admin approves it here.',
+  pRegOpenHint: 'Anyone who knows this server’s address can sign up at /account/register.',
+  pInvited: 'Invited',
+  pPending: 'Waiting for approval',
+  pActive: 'Active',
+  pDisabled: 'Disabled',
+  pYou: 'you',
+  pApprove: 'Approve',
+  pReinvite: 'New invitation link',
+  pMakeAdmin: 'Make admin',
+  pMakeMember: 'Make member',
+  pDisable: 'Disable',
+  pDisableConfirm: 'Disable {name}? They’re signed out of every device at once and can’t sign in until enabled again.',
+  pEnable: 'Enable',
+  pRemove: 'Remove',
+  pRemoveConfirm: 'Remove {name} with all their times and devices? This can’t be undone.',
+  loginEmailless: 'This server’s first account has no email yet: leave the email empty and use the password.',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -371,6 +404,39 @@ const DE: Record<Key, string> = {
   ownerEmail: 'Deine E-Mail',
   ownerName: 'Dein Name',
   ownerSave: 'Sichern',
+  peopleTitle: 'Personen',
+  pIntro: 'Alle mit einem Konto auf diesem Server, und ihre Geräte. Admins verwalten hier Konten; niemand sieht die Zeiten anderer.',
+  pInviteTitle: 'Jemanden einladen',
+  pInviteIntro: 'Die Person bekommt einen Link, mit dem sie ihr Konto anlegt (Name und Passwort). Gib ihn per Nachricht oder E-Mail weiter.',
+  pEmail: 'E-Mail',
+  pName: 'Name (optional)',
+  pMember: 'Mitglied',
+  pAdmin: 'Admin',
+  pInvite: 'Einladen',
+  pInviteFor: 'Einladung für {email}',
+  pInviteHow: 'Schick diesen Link. Er gilt einmal, bis {date}.',
+  pRegTitle: 'Wer ein Konto anlegen darf',
+  pRegInvite: 'Nur mit Einladung',
+  pRegApproval: 'Mit Freigabe',
+  pRegOpen: 'Alle',
+  pRegInviteHint: 'Nur wer einen Einladungslink hat, kann sich registrieren.',
+  pRegApprovalHint: 'Alle können sich unter /account/register registrieren; das Konto wird aktiv, sobald ein Admin es hier freigibt.',
+  pRegOpenHint: 'Alle, die die Adresse dieses Servers kennen, können sich unter /account/register registrieren.',
+  pInvited: 'Eingeladen',
+  pPending: 'Wartet auf Freigabe',
+  pActive: 'Aktiv',
+  pDisabled: 'Gesperrt',
+  pYou: 'du',
+  pApprove: 'Freigeben',
+  pReinvite: 'Neuer Einladungslink',
+  pMakeAdmin: 'Zum Admin machen',
+  pMakeMember: 'Zum Mitglied machen',
+  pDisable: 'Sperren',
+  pDisableConfirm: '{name} sperren? Die Person wird sofort auf allen Geräten abgemeldet und kann sich erst nach dem Entsperren wieder anmelden.',
+  pEnable: 'Entsperren',
+  pRemove: 'Entfernen',
+  pRemoveConfirm: '{name} mit allen Zeiten und Geräten entfernen? Das lässt sich nicht rückgängig machen.',
+  loginEmailless: 'Das erste Konto dieses Servers hat noch keine E-Mail: Lass die E-Mail leer und nimm das Passwort.',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -386,7 +452,7 @@ type Config = {
   rules: Record<'managed' | 'allowLocalApi' | 'allowActivityTrail' | 'phoneApp', boolean>;
   audit: { at: string; what: string }[];
 };
-type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; owner: { id: string; email: string | null; name: string } };
+type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; me: { id: string; email: string | null; name: string }; registration: 'invite' | 'approval' | 'open'; pending: number };
 
 let token = '';
 try {
@@ -815,14 +881,15 @@ function ago(iso: string | null): string {
   return t('devLastSeen', { when });
 }
 
-function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Device[]) => void; setErr: (e: string | null) => void }) {
+function DeviceRow({ d, reload, setErr }: { d: Device; reload: () => void; setErr: (e: string | null) => void }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(d.name);
   const [icon, label] = KIND[kindOf(d) ?? ''] ?? ['devices', 'devUnknown'];
   const run = async (method: string, body?: unknown) => {
     try {
       setErr(null);
-      setDevices((await call<{ devices: Device[] }>(method, `/devices/${d.id}`, body)).devices);
+      await call(method, `/devices/${d.id}`, body);
+      reload();
     } catch (e) {
       setErr((e as Error).message);
     }
@@ -830,7 +897,7 @@ function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Devic
   return (
     <li className={`a-device ${unused(d) ? 'unused' : ''}`}>
       <span className="a-device-icon" title={t(label)}>
-        <Icon name={icon} size={22} />
+        <Icon name={icon} size={20} />
       </span>
       <div className="a-device-main">
         {editing ? (
@@ -846,9 +913,6 @@ function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Devic
         <span className="a-hint">
           {t(label)} · {ago(d.lastSeenAt)} · {t('devSince', { date: new Date(d.createdAt).toLocaleDateString() })}
         </span>
-        <label className="a-device-admin">
-          <input type="checkbox" checked={Boolean(d.admin)} onChange={(e) => run('PATCH', { admin: e.target.checked })} /> {t('devAdmin')}
-        </label>
       </div>
       <div className="a-device-actions">
         {!editing && (
@@ -857,76 +921,160 @@ function DeviceRow({ d, setDevices, setErr }: { d: Device; setDevices: (l: Devic
           </button>
         )}
         <button className="soft danger" title={t('devDisconnect')} onClick={() => confirm(t('devConfirm', { name: d.name })) && run('DELETE')}>
-          <Icon name="link_off" size={18} /> {t('devDisconnect')}
+          <Icon name="link_off" size={18} />
         </button>
       </div>
     </li>
   );
 }
 
-function AddDevice({ s }: Ctx) {
-  const [name, setName] = useState('');
-  const [code, setCode] = useState<{ name: string | null; code: string; expiresAt: string } | null>(null);
-  // The phone app connects by itself when opened with #pair=CODE (scanning the QR code does exactly that).
-  const base = (s.config.company.publicUrl || location.origin).replace(/\/+$/, '');
-  const link = code ? `${base}/#pair=${code.code}` : '';
+// ---- People: everyone with an account, their devices, invitations, who may register ------------------
+
+type PersonRow = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'pending' | 'active' | 'disabled'; owner: boolean; lastSeenAt: string | null; devices: Device[] };
+type Invite = { personId: string; email: string; link: string; expiresAt: string };
+const STATUS_KEY: Record<PersonRow['status'], Key> = { invited: 'pInvited', pending: 'pPending', active: 'pActive', disabled: 'pDisabled' };
+
+function InviteBox({ invite }: { invite: Invite }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <div className="a-card">
-      <strong>
-        <Icon name="qr_code_2" size={18} /> {t('addTitle')}
-      </strong>
-      <span className="a-hint">{t('addIntro')}</span>
-      <form className="a-inline" onSubmit={async (e) => (e.preventDefault(), setCode(await call('POST', '/pair', { name })))}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('addName')} maxLength={60} />
-        <button className="primary">{t('addButton')}</button>
-      </form>
-      {code && (
-        <div className="a-invite">
-          <Qr text={link} />
-          <div>
-            <strong>{code.name ?? t('addAuto')}</strong>
-            <code className="a-code">{code.code}</code>
-            <span className="a-hint">{t('addValid', { time: new Date(code.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</span>
-          </div>
-        </div>
-      )}
+    <div className="a-invite">
+      <Qr text={invite.link} />
+      <div>
+        <strong>{t('pInviteFor', { email: invite.email })}</strong>
+        <code>{invite.link}</code>
+        <span className="a-hint">{t('pInviteHow', { date: new Date(invite.expiresAt).toLocaleDateString() })}</span>
+        <button
+          className="soft"
+          onClick={() => {
+            navigator.clipboard?.writeText(invite.link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? t('copied') : t('copy')}
+        </button>
+      </div>
     </div>
   );
 }
 
-function Devices(ctx: Ctx) {
-  const [devices, setDevices] = useState<Device[] | null>(null);
-  const [done, setDone] = useState<string | null>(null);
+function People(ctx: Ctx) {
+  const [people, setPeople] = useState<PersonRow[] | null>(null);
+  const [registration, setRegistration] = useState<'invite' | 'approval' | 'open'>('invite');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'member' | 'admin'>('member');
+  const [invite, setInvite] = useState<Invite | null>(null);
+  const take = (r: { people: PersonRow[]; registration?: typeof registration }) => (setPeople(r.people), r.registration && setRegistration(r.registration));
+  const load = () => call<{ people: PersonRow[]; registration: typeof registration }>('GET', '/people').then(take, (e) => ctx.setErr((e as Error).message));
   useEffect(() => {
-    call<{ devices: Device[] }>('GET', '/devices').then((r) => setDevices(r.devices), (e) => ctx.setErr((e as Error).message));
+    void load();
   }, []);
+  const run = async (method: string, path: string, body?: unknown) => {
+    try {
+      ctx.setErr(null);
+      const r = await call<{ people: PersonRow[]; registration?: typeof registration; invite?: Invite }>(method, path, body);
+      take(r);
+      if (r.invite) setInvite(r.invite);
+      call<State>('GET', '/state').then(ctx.setS);
+    } catch (e) {
+      ctx.setErr((e as Error).message);
+    }
+  };
   return (
     <>
-      <p className="a-intro">{t('devicesIntro')}</p>
-      {devices && devices.length === 0 && <p className="a-hint">{t('devNone')}</p>}
-      {devices && devices.some(unused) && (
-        <div className="a-inline a-cleanup">
-          <span className="a-hint">{done ?? t('devCleanupHint')}</span>
-          <button
-            className="soft"
-            onClick={async () => {
-              const r = await call<{ removed: number; devices: Device[] }>('POST', '/devices/cleanup');
-              setDevices(r.devices);
-              setDone(t('devCleaned', { n: r.removed }));
-            }}
-          >
-            {t('devCleanup', { n: devices.filter(unused).length })}
-          </button>
+      <p className="a-intro">{t('pIntro')}</p>
+      <form
+        className="a-card"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void run('POST', '/people', { email, name: name || undefined, role }).then(() => (setEmail(''), setName('')));
+        }}
+      >
+        <strong>
+          <Icon name="person" size={18} /> {t('pInviteTitle')}
+        </strong>
+        <span className="a-hint">{t('pInviteIntro')}</span>
+        <div className="a-row">
+          <input type="email" required placeholder={t('pEmail')} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder={t('pName')} value={name} onChange={(e) => setName(e.target.value)} />
+          <select value={role} onChange={(e) => setRole(e.target.value as 'member' | 'admin')}>
+            <option value="member">{t('pMember')}</option>
+            <option value="admin">{t('pAdmin')}</option>
+          </select>
+          <button className="primary">{t('pInvite')}</button>
         </div>
-      )}
-      {devices && devices.length > 0 && (
-        <ul className="a-devices">
-          {devices.map((d) => (
-            <DeviceRow key={d.id} d={d} setDevices={setDevices} setErr={ctx.setErr} />
+        {invite && <InviteBox invite={invite} />}
+      </form>
+      <div className="a-card">
+        <strong>{t('pRegTitle')}</strong>
+        <div className="a-seg">
+          {(['invite', 'approval', 'open'] as const).map((m) => (
+            <button key={m} className={registration === m ? 'on' : ''} onClick={() => run('PUT', '/registration', { mode: m })}>
+              {t(m === 'invite' ? 'pRegInvite' : m === 'approval' ? 'pRegApproval' : 'pRegOpen')}
+            </button>
           ))}
-        </ul>
-      )}
-      <AddDevice {...ctx} />
+        </div>
+        <span className="a-hint">{t(registration === 'invite' ? 'pRegInviteHint' : registration === 'approval' ? 'pRegApprovalHint' : 'pRegOpenHint')}</span>
+      </div>
+      <ul className="a-people">
+        {people?.map((x) => (
+          <li key={x.id} className={`a-person ${x.status}`}>
+            <div className="a-person-head">
+              <span className="a-device-icon">
+                <Icon name="person" size={20} />
+              </span>
+              <div className="a-device-main">
+                <strong>
+                  {x.name} {x.id === ctx.s.me.id && <span className="a-tag">{t('pYou')}</span>}
+                </strong>
+                <span className="a-hint">{x.email ?? '—'}</span>
+              </div>
+              <span className={`a-status ${x.status === 'pending' ? 'new' : ''}`}>{t(STATUS_KEY[x.status])}</span>
+              <span className="a-status">{t(x.role === 'admin' ? 'pAdmin' : 'pMember')}</span>
+            </div>
+            {x.devices.length > 0 && (
+              <ul className="a-devices">
+                {x.devices.map((d) => (
+                  <DeviceRow key={d.id} d={d} reload={load} setErr={ctx.setErr} />
+                ))}
+              </ul>
+            )}
+            {x.id !== ctx.s.me.id && (
+              <div className="a-inline a-person-actions">
+                {x.status === 'pending' && (
+                  <button className="primary" onClick={() => run('PATCH', `/people/${x.id}`, { status: 'active' })}>
+                    {t('pApprove')}
+                  </button>
+                )}
+                {x.status === 'invited' && (
+                  <button className="soft" onClick={() => run('POST', `/people/${x.id}/invite`)}>
+                    {t('pReinvite')}
+                  </button>
+                )}
+                <button className="soft" onClick={() => run('PATCH', `/people/${x.id}`, { role: x.role === 'admin' ? 'member' : 'admin' })}>
+                  {t(x.role === 'admin' ? 'pMakeMember' : 'pMakeAdmin')}
+                </button>
+                {x.status === 'active' && (
+                  <button className="soft" onClick={() => confirm(t('pDisableConfirm', { name: x.name })) && run('PATCH', `/people/${x.id}`, { status: 'disabled' })}>
+                    {t('pDisable')}
+                  </button>
+                )}
+                {x.status === 'disabled' && (
+                  <button className="soft" onClick={() => run('PATCH', `/people/${x.id}`, { status: 'active' })}>
+                    {t('pEnable')}
+                  </button>
+                )}
+                {!x.owner && (
+                  <button className="soft danger" onClick={() => confirm(t('pRemoveConfirm', { name: x.name })) && run('DELETE', `/people/${x.id}`)}>
+                    {t('pRemove')}
+                  </button>
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
@@ -1052,7 +1200,7 @@ function Feedback(ctx: Ctx) {
 
 function OwnerPrompt({ s, setS }: { s: State; setS: (s: State) => void }) {
   const [email, setEmail] = useState('');
-  const [name, setName] = useState(s.owner.name === 'Owner' ? '' : s.owner.name);
+  const [name, setName] = useState(s.me.name === 'Owner' ? '' : s.me.name);
   const [err, setErr] = useState<string | null>(null);
   return (
     <form
@@ -1060,7 +1208,7 @@ function OwnerPrompt({ s, setS }: { s: State; setS: (s: State) => void }) {
       onSubmit={async (e) => {
         e.preventDefault();
         try {
-          setS(await call('PATCH', '/owner', { email, name: name || undefined }));
+          setS(await call('PATCH', '/me', { email, name: name || undefined }));
         } catch (e) {
           setErr((e as Error).message);
         }
@@ -1098,7 +1246,8 @@ const keepToken = (value: string) => {
   }
 };
 
-function Login({ onIn }: { onIn: (s: State) => void }) {
+function Login({ onIn, emailless }: { onIn: (s: State) => void; emailless: boolean }) {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1117,7 +1266,7 @@ function Login({ onIn }: { onIn: (s: State) => void }) {
           e.preventDefault();
           setBusy(true);
           try {
-            const r = await call<State & { token: string }>('POST', '/login', { password });
+            const r = await call<State & { token: string }>('POST', '/login', { email: email || undefined, password });
             keepToken(r.token);
             onIn(r);
           } catch (e) {
@@ -1136,8 +1285,11 @@ function Login({ onIn }: { onIn: (s: State) => void }) {
             <Icon name="warning" size={18} /> {err}
           </p>
         )}
+        <Field label={t('pEmail')} hint={emailless ? t('loginEmailless') : undefined}>
+          <input type="email" autoComplete="username" autoFocus={!emailless} value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
         <Field label={t('password')}>
-          <input type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input type="password" autoComplete="current-password" autoFocus={emailless} value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <footer className="a-foot">
           <span className="a-hint">{t('pwForgot')}</span>
@@ -1199,7 +1351,7 @@ function Account({ s, setS, setErr }: Ctx) {
 // ---- App ------------------------------------------------------------------------------------------
 
 type Section = { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => ReactNode };
-const DEVICES: Section = { key: 'devices', title: 'devicesTitle', icon: 'devices', view: (c) => <Devices {...c} /> };
+const PEOPLE: Section = { key: 'people', title: 'peopleTitle', icon: 'group', view: (c) => <People {...c} /> };
 const FEEDBACK: Section = { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} /> };
 const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
 /** After the setup, these steps are Settings pages of their own (the others only make sense in the wizard). */
@@ -1222,6 +1374,7 @@ function App() {
   const [step, setStep] = useState(0);
   const admin = location.pathname.startsWith('/admin');
   const [login, setLogin] = useState(false);
+  const [emailless, setEmailless] = useState(false);
   // The wizard again, on request, after the setup is finished.
   const [wizard, setWizard] = useState(false);
 
@@ -1239,7 +1392,8 @@ function App() {
         } else if (token) setS(await call('GET', '/state'));
         else if (admin) {
           // No link: sign in with the password, if the server has one.
-          const st = await call<{ passwordSet: boolean }>('GET', '/status');
+          const st = await call<{ passwordSet: boolean; emailless: boolean }>('GET', '/status');
+          setEmailless(st.emailless);
           if (st.passwordSet) setLogin(true);
           else setFatal(t('noPassword'));
         } else setFatal(t('noLink'));
@@ -1259,7 +1413,7 @@ function App() {
     document.title = t(admin ? 'adminTitle' : 'title');
   }, []);
 
-  if (login && !s) return <Login onIn={(r) => (setLogin(false), setS(r))} />;
+  if (login && !s) return <Login emailless={emailless} onIn={(r) => (setLogin(false), setS(r))} />;
   if (fatal)
     return (
       <main className="a-page">
@@ -1277,7 +1431,7 @@ function App() {
   // The Admin page: Manage (everyday: devices, feedback, account), then either the setup wizard (numbered steps, until
   // it's finished or when run again) or Settings (the same pages, each on its own, without steps). /setup is the wizard.
   const setupMode = !admin || !s.config.setupDone || wizard;
-  const MANAGE = admin ? [DEVICES, FEEDBACK, ACCOUNT] : [];
+  const MANAGE = admin ? [PEOPLE, FEEDBACK, ACCOUNT] : [];
   const rest = setupMode ? STEPS : STEPS.filter((x) => SETTINGS_KEYS.includes(x.key));
   const SECTIONS = [...MANAGE, ...rest];
   const offset = MANAGE.length;
@@ -1307,7 +1461,7 @@ function App() {
           </button>
         )}
       </header>
-      {admin && !s.owner.email && <OwnerPrompt s={s} setS={setS} />}
+      {admin && !s.me.email && <OwnerPrompt s={s} setS={setS} />}
       {admin && !s.passwordSet && step !== 2 && (
         <button className="a-banner" onClick={() => (setStep(2), setErr(null))}>
           <Icon name="lock" size={18} /> {t('pwMissing')} <Icon name="arrow_forward" size={16} />
@@ -1323,6 +1477,7 @@ function App() {
                 <span className="a-num">{i < offset || !setupMode ? <Icon name={st.icon} size={14} /> : i - offset + 1}</span>
                 {t(titleOf(st))}
                 {st.key === 'feedback' && s.feedbackUnread > 0 && <span className="a-badge">{s.feedbackUnread}</span>}
+                {st.key === 'people' && s.pending > 0 && <span className="a-badge">{s.pending}</span>}
               </button>
             </Fragment>
           ))}

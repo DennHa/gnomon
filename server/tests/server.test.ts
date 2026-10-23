@@ -401,110 +401,7 @@ describe('static folders (/about, /example)', () => {
   });
 });
 
-describe('admin page from a trusted device (no terminal)', () => {
-  test('the first device opens the Admin page; devices can be renamed, allowed, disconnected and added by code', async () => {
-    const { Company } = await import('../src/company');
-    const own = new Store(':memory:');
-    const company = new Company(own, Buffer.alloc(32, 9), 'file');
-    const app = http.createServer(createApp({ store: own, webDir, company }));
-    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
-    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
-    const go = async (method: string, p: string, body?: unknown, auth?: string, headers: Record<string, string> = {}) => {
-      const r = await fetch(`${url}/api/v1${p}`, { method, headers: { ...(auth && { Authorization: `Bearer ${auth}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
-      return { status: r.status, body: (await r.json()) as any };
-    };
-    try {
-      // An old phone pairing is the oldest device: it must not get the right just for that.
-      const phone = own.addDevice('iPhone', 'phone');
-      const mac = own.addDevice('MacBook');
-      const otherMac = own.addDevice('Second Mac', 'mac');
-      assert.equal((await go('POST', '/admin-link', {}, phone.key)).status, 403, 'a phone never claims it');
-      // The first Mac to ask (saying it's a Mac) gets it, and is recorded as a Mac from now on.
-      const link = await go('POST', '/admin-link', { client: 'mac' }, mac.key);
-      assert.equal((await go('POST', '/admin-link', { client: 'mac' }, otherMac.key)).status, 403, 'only while nobody has it');
-      own.revokeDevice(otherMac.device.id);
-      assert.equal(link.status, 201);
-      const code = String(link.body.path).match(/^\/admin#code=([A-Z0-9-]+)$/)?.[1];
-      assert.ok(code, 'a one-time link to /admin');
-      const session = (await go('POST', '/admin/session', { code })).body.token;
-      assert.ok(session);
-      assert.equal((await go('POST', '/admin/session', { code })).status, 401, 'the link works once');
 
-      let list = (await go('GET', '/admin/devices', undefined, session)).body.devices;
-      assert.deepEqual(list.map((d: any) => [d.name, d.client, d.admin]), [['iPhone', 'phone', false], ['MacBook', 'mac', true]]);
-      // Rename and allow the phone; then the Mac may give up the right, but the last one can't.
-      list = (await go('PATCH', `/admin/devices/${phone.device.id}`, { name: 'Alex iPhone', admin: true }, session)).body.devices;
-      assert.deepEqual(list.map((d: any) => [d.name, d.admin]), [['Alex iPhone', true], ['MacBook', true]]);
-      assert.equal((await go('PATCH', `/admin/devices/${mac.device.id}`, { admin: false }, session)).status, 200);
-      assert.equal((await go('PATCH', `/admin/devices/${phone.device.id}`, { admin: false }, session)).status, 422);
-      assert.equal((await go('PATCH', `/admin/devices/${phone.device.id}`, { name: '  ' }, session)).status, 422);
-
-      // A code for a new device; a phone's browser that redeems it shows up as a phone.
-      const pair = await go('POST', '/admin/pair', { name: 'iPad' }, session);
-      assert.equal(pair.status, 201);
-      const added = await go('POST', '/pair', { code: pair.body.code }, undefined, { 'User-Agent': 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)' });
-      assert.equal(added.status, 201);
-      list = (await go('GET', '/admin/devices', undefined, session)).body.devices;
-      assert.deepEqual(list.at(-1).client, 'phone');
-
-      // Disconnecting takes the device's key away at once.
-      list = (await go('DELETE', `/admin/devices/${phone.device.id}`, undefined, session)).body.devices;
-      assert.equal(list.some((d: any) => d.id === phone.device.id), false);
-      assert.equal((await go('GET', '/me', undefined, phone.key)).status, 401);
-      // Without a session, none of it.
-      assert.equal((await go('GET', '/admin/devices')).status, 401);
-    } finally {
-      await new Promise((r) => app.close(r));
-      own.close();
-    }
-  });
-});
-
-test('admin password: set once while signed in, then sign in from any browser; wrong ones lock for a while', async () => {
-  const { Company } = await import('../src/company');
-  const own = new Store(':memory:');
-  const company = new Company(own, Buffer.alloc(32, 5), 'file');
-  const app = http.createServer(createApp({ store: own, webDir, company }));
-  await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
-  const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
-  const go = async (method: string, p: string, body?: unknown, auth?: string) => {
-    const r = await fetch(`${url}/api/v1/admin${p}`, { method, headers: { ...(auth && { Authorization: `Bearer ${auth}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
-    return { status: r.status, body: (await r.json()) as any };
-  };
-  try {
-    assert.deepEqual((await go('GET', '/status')).body, { passwordSet: false });
-    assert.equal((await go('POST', '/login', { password: 'anything at all' })).status, 401, 'no password, no login');
-    // Signed in with a one-time code, set the password.
-    const code = own.createAdminCode('admin', 5);
-    const first = (await go('POST', '/session', { code })).body;
-    assert.equal(first.passwordSet, false);
-    assert.equal((await go('POST', '/password', { password: 'short' }, first.token)).status, 422);
-    assert.equal((await go('POST', '/password', { password: 'correct horse battery' }, first.token)).body.passwordSet, true);
-    assert.equal(own.getMeta('adminPassword')?.includes('correct horse'), false, 'only a hash is kept');
-    // Sign out; the old session is gone.
-    await go('DELETE', '/session', undefined, first.token);
-    assert.equal((await go('GET', '/state', undefined, first.token)).status, 401);
-    // Now straight from the browser.
-    assert.deepEqual((await go('GET', '/status')).body, { passwordSet: true });
-    const login = await go('POST', '/login', { password: 'correct horse battery' });
-    assert.equal(login.status, 201);
-    assert.equal((await go('GET', '/devices', undefined, login.body.token)).status, 200);
-    // Old pairings go with one click; admins stay.
-    const keep = own.addDevice('Alex’s MacBook Pro', 'mac');
-    own.updateDevice(keep.device.id, { admin: true });
-    own.addDevice('iPhone · Safari', 'phone');
-    (own as any).db.prepare('UPDATE devices SET created_at = ? WHERE name = ?').run(new Date(Date.now() - 3 * 86_400_000).toISOString(), 'iPhone · Safari');
-    const cleaned = await go('POST', '/devices/cleanup', undefined, login.body.token);
-    assert.equal(cleaned.body.removed, 1);
-    assert.deepEqual(cleaned.body.devices.map((d: any) => d.name), ['Alex’s MacBook Pro']);
-    // Five wrong passwords lock the login, even for the right one.
-    for (let i = 0; i < 5; i++) assert.equal((await go('POST', '/login', { password: 'wrong guess ' + i })).status, 401);
-    assert.equal((await go('POST', '/login', { password: 'correct horse battery' })).status, 429);
-  } finally {
-    await new Promise((r) => app.close(r));
-    own.close();
-  }
-});
 
 test('feedback: anyone can write, only the secret reads the replies, the admin answers; spam is limited', async () => {
   const { Company } = await import('../src/company');
@@ -555,23 +452,6 @@ test('feedback: anyone can write, only the secret reads the replies, the admin a
   }
 });
 
-test('a finished company server never hands out the admin right by itself', async () => {
-  const { Company } = await import('../src/company');
-  const own = new Store(':memory:');
-  const company = new Company(own, Buffer.alloc(32, 3), 'file');
-  company.save({ ...company.get(), setupDone: true }, 'Finished the setup');
-  const app = http.createServer(createApp({ store: own, webDir, company }));
-  await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
-  const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
-  try {
-    const mac = own.addDevice('Employee Mac', 'mac');
-    const r = await fetch(`${url}/api/v1/admin-link`, { method: 'POST', headers: { Authorization: `Bearer ${mac.key}`, 'Content-Type': 'application/json' }, body: '{"client":"mac"}' });
-    assert.equal(r.status, 403);
-  } finally {
-    await new Promise((r) => app.close(r));
-    own.close();
-  }
-});
 
 describe('people: each person only ever sees their own data', () => {
   test('entries, workdays, timer, state and sync stay apart, also for the same date; a disabled person is locked out', async () => {
@@ -667,6 +547,109 @@ describe('people: each person only ever sees their own data', () => {
     assert.equal(again.listPeople().length, 1);
     assert.equal(again.get().entries.length, 1);
     again.close();
+  });
+});
+
+describe('accounts: admins, invitations, registration and sign-in (design step 2)', () => {
+  async function server(setup?: (own: Store) => void) {
+    const { Company } = await import('../src/company');
+    const own = new Store(':memory:');
+    const company = new Company(own, Buffer.alloc(32, 6), 'file');
+    setup?.(own);
+    const app = http.createServer(createApp({ store: own, webDir, company }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const go = async (method: string, p: string, body?: unknown, auth?: string, headers: Record<string, string> = {}) => {
+      const r = await fetch(`${url}/api/v1${p}`, { method, headers: { ...(auth && { Authorization: `Bearer ${auth}` }), ...(body !== undefined && { 'Content-Type': 'application/json' }), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+      return { status: r.status, body: (await r.json()) as any };
+    };
+    return { own, go, close: async () => (await new Promise((r) => app.close(r)), own.close()) };
+  }
+
+  test('the owner: password alone until there is an email, then email and password; members never get into the Admin page', async () => {
+    const { own, go, close } = await server((o) => o.setPassword(o.ownerId, 'owner password 1'));
+    try {
+      assert.deepEqual((await go('GET', '/admin/status')).body, { passwordSet: true, emailless: true });
+      const first = await go('POST', '/admin/login', { password: 'owner password 1' });
+      assert.equal(first.status, 201);
+      assert.equal(first.body.me.email, null);
+      assert.equal((await go('PATCH', '/admin/me', { email: 'Owner@Example.com', name: 'Alex' }, first.body.token)).body.me.email, 'owner@example.com');
+      assert.equal((await go('POST', '/admin/login', { password: 'owner password 1' })).status, 401, 'now the email is needed');
+      const admin = (await go('POST', '/admin/login', { email: 'owner@example.com', password: 'owner password 1' })).body.token;
+      assert.ok(admin);
+      // A member signs up and may not use the Admin page, by password or by a link from their device.
+      const invited = (await go('POST', '/admin/people', { email: 'anna@example.com', name: 'Anna' }, admin)).body.invite;
+      const code = String(invited.link).split('#invite=')[1];
+      assert.deepEqual((await go('GET', `/account/invite/${code}`)).body, { email: 'anna@example.com', name: 'Anna' });
+      const anna = await go('POST', '/account/register', { invite: code, name: 'Anna B.', password: 'anna password 1', device: true, client: 'mac', deviceName: 'Anna’s MacBook' });
+      assert.equal(anna.status, 201);
+      assert.equal((await go('POST', '/account/register', { invite: code, name: 'Again', password: 'whatever 12345' })).status, 404, 'an invitation works once');
+      assert.equal((await go('POST', '/admin/login', { email: 'anna@example.com', password: 'anna password 1' })).status, 403);
+      assert.equal((await go('POST', '/admin-link', { client: 'mac' }, anna.body.key)).status, 403);
+      const link = await go('POST', '/account-link', { client: 'mac' }, anna.body.key);
+      assert.match(link.body.path, /^\/account#code=/);
+      const sess = await go('POST', '/account/session', { code: link.body.path.split('code=')[1] });
+      assert.deepEqual([sess.body.me.email, sess.body.devices.map((d: any) => d.name)], ['anna@example.com', ['Anna’s MacBook']]);
+      // The Admin page sees Anna and her device; it can't demote or disable the last admin.
+      const people = (await go('GET', '/admin/people', undefined, admin)).body.people;
+      assert.deepEqual(people.map((x: any) => [x.email, x.role, x.status, x.devices.length]), [['owner@example.com', 'admin', 'active', 0], ['anna@example.com', 'member', 'active', 1]]);
+      assert.equal((await go('PATCH', `/admin/people/${own.ownerId}`, { role: 'member' }, admin)).status, 422);
+      // Disabled: signed out everywhere at once.
+      const annaId = people[1].id;
+      await go('PATCH', `/admin/people/${annaId}`, { status: 'disabled' }, admin);
+      assert.equal((await go('GET', '/state', undefined, anna.body.key)).status, 401);
+      assert.equal((await go('GET', '/account/me', undefined, sess.body.token)).status, 401);
+      assert.equal((await go('POST', '/account/device', { email: 'anna@example.com', password: 'anna password 1' })).status, 401);
+      // Removed: gone with her data; the owner can't be removed.
+      await go('PATCH', `/admin/people/${annaId}`, { status: 'active' }, admin);
+      assert.equal((await go('DELETE', `/admin/people/${annaId}`, undefined, admin)).body.people.length, 1);
+      assert.equal((await go('DELETE', `/admin/people/${own.ownerId}`, undefined, admin)).status, 422);
+    } finally {
+      await close();
+    }
+  });
+
+  test('who may register: invited only, with approval, or anyone; then email and password sign in the Mac and the phone', async () => {
+    const { own, go, close } = await server((o) => {
+      o.updatePerson(o.ownerId, { email: 'boss@example.com' });
+      o.setPassword(o.ownerId, 'boss password 1');
+    });
+    try {
+      const admin = (await go('POST', '/admin/login', { email: 'boss@example.com', password: 'boss password 1' })).body.token;
+      const form = { name: 'Ben', email: 'ben@example.com', password: 'ben password 12' };
+      assert.equal((await go('GET', '/account/config')).body.registration, 'invite');
+      assert.equal((await go('POST', '/account/register', form)).status, 403);
+      await go('PUT', '/admin/registration', { mode: 'approval' }, admin);
+      assert.equal((await go('POST', '/account/register', form)).status, 202, 'waits for approval');
+      assert.equal((await go('POST', '/account/device', { email: 'ben@example.com', password: 'ben password 12' })).status, 401);
+      const ben = (await go('GET', '/admin/people', undefined, admin)).body.people.find((x: any) => x.email === 'ben@example.com');
+      assert.equal(ben.status, 'pending');
+      await go('PATCH', `/admin/people/${ben.id}`, { status: 'active' }, admin);
+      // Signed in with email and password: a Mac and a phone, both Ben's.
+      const mac = await go('POST', '/account/device', { email: 'BEN@example.com', password: 'ben password 12', client: 'mac', deviceName: 'Ben’s Mac' });
+      const phone = await go('POST', '/account/device', { email: 'ben@example.com', password: 'ben password 12' }, undefined, { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1' });
+      assert.equal(phone.body.device.name, 'iPhone · Safari');
+      await go('POST', '/entries', { description: 'from the Mac', start: '2026-10-15T09:00:00Z', end: '2026-10-15T10:00:00Z' }, mac.body.key);
+      assert.equal((await go('GET', '/entries?from=2026-10-15', undefined, phone.body.key)).body[0].description, 'from the Mac');
+      // Open registration; an email can't be taken twice.
+      await go('PUT', '/admin/registration', { mode: 'open' }, admin);
+      assert.equal((await go('POST', '/account/register', form)).status, 409);
+      const cara = await go('POST', '/account/register', { name: 'Cara', email: 'cara@example.com', password: 'cara password 1' });
+      assert.equal(cara.status, 201);
+      assert.ok(cara.body.token);
+      // The account page: change the name; the email only with the password; the password with the current one.
+      assert.equal((await go('PATCH', '/account/me', { name: 'Cara C.' }, cara.body.token)).body.me.name, 'Cara C.');
+      assert.equal((await go('PATCH', '/account/me', { email: 'cara@new.example.com' }, cara.body.token)).status, 403);
+      assert.equal((await go('PATCH', '/account/me', { email: 'cara@new.example.com', password: 'cara password 1' }, cara.body.token)).body.me.email, 'cara@new.example.com');
+      assert.equal((await go('POST', '/account/password', { current: 'nope', password: 'another password' }, cara.body.token)).status, 403);
+      assert.equal((await go('POST', '/account/password', { current: 'cara password 1', password: 'another password' }, cara.body.token)).status, 200);
+      // Five wrong passwords lock signing in from that address for a while.
+      for (let i = 0; i < 5; i++) assert.equal((await go('POST', '/account/login', { email: 'cara@new.example.com', password: `wrong ${i} wrong` })).status, 401);
+      assert.equal((await go('POST', '/account/login', { email: 'cara@new.example.com', password: 'another password' })).status, 429);
+      assert.equal(own.listPeople().length, 3);
+    } finally {
+      await close();
+    }
   });
 });
 

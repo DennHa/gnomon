@@ -61,6 +61,17 @@ class HttpError extends Error {
   }
 }
 const bad = (message: string) => new HttpError(422, 'invalid', message);
+/** A plausible email address, lowercase, or a 422. */
+function validEmail(v: unknown): string {
+  const email = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) throw bad('Enter an email address like name@example.com');
+  return email;
+}
+function validPassword(v: unknown): string {
+  const pw = typeof v === 'string' ? v : '';
+  if (pw.length < 10 || pw.length > 200) throw bad('The password needs at least 10 characters');
+  return pw;
+}
 
 /** Who's asking, for rate limits: behind Cloudflare or a proxy its header, otherwise the connection. */
 function clientAddress(req: IncomingMessage): string {
@@ -190,6 +201,11 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
 
   function serverRoute(method: string, p: string, query: Record<string, string>, body: unknown, device: Device): ApiResponse | undefined {
     if (method === 'GET' && p === '/me') return { status: 200, body: { id: device.id, name: device.name } };
+    // Whose account this device is signed in to, for "Signed in as …" on the Mac.
+    if (method === 'GET' && p === '/me/account') {
+      const x = store.person(device.personId)!;
+      return { status: 200, body: { name: x.name, email: x.email, role: x.role } };
+    }
     // Your own devices (never anyone else's), e.g. so the Mac knows whether a phone is connected yet.
     if (method === 'GET' && p === '/me/devices')
       return { status: 200, body: store.listDevices().filter((d) => !d.revokedAt && d.personId === device.personId).map((d) => ({ id: d.id, name: d.name, client: d.client ?? null, lastSeenAt: d.lastSeenAt, current: d.id === device.id })) };
@@ -206,17 +222,15 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       const code = store.createPairCode(name, ttl, device.personId); // the new device joins the same person
       return { status: 201, body: { code: `${code.slice(0, 4)}-${code.slice(4)}`, name, expiresAt: new Date(Date.now() + ttl * 60_000).toISOString() } };
     }
-    if (method === 'POST' && p === '/admin-link') {
-      // A trusted device (usually the Mac) opens the Admin page without the terminal: a one-time link, 5 minutes.
-      const fromMac = isObj(body) && body.client === 'mac';
-      if (fromMac) store.setDeviceClient(device.id, 'mac');
-      // The first Mac to ask gets the right while nobody has it, on a private server (company setup not finished).
-      // A company server's admin hands it out on the page instead.
-      const claim = fromMac && !company?.get().setupDone;
-      if (!store.isAdminDevice(device.id, claim)) throw new HttpError(403, 'not_admin', 'This device may not open the Admin page. Allow it there first.');
-      const code = store.createAdminCode('admin', 5);
-      company?.save(company.get(), `Admin page opened from ${device.name}`);
-      return { status: 201, body: { path: `/admin#code=${code.slice(0, 4)}-${code.slice(4)}`, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() } };
+    if (method === 'POST' && (p === '/admin-link' || p === '/account-link')) {
+      // A signed-in device opens its person's account page, or (for an admin) the Admin page, in the browser,
+      // already signed in: a one-time link for 5 minutes.
+      if (isObj(body) && body.client === 'mac') store.setDeviceClient(device.id, 'mac');
+      const admin = p === '/admin-link';
+      if (admin && store.person(device.personId)?.role !== 'admin') throw new HttpError(403, 'not_admin', 'Only admins can open the Admin page.');
+      const code = store.createAdminCode(`${admin ? 'admin' : 'account'}:${device.personId}`, 5);
+      if (admin) company?.save(company.get(), `Admin page opened from ${device.name}`);
+      return { status: 201, body: { path: `/${admin ? 'admin' : 'account'}#code=${code.slice(0, 4)}-${code.slice(4)}`, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() } };
     }
     if (method === 'GET' && p === '/sync') return { status: 200, body: pull(query, device.personId) };
     if (method === 'POST' && p === '/sync') return { status: 200, body: push(body, device.personId) };
@@ -230,13 +244,37 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   // Access: the admin password (set once, see below), or a one-time code (from the server log, `gnomon-admin admin-link`
   // or the Mac's "Open server admin"), traded for a session that lives in memory for two hours after the last request.
   // A restart signs the admin out.
-  const adminSessions = new Map<string, number>();
+  // Browser sessions (Admin page and account page): always a person's, kept in memory for two hours after the last
+  // request; a restart signs everyone out of the browser (devices keep their keys).
+  const sessions = new Map<string, { personId: string; until: number }>();
   const ADMIN_SESSION_MS = 2 * 3_600_000;
   let adminFailures = 0;
   let adminLockedUntil = 0;
-  // Wrong passwords: five tries, then 15 minutes of nothing (also for the right one), against guessing.
-  let loginFailures = 0;
-  let loginLockedUntil = 0;
+  // Wrong passwords: five tries per address, then 15 minutes of nothing (also for the right one), against guessing.
+  const loginFails = new Map<string, { n: number; until: number }>();
+  function loginGuard(address: string) {
+    const f = loginFails.get(address);
+    if (f && f.until > Date.now()) throw new HttpError(429, 'too_many_attempts', 'Too many wrong passwords. Try again in 15 minutes.');
+  }
+  function loginFailed(address: string): never {
+    const f = loginFails.get(address);
+    const n = (f && f.until <= Date.now() && f.until !== 0 ? 0 : (f?.n ?? 0)) + 1;
+    loginFails.set(address, { n: n >= 5 ? 0 : n, until: n >= 5 ? Date.now() + PAIR_LOCK_MS : 0 });
+    throw new HttpError(401, 'wrong_password', 'That email or password isn’t right');
+  }
+  /** Email and password → the person, for anyone who may sign in (not invited-only, pending or disabled). */
+  function checkLogin(req: IncomingMessage, email: unknown, password: unknown, adminWithoutEmail = false) {
+    const address = clientAddress(req);
+    loginGuard(address);
+    const pw = typeof password === 'string' && password.length <= 200 ? password : '';
+    const em = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    // The owner from before people existed may not have an email yet: on the Admin page, the password alone.
+    const owner = store.person(store.ownerId)!;
+    const person = em ? store.personByEmail(em) : adminWithoutEmail && !owner.email ? owner : undefined;
+    if (!person || !pw || person.status !== 'active' || !store.checkPassword(person.id, pw)) loginFailed(address);
+    loginFails.delete(address);
+    return person;
+  }
   // Feedback limits, in memory (a restart forgets them, which is fine for spam protection).
   const feedbackLog = new Map<string, number[]>();
   let feedbackDay: number[] = [];
@@ -250,22 +288,35 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     feedbackDay.push(now);
     return true;
   }
-  const newSession = () => {
+  const newSession = (personId: string) => {
     const token = randomBytes(24).toString('base64url');
-    adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
+    sessions.set(token, { personId, until: Date.now() + ADMIN_SESSION_MS });
     return token;
   };
-
-  function adminSession(req: IncomingMessage): boolean {
+  const bearer = (req: IncomingMessage) => {
     const auth = String(req.headers.authorization ?? '');
-    const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-    const until = adminSessions.get(token);
-    if (!until || until < Date.now()) return false;
-    adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
-    return true;
+    return auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  };
+
+  /** The person a browser session belongs to (and still may sign in), or undefined. */
+  function sessionPerson(req: IncomingMessage) {
+    const token = bearer(req);
+    const sess = sessions.get(token);
+    if (!sess || sess.until < Date.now()) return undefined;
+    const person = store.person(sess.personId);
+    if (!person || person.status !== 'active') return undefined;
+    sess.until = Date.now() + ADMIN_SESSION_MS;
+    return person;
   }
 
-  function adminState() {
+  /** Sign a person out of every browser and every device. */
+  function signOutEverywhere(personId: string) {
+    for (const [token, sess] of sessions) if (sess.personId === personId) sessions.delete(token);
+    for (const d of store.listDevices()) if (!d.revokedAt && d.personId === personId) store.revokeDevice(d.id);
+  }
+
+  function adminState(meId: string) {
+    const me = store.person(meId)!;
     const c = company!.get();
     const release = readRelease(releasesDir);
     return {
@@ -274,34 +325,142 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       keySource: company!.keySource,
       release: release ? { version: release.version, size: release.size } : null,
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
-      passwordSet: store.hasAdminPassword(),
+      passwordSet: store.hasPassword(me.id),
       feedbackUnread: store.listFeedback().filter((t) => t.unread).length,
-      owner: (({ id, email, name }) => ({ id, email, name }))(store.person(store.ownerId)!),
+      me: { id: me.id, email: me.email, name: me.name },
+      registration: store.registration(),
+      pending: store.listPeople().filter((x) => x.status === 'pending').length,
     };
+  }
+
+  /**
+   * Everyone's own account (docs/accounts-design.md, section 3): registering (with an invitation, or as this server
+   * allows), signing in, signing in a device with email and password, and the account page's own routes.
+   */
+  function accountRoute(req: IncomingMessage, method: string, p: string, body: unknown): [number, unknown] {
+    const b = isObj(body) ? body : {};
+    const meOut = (personId: string) => {
+      const x = store.person(personId)!;
+      return {
+        me: { id: x.id, name: x.name, email: x.email, role: x.role },
+        devices: store.listDevices().filter((d) => !d.revokedAt && d.personId === x.id).map(({ id, name, client, lastSeenAt, createdAt }) => ({ id, name, client, lastSeenAt, createdAt })),
+      };
+    };
+    const signInDevice = (personId: string) => {
+      const ua = String(req.headers['user-agent'] ?? '');
+      const client = b.client === 'mac' ? 'mac' : /iPhone|iPad|Android|Mobile/i.test(ua) ? 'phone' : 'web';
+      const name = typeof b.deviceName === 'string' && b.deviceName.trim() ? b.deviceName.trim().slice(0, 60) : describeDevice(ua, b.standalone === true);
+      const { device, key } = store.addDevice(name, client, personId);
+      return { key, device: { id: device.id, name: device.name } };
+    };
+    if (method === 'GET' && p === '/account/config') return [200, { registration: store.registration(), name: company?.get().company.name || null }];
+    const inv = p.match(/^\/account\/invite\/([A-Za-z0-9-]{4,20})$/);
+    if (method === 'GET' && inv) {
+      const person = store.inviteFor(inv[1]);
+      if (!person || person.status !== 'invited') throw new HttpError(404, 'invalid_invite', 'This invitation is wrong, used or expired. Ask for a new one.');
+      return [200, { email: person.email, name: person.name }];
+    }
+    if (method === 'POST' && p === '/account/register') {
+      loginGuard(clientAddress(req));
+      const name = typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 80) : '';
+      if (!name) throw bad('Enter your name');
+      const password = validPassword(b.password);
+      const invite = typeof b.invite === 'string' && b.invite.trim() ? b.invite.trim() : '';
+      let person;
+      if (invite) {
+        const invited = store.inviteFor(invite);
+        if (!invited || invited.status !== 'invited') throw new HttpError(404, 'invalid_invite', 'This invitation is wrong, used or expired. Ask for a new one.');
+        // The invitation says who it's for; the email comes from it (it's the proof of the address).
+        const email = invited.email ?? validEmail(b.email);
+        store.updatePerson(invited.id, { name, email, status: 'active' });
+        store.useInvite(invite);
+        person = store.person(invited.id)!;
+      } else {
+        const mode = store.registration();
+        if (mode === 'invite') throw new HttpError(403, 'invite_only', 'This server only takes invited people. Ask its admin for an invitation.');
+        const email = validEmail(b.email);
+        if (store.personByEmail(email)) throw new HttpError(409, 'exists', 'There’s already an account with this email. Sign in instead.');
+        person = store.addPerson({ email, name, status: mode === 'open' ? 'active' : 'pending' });
+      }
+      store.setPassword(person.id, password);
+      company?.save(company.get(), `${person.email} signed up`);
+      if (person.status === 'pending') return [202, { pending: true }];
+      // Signing up from the Mac or the phone signs that device in at once; from the browser, a session.
+      return [201, b.device === true ? signInDevice(person.id) : { token: newSession(person.id), ...meOut(person.id) }];
+    }
+    if (method === 'POST' && p === '/account/login') {
+      const person = checkLogin(req, b.email, b.password);
+      return [201, { token: newSession(person.id), ...meOut(person.id) }];
+    }
+    if (method === 'POST' && p === '/account/device') {
+      // The Mac or the phone signs in with email and password and gets its own device key.
+      const person = checkLogin(req, b.email, b.password);
+      return [201, signInDevice(person.id)];
+    }
+    if (method === 'POST' && p === '/account/session') {
+      // A one-time link from a signed-in device ("Manage account" on the Mac).
+      const code = typeof b.code === 'string' && b.code.length <= 20 ? b.code : '';
+      const purpose = code ? store.redeemAdminCode(code) : undefined;
+      const personId = purpose?.startsWith('account:') ? purpose.slice(8) : undefined;
+      if (!personId || store.person(personId)?.status !== 'active') throw new HttpError(401, 'invalid_code', 'This link is wrong, was used already, or has expired');
+      return [201, { token: newSession(personId), ...meOut(personId) }];
+    }
+    const me = sessionPerson(req);
+    if (!me) throw new HttpError(401, 'unauthorized', 'Sign in again');
+    if (method === 'GET' && p === '/account/me') return [200, meOut(me.id)];
+    if (method === 'PATCH' && p === '/account/me') {
+      const name = typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 80) : undefined;
+      let email: string | undefined;
+      if (b.email !== undefined) {
+        email = validEmail(b.email);
+        // Until the server can send a confirmation (email server, step 3), changing it needs the password.
+        if (email !== me.email && !(typeof b.password === 'string' && store.checkPassword(me.id, b.password))) throw new HttpError(403, 'password_needed', 'Enter your password to change your email');
+        const other = store.personByEmail(email);
+        if (other && other.id !== me.id) throw bad('Another account already has this email');
+      }
+      store.updatePerson(me.id, { name, email });
+      return [200, meOut(me.id)];
+    }
+    if (method === 'POST' && p === '/account/password') {
+      if (store.hasPassword(me.id) && !(typeof b.current === 'string' && store.checkPassword(me.id, b.current))) throw new HttpError(403, 'wrong_password', 'Your current password isn’t right');
+      store.setPassword(me.id, validPassword(b.password));
+      return [200, meOut(me.id)];
+    }
+    const dev = p.match(/^\/account\/devices\/([\w-]{1,64})$/);
+    if (method === 'DELETE' && dev) {
+      const d = store.listDevices().find((x) => x.id === dev[1] && x.personId === me.id && !x.revokedAt);
+      if (!d) throw new HttpError(404, 'not_found', 'No such device');
+      store.revokeDevice(d.id);
+      return [200, meOut(me.id)];
+    }
+    if (method === 'DELETE' && p === '/account/session') {
+      sessions.delete(bearer(req));
+      return [200, { signedOut: true }];
+    }
+    if (method === 'POST' && p === '/account/signout-everywhere') {
+      signOutEverywhere(me.id);
+      return [200, { signedOut: true }];
+    }
+    throw new HttpError(404, 'not_found', 'Unknown account route');
   }
 
   async function adminRoute(req: IncomingMessage, method: string, p: string, body: unknown): Promise<[number, unknown]> {
     if (!company) throw new HttpError(404, 'not_found', 'Company setup isn’t available on this server');
-    // Before signing in: whether a password exists, so the page knows to show the login.
-    if (method === 'GET' && p === '/admin/status') return [200, { passwordSet: store.hasAdminPassword() }];
+    // Before signing in: whether any admin can sign in with a password, and whether the owner still has no email.
+    const admins = store.listPeople().filter((x) => x.role === 'admin' && x.status === 'active');
+    if (method === 'GET' && p === '/admin/status') return [200, { passwordSet: admins.some((x) => store.hasPassword(x.id)), emailless: !store.person(store.ownerId)!.email }];
     if (method === 'POST' && p === '/admin/login') {
-      if (Date.now() < loginLockedUntil) throw new HttpError(429, 'too_many_attempts', 'Too many wrong passwords. Try again in 15 minutes.');
-      const password = isObj(body) && typeof body.password === 'string' && body.password.length <= 200 ? body.password : '';
-      if (!password || !store.checkAdminPassword(password)) {
-        if (++loginFailures >= 5) {
-          loginFailures = 0;
-          loginLockedUntil = Date.now() + PAIR_LOCK_MS;
-        }
-        throw new HttpError(401, 'wrong_password', 'That password isn’t right');
-      }
-      loginFailures = 0;
-      return [201, { token: newSession(), ...adminState() }];
+      const person = checkLogin(req, isObj(body) ? body.email : undefined, isObj(body) ? body.password : undefined, true);
+      if (person.role !== 'admin') throw new HttpError(403, 'not_admin', 'This account isn’t an admin. Your own account is at /account.');
+      return [201, { token: newSession(person.id), ...adminState(person.id) }];
     }
     if (method === 'POST' && p === '/admin/session') {
       if (Date.now() < adminLockedUntil) throw new HttpError(429, 'too_many_attempts', 'Too many wrong codes. Try again in 15 minutes.');
       const code = isObj(body) && typeof body.code === 'string' && body.code.length <= 20 ? body.code : '';
       const purpose = code ? store.redeemAdminCode(code) : undefined;
-      if (!purpose || (purpose === 'setup' && company.get().setupDone)) {
+      // Codes from the log or the command line are the owner's; links from a device name their person.
+      const personId = purpose === 'setup' || purpose === 'admin' ? store.ownerId : purpose?.startsWith('admin:') ? purpose.slice(6) : undefined;
+      if (!purpose || !personId || store.person(personId)?.role !== 'admin' || (purpose === 'setup' && company.get().setupDone)) {
         if (++adminFailures >= PAIR_MAX_FAILURES) {
           adminFailures = 0;
           adminLockedUntil = Date.now() + PAIR_LOCK_MS;
@@ -310,25 +469,26 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
         throw new HttpError(401, 'invalid_code', 'This link is wrong, was used already, or has expired');
       }
       adminFailures = 0;
-      return [201, { token: newSession(), ...adminState() }];
+      return [201, { token: newSession(personId), ...adminState(personId) }];
     }
-    if (!adminSession(req)) throw new HttpError(401, 'unauthorized', 'Sign in again');
+    const me = sessionPerson(req);
+    if (!me) throw new HttpError(401, 'unauthorized', 'Sign in again');
+    if (me.role !== 'admin') throw new HttpError(403, 'not_admin', 'Only admins can use this page.');
     if (method === 'DELETE' && p === '/admin/session') {
-      const auth = String(req.headers.authorization ?? '');
-      adminSessions.delete(auth.slice(7).trim());
+      sessions.delete(bearer(req));
       return [200, { signedOut: true }];
     }
     if (method === 'POST' && p === '/admin/password') {
-      // Set or change the password; being signed in is the proof (a link from the Mac or the log works if it's forgotten).
+      // Your own password; being signed in is the proof (a link from the Mac or the log works if it's forgotten).
       const password = isObj(body) && typeof body.password === 'string' ? body.password : '';
       if (password.length < 10 || password.length > 200) throw bad('The password needs at least 10 characters');
-      store.setAdminPassword(password);
-      company.save(company.get(), 'Changed the admin password');
-      return [200, adminState()];
+      store.setPassword(me.id, password);
+      company.save(company.get(), `${me.name} changed their password`);
+      return [200, adminState(me.id)];
     }
 
     const c = company.get();
-    if (method === 'GET' && p === '/admin/state') return [200, adminState()];
+    if (method === 'GET' && p === '/admin/state') return [200, adminState(me.id)];
     if (method === 'PUT' && p === '/admin/config') {
       if (!isObj(body)) throw bad('Send the settings as an object');
       try {
@@ -336,7 +496,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       } catch (err) {
         throw bad((err as Error).message);
       }
-      return [200, adminState()];
+      return [200, adminState(me.id)];
     }
     if (method === 'POST' && p === '/admin/float') {
       const token = isObj(body) && typeof body.token === 'string' ? body.token.trim() : '';
@@ -345,7 +505,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       if (!r.ok) throw new HttpError(422, 'test_failed', r.error);
       company.setSecret('float', token);
       company.save({ ...c, float: { tested: new Date().toISOString(), people: r.people } }, 'Connected Float');
-      return [200, adminState()];
+      return [200, adminState(me.id)];
     }
     if (method === 'POST' && p === '/admin/personio') {
       const id = isObj(body) && typeof body.clientId === 'string' ? body.clientId.trim() : '';
@@ -357,13 +517,13 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       // Full-day absence types become days off by default; hourly ones stay manual.
       const dayOffTypes = c.personio.dayOffTypes ?? r.absenceTypes.filter((t) => t.unit !== 'HOUR').map((t) => t.id);
       company.save({ ...c, personio: { tested: new Date().toISOString(), people: r.people, absenceTypes: r.absenceTypes, dayOffTypes } }, 'Connected Personio');
-      return [200, { ...adminState(), morePeople: r.morePeople }];
+      return [200, { ...adminState(me.id), morePeople: r.morePeople }];
     }
     const which = p.match(/^\/admin\/(float|personio)$/)?.[1] as 'float' | 'personio' | undefined;
     if (method === 'DELETE' && which) {
       company.setSecret(which, null);
       company.save({ ...c, [which]: {} }, `Disconnected ${which === 'float' ? 'Float' : 'Personio'}`);
-      return [200, adminState()];
+      return [200, adminState(me.id)];
     }
     if (method === 'GET' && p === '/admin/profile') {
       if (!c.company.publicUrl) throw bad('Enter the server’s address first');
@@ -383,12 +543,10 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     const dev = p.match(/^\/admin\/devices\/([\w-]{1,64})$/)?.[1];
     if (method === 'PATCH' && dev) {
       const name = isObj(body) && typeof body.name === 'string' ? body.name.trim().slice(0, 60) : undefined;
-      const admin = isObj(body) && typeof body.admin === 'boolean' ? body.admin : undefined;
-      if (name === '') throw bad('A device needs a name');
-      if (admin === false && store.listDevices().filter((d) => !d.revokedAt && d.admin && d.id !== dev).length === 0) throw bad('At least one device must be able to open this page');
-      const d = store.updateDevice(dev, { name, admin });
+      if (!name) throw bad('A device needs a name');
+      const d = store.updateDevice(dev, { name });
       if (!d) throw new HttpError(404, 'not_found', 'No such device');
-      company.save(c, name !== undefined ? `Renamed a device to ${name}` : `${admin ? 'Allowed' : 'Stopped'} ${d.name} opening the Admin page`);
+      company.save(c, `Renamed a device to ${name}`);
       return [200, { devices: store.listDevices().filter((x) => !x.revokedAt) }];
     }
     if (method === 'DELETE' && dev) {
@@ -397,15 +555,69 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       company.save(c, `Disconnected ${d.name}`);
       return [200, { devices: store.listDevices().filter((x) => !x.revokedAt) }];
     }
-    if (method === 'PATCH' && p === '/admin/owner') {
-      // The owner's account (everything this server had before people existed): their email, asked once.
-      const email = isObj(body) && typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    if (method === 'PATCH' && p === '/admin/me') {
+      // The owner from before people existed has no email yet: asked once, then it's their sign-in.
+      const email = validEmail(isObj(body) ? body.email : undefined);
       const name = isObj(body) && typeof body.name === 'string' ? body.name.trim().slice(0, 80) : undefined;
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) throw bad('Enter an email address like name@example.com');
-      if (store.listPeople().some((x) => x.email === email && x.id !== store.ownerId)) throw bad('Another person already has this email');
-      store.updatePerson(store.ownerId, { email, ...(name && { name }) });
-      company.save(c, 'Set the owner’s email');
-      return [200, adminState()];
+      if (store.listPeople().some((x) => x.email === email && x.id !== me.id)) throw bad('Another person already has this email');
+      store.updatePerson(me.id, { email, ...(name && { name }) });
+      company.save(c, `${name || me.name} set their email`);
+      return [200, adminState(me.id)];
+    }
+    // People: everyone with an account, their devices, invitations, approvals, roles; who may register.
+    const peopleList = () => {
+      const devices = store.listDevices().filter((d) => !d.revokedAt);
+      return store.listPeople().map((x) => ({ ...x, owner: x.id === store.ownerId, hasPassword: store.hasPassword(x.id), devices: devices.filter((d) => d.personId === x.id).map(({ id, name, client, lastSeenAt, createdAt }) => ({ id, name, client, lastSeenAt, createdAt })) }));
+    };
+    const inviteLink = (code: string) => `${(c.company.publicUrl || `https://${String(req.headers.host ?? 'localhost')}`).replace(/\/+$/, '')}/account/register#invite=${code}`;
+    if (method === 'GET' && p === '/admin/people') return [200, { people: peopleList(), registration: store.registration() }];
+    if (method === 'POST' && p === '/admin/people') {
+      const email = validEmail(isObj(body) ? body.email : undefined);
+      const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 80) : email.split('@')[0];
+      const role = isObj(body) && body.role === 'admin' ? 'admin' : 'member';
+      if (store.personByEmail(email)) throw bad('There’s already an account with this email');
+      const person = store.addPerson({ email, name, role, status: 'invited' });
+      const code = store.createInvite(person.id);
+      company.save(c, `Invited ${email}`);
+      return [201, { people: peopleList(), invite: { personId: person.id, email, link: inviteLink(code), expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() } }];
+    }
+    const pid = p.match(/^\/admin\/people\/([\w-]{36})(\/invite)?$/);
+    if (pid) {
+      const target = store.person(pid[1]);
+      if (!target) throw new HttpError(404, 'not_found', 'No such person');
+      const otherAdmins = store.listPeople().filter((x) => x.role === 'admin' && x.status === 'active' && x.id !== target.id).length;
+      if (method === 'POST' && pid[2]) {
+        if (target.status !== 'invited') throw bad('This person has already signed up');
+        const code = store.createInvite(target.id);
+        company.save(c, `Invited ${target.email} again`);
+        return [201, { people: peopleList(), invite: { personId: target.id, email: target.email, link: inviteLink(code), expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() } }];
+      }
+      if (method === 'PATCH' && !pid[2]) {
+        const role = isObj(body) && (body.role === 'admin' || body.role === 'member') ? body.role : undefined;
+        const status = isObj(body) && (body.status === 'active' || body.status === 'disabled') ? body.status : undefined;
+        const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 80) : undefined;
+        if ((role === 'member' || status === 'disabled') && target.role === 'admin' && otherAdmins === 0) throw bad('At least one admin must stay');
+        if (status === 'active' && target.status === 'invited') throw bad('An invited person becomes active when they sign up');
+        store.updatePerson(target.id, { role, status, name });
+        if (status === 'disabled') signOutEverywhere(target.id);
+        company.save(c, `${status === 'disabled' ? 'Disabled' : status === 'active' ? (target.status === 'pending' ? 'Approved' : 'Enabled') : 'Changed'} ${target.email ?? target.name}`);
+        return [200, { people: peopleList(), registration: store.registration() }];
+      }
+      if (method === 'DELETE' && !pid[2]) {
+        if (target.id === me.id) throw bad('You can’t remove yourself');
+        if (target.id === store.ownerId) throw bad('The server’s first account stays');
+        signOutEverywhere(target.id);
+        store.removePerson(target.id);
+        company.save(c, `Removed ${target.email ?? target.name} and their data`);
+        return [200, { people: peopleList(), registration: store.registration() }];
+      }
+    }
+    if (method === 'PUT' && p === '/admin/registration') {
+      const mode = isObj(body) ? body.mode : undefined;
+      if (mode !== 'invite' && mode !== 'approval' && mode !== 'open') throw bad('mode must be invite, approval or open');
+      store.setRegistration(mode);
+      company.save(c, `Registration: ${mode}`);
+      return [200, { people: peopleList(), registration: store.registration() }];
     }
     // Feedback inbox: conversations, reading one marks it seen, replies, status, deleting.
     if (method === 'GET' && p === '/admin/feedback') return [200, { threads: store.listFeedback() }];
@@ -453,7 +665,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     if (method === 'POST' && p === '/admin/finish') {
       store.clearAdminCodes('setup'); // the setup link from the log stops working
       company.save({ ...c, setupDone: true }, 'Finished the setup');
-      return [200, adminState()];
+      return [200, adminState(me.id)];
     }
     throw new HttpError(404, 'not_found', 'Unknown admin route');
   }
@@ -528,6 +740,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
 
     // The setup wizard and Admin page have their own sign-in (a one-time admin code, then a short session).
     if (p === '/admin' || p.startsWith('/admin/')) return send(res, ...(await adminRoute(req, method, p, body)));
+    if (p.startsWith('/account/')) return send(res, ...accountRoute(req, method, p, body));
 
     const auth = String(req.headers.authorization ?? '');
     const device = auth.startsWith('Bearer ') ? store.authenticate(auth.slice(7).trim()) : undefined;
@@ -545,6 +758,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     let rel = decodeURIComponent(url.pathname);
     // The setup wizard and Admin page are their own small app; everything else is the phone app (no server routes).
     if (company && /^\/(setup|admin)\/?$/.test(rel)) rel = '/admin.html';
+    else if (/^\/account(\/register)?\/?$/.test(rel)) rel = '/account.html';
     else if (rel === '/' || !path.extname(rel)) rel = '/index.html';
     const file = path.resolve(webDir, `.${rel}`);
     if (!file.startsWith(path.resolve(webDir) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { error: 'not_found', message: 'Not found' });

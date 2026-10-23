@@ -1091,3 +1091,22 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .phone-steps { margin: 0 0 10px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
 .phone-done { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 0 20px; color: var(--ok); }
 .phone-done strong { color: var(--text); font-size: 17px; }
+/* Account: sign in or create one (first screen and Settings → Account) */
+.acc-form { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.acc-form .segmented { align-self: flex-start; }
+.acc-form .field input { width: 100%; box-sizing: border-box; }
+.acc-note { padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); }
+/* The account form inside the intro: stacked fields, the cards shrink once "With an account" is picked. */
+.tour .acc-form { gap: 8px; }
+.tour .acc-form .field { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin: 0; }
+.tour .acc-form .field > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.tour .acc-form .field input { padding: 8px 10px; }
+.tour .style-cards.compact { margin-top: 4px; }
+.tour .style-cards.compact .style-card { padding: 8px 12px; flex-direction: row; align-items: center; gap: 8px; }
+.tour .style-cards.compact .style-card .muted { display: none; }
+.tour .acc-form { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; row-gap: 8px; }
+.tour .acc-form > * { grid-column: 1 / -1; }
+.tour .acc-form > .field:has(input[type='email']), .tour .acc-form > .field:has(input[type='password']) { grid-column: auto; }
+.tour .acc-form .field input { width: 100%; box-sizing: border-box; }
+.tour .acc-form > .muted.small { margin: 0; }
+.tour .acc-form > .segmented { justify-self: start; }

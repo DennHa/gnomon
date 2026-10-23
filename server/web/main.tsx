@@ -142,6 +142,22 @@ function Pair({ onPaired }: { onPaired: (key: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
+  // Signing in with the account is the way in; a code from the Mac (or the QR code) stays as a second way.
+  const [withCode, setWithCode] = useState(Boolean(PAIR_FROM_LINK));
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  async function signIn(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      onPaired((await api.signIn(email.trim(), password)).key);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function pair(value: string, fromLink = false) {
     setBusy(true);
@@ -172,13 +188,34 @@ function Pair({ onPaired }: { onPaired: (key: string) => void }) {
     if (value) void pair(value);
   }
 
+  if (!withCode)
+    return (
+      <form className="pair" onSubmit={signIn}>
+        <div className="pair-logo">
+          <Icon name="timer" size={40} />
+        </div>
+        <h1>{t('pairTitle')}</h1>
+        <p className="muted">{t('pairHelp')}</p>
+        <input className="code login" type="email" autoComplete="username" placeholder={t('signInEmail')} value={email} onChange={(e) => setEmail(e.target.value)} aria-label={t('signInEmail')} />
+        <input className="code login" type="password" autoComplete="current-password" placeholder={t('signInPassword')} value={password} onChange={(e) => setPassword(e.target.value)} aria-label={t('signInPassword')} />
+        {error && <p className="error">{error}</p>}
+        <button className="primary big" disabled={busy || !email.trim() || !password}>
+          {t('signIn')}
+        </button>
+        <a className="muted small" href="/account/register">
+          {t('noAccount')}
+        </a>
+        <button type="button" className="link small" onClick={() => (setWithCode(true), setError(null))}>
+          {t('useCode')}
+        </button>
+      </form>
+    );
   return (
     <form className="pair" onSubmit={submit}>
       <div className="pair-logo">
         <Icon name="timer" size={40} />
       </div>
       <h1>{t('pairTitle')}</h1>
-      <p className="muted">{t('pairHelp')}</p>
       <button type="button" className="primary big" onClick={() => setScanning(true)} disabled={busy}>
         <Icon name="qr_code_scanner" size={26} /> {t('scanQr')}
       </button>

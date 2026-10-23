@@ -52,6 +52,8 @@ import i_hourglass_top from '@material-symbols/svg-400/rounded/hourglass_top.svg
 import i_waving_hand from '@material-symbols/svg-400/rounded/waving_hand.svg?raw';
 import i_person from '@material-symbols/svg-400/rounded/person.svg?raw';
 import i_mobile from '@material-symbols/svg-400/rounded/mobile.svg?raw';
+import i_devices from '@material-symbols/svg-400/rounded/devices.svg?raw';
+import i_laptop_mac from '@material-symbols/svg-400/rounded/laptop_mac.svg?raw';
 import i_admin_panel_settings from '@material-symbols/svg-400/rounded/admin_panel_settings.svg?raw';
 import i_science from '@material-symbols/svg-400/rounded/science.svg?raw';
 import i_link from '@material-symbols/svg-400/rounded/link.svg?raw';
@@ -112,6 +114,8 @@ const ICONS = {
   waving_hand: i_waving_hand,
   person: i_person,
   mobile: i_mobile,
+  devices: i_devices,
+  laptop_mac: i_laptop_mac,
   admin_panel_settings: i_admin_panel_settings,
   science: i_science,
   link: i_link,

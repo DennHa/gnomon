@@ -47,6 +47,10 @@ declare global {
       serverPairCode(name: string): Promise<ServerResult<{ code: string; expiresAt: string; link: string }>>;
       /** Opens the server's Admin page in the browser, signed in. */
       serverAdminLink(): Promise<ServerResult<object>>;
+      serverSignIn(url: string, email: string, password: string): Promise<ServerResult<ServerStatus & { pending?: boolean }>>;
+      serverRegister(form: { url: string; invite?: string; name: string; email: string; password: string }): Promise<ServerResult<ServerStatus & { pending?: boolean }>>;
+      serverAccount(): Promise<{ name: string; email: string | null; role: 'admin' | 'member' } | null>;
+      serverAccountLink(): Promise<ServerResult<object>>;
       serverMyDevices(): Promise<ServerResult<{ devices: { id: string; name: string; client: string | null; lastSeenAt: string | null; current: boolean }[] }>>;
       feedbackAvailable(): Promise<boolean>;
       feedbackSend(msg: { text: string; sender?: string; withInfo: boolean }): Promise<ServerResult<object>>;

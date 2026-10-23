@@ -202,3 +202,7 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
   display: flex; flex-direction: column; gap: 12px; color: #fff; text-align: center; }
 .scan-bottom p { margin: 0; }
 .scan-bottom .soft { background: rgba(255, 255, 255, 0.16); color: #fff; }
+/* Signing in with the account */
+.pair input.code.login { text-transform: none; letter-spacing: normal; font-size: 17px; }
+.pair a.small { text-align: center; color: var(--accent-strong); }
+.pair button.link { border: 0; background: none; color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer; }

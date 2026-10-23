@@ -7,6 +7,7 @@ import { Icon, type IconName } from '../icons';
 import { t, type MsgKey } from '../i18n';
 import { prettyAccel } from '../shortcuts';
 import { workStyleDefaults } from '../actions';
+import AccountForm from './AccountForm';
 import type { WorkStyle } from '../types';
 // Close-ups rendered from the demo screenshots (scripts/hero-shots.cjs), scaled down for the app.
 import imgTimer from '../assets/tour/timer.jpg';
@@ -15,7 +16,9 @@ import imgSwitcher from '../assets/tour/switcher.png';
 import imgWeek from '../assets/tour/week.jpg';
 import imgBalance from '../assets/tour/balance.jpg';
 
-type Step = { icon: IconName; title: MsgKey; text: MsgKey; img?: string; choice?: boolean; name?: boolean };
+type Step = { icon: IconName; title: MsgKey; text: MsgKey; img?: string; choice?: boolean; name?: boolean; use?: boolean };
+/** First of all: on this Mac only, or with an account (Mac, phone and web). A company Mac goes straight to sign-in. */
+const USE: Step = { icon: 'devices', title: 'tour.useTitle', text: 'tour.useText', use: true };
 const WELCOME: Step = { icon: 'waving_hand', title: 'tour.welcomeTitle', text: 'tour.welcomeText', img: imgTimer };
 /** Your name, for the morning greeting and CSV exports; skipping leaves it out. */
 const NAME: Step = { icon: 'person', title: 'tour.nameTitle', text: 'tour.nameText', name: true };
@@ -29,7 +32,7 @@ const LATER_LIVE: Step = { ...LATER, text: 'tour.laterTextLive' };
 const TRACK_CLOCK: Step = { ...TRACK, text: 'tour.trackTextClock' };
 const BALANCE: Step = { icon: 'savings', title: 'tour.balanceTitle', text: 'tour.balanceText', img: imgBalance };
 /** After the welcome you pick how you work; the steps then follow that way of working. */
-const stepsFor = (style?: WorkStyle): Step[] => [WELCOME, NAME, STYLE, ...(style === 'live' ? [TRACK, DAY_LIVE, LATER_LIVE] : [DAY, LATER, TRACK_CLOCK]), BALANCE];
+const stepsFor = (style?: WorkStyle): Step[] => [USE, WELCOME, NAME, STYLE, ...(style === 'live' ? [TRACK, DAY_LIVE, LATER_LIVE] : [DAY, LATER, TRACK_CLOCK]), BALANCE];
 const STEP_COUNT = stepsFor().length;
 
 /** The step to open with, e.g. "#tour@3" for screenshots. */
@@ -50,6 +53,7 @@ export default function Tour() {
   };
   const setStep = (n: number) => (saveName(), setStepRaw(n));
   const STEPS = stepsFor(data.settings.workStyle);
+  const [withAccount, setWithAccount] = useState(Boolean(profile?.serverUrl));
   const last = step === STEPS.length - 1;
   const choose = (style: WorkStyle) => {
     update((d) => ({ ...d, settings: { ...d.settings, ...workStyleDefaults(style) } }));
@@ -103,6 +107,25 @@ export default function Tour() {
               onChange={(e) => setNameDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && setStep(step + 1)}
             />
+          )}
+          {s.use && (
+            <>
+              {!profile?.serverUrl && (
+                <div className={`style-cards ${withAccount ? 'compact' : ''}`}>
+                  <button className="style-card" onClick={() => (setWithAccount(false), setStep(step + 1))}>
+                    <Icon name="laptop_mac" size={26} />
+                    <strong>{t('tour.useLocal')}</strong>
+                    <span className="muted small">{t('tour.useLocalText')}</span>
+                  </button>
+                  <button className={`style-card ${withAccount ? 'active' : ''}`} onClick={() => setWithAccount(true)}>
+                    <Icon name="devices" size={26} />
+                    <strong>{t('tour.useAccount')}</strong>
+                    <span className="muted small">{t('tour.useAccountText')}</span>
+                  </button>
+                </div>
+              )}
+              {withAccount && <AccountForm onDone={() => setStep(step + 1)} />}
+            </>
           )}
           {s.choice && (
             <div className="style-cards">

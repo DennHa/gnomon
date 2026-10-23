@@ -1,7 +1,12 @@
 // English and German, following the phone's language.
 const en = {
-  pairTitle: 'Connect this device',
-  pairHelp: 'Scan the QR code from Gnomon on the Mac (Settings → Connections) or from another phone, or type the code.',
+  pairTitle: 'Sign in to Gnomon',
+  pairHelp: 'With the email and password of your Gnomon account.',
+  signInEmail: 'Email',
+  signInPassword: 'Password',
+  signIn: 'Sign in',
+  noAccount: 'No account yet? Create one',
+  useCode: 'Have a code from the Mac instead?',
   pairCode: 'Pairing code',
   pairButton: 'Connect',
   pairOrKey: 'Or paste a device key',
@@ -86,8 +91,13 @@ const en = {
 };
 type Key = keyof typeof en;
 const de: Record<Key, string> = {
-  pairTitle: 'Dieses Gerät verbinden',
-  pairHelp: 'Scanne den QR-Code aus Gnomon am Mac (Einstellungen → Verbindungen) oder von einem anderen Handy, oder gib den Code ein.',
+  pairTitle: 'Bei Gnomon anmelden',
+  pairHelp: 'Mit der E-Mail und dem Passwort deines Gnomon-Kontos.',
+  signInEmail: 'E-Mail',
+  signInPassword: 'Passwort',
+  signIn: 'Anmelden',
+  noAccount: 'Noch kein Konto? Hier anlegen',
+  useCode: 'Lieber mit einem Code vom Mac?',
   pairCode: 'Kopplungscode',
   pairButton: 'Verbinden',
   pairOrKey: 'Oder einen Geräteschlüssel einfügen',

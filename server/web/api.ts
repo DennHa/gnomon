@@ -92,6 +92,9 @@ export const api = {
   pair: (code: string) =>
     call<{ key: string; device: { name: string } }>('POST', '/pair', { code, standalone: window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true }, null),
   forgetDevice: () => call('DELETE', '/me'),
+  /** Sign this phone in with the account's email and password; it gets its own device key. */
+  signIn: (email: string, password: string) =>
+    call<{ key: string; device: { name: string } }>('POST', '/account/device', { email, password, standalone: window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true }, null),
   me: (key: string) => call<{ name: string }>('GET', '/me', undefined, key),
   entries: (from: string, to = from) => call<Entry[]>('GET', `/entries?from=${from}&to=${to}`),
   workdays: (from: string, to = from) => call<Workday[]>('GET', `/workdays?from=${from}&to=${to}`),
