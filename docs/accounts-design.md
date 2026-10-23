@@ -56,7 +56,9 @@ Admin routes check the person's role instead of today's separate admin flag on t
   server and email).
 - A **company Mac** (with a settings profile from IT) skips the choice and goes straight to the company's sign-in.
 
-**Register** asks for the server's address first (the company's, or one you run). Each server decides who may
+**Register** asks for the server's address first (the company's, or one you run). On a company Mac the address comes
+from the settings profile (`serverUrl`), so nobody types it. Everyone else sees a hint below the field: *No server?
+Use Gnomon on this Mac only, or set up your own*, linking to the server guide (server/README.md). Each server decides who may
 register, under Admin → Settings → People:
 
 - **Invited only** (the default, and for company servers): register with the invitation link or code; the email
