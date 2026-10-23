@@ -3,6 +3,18 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.13 · 2026-10-23
+
+- **Start your way:** the first screen asks whether you use Gnomon on this Mac only, or with an account on a Gnomon
+  server, so your Mac, phone and browser stay in step.
+- **Sign in with email and password** on the Mac (Settings → Connections → Account) and on your phone. A code from
+  the Mac still works too.
+- **Your account page** on the server: change your name, email and password, see your devices, and sign out
+  everywhere at once.
+- **Invite people:** the server's admin has a People page. Invite someone with a link, approve new accounts, make
+  someone an admin, or disable an account. Each server decides who may register: invited only, with approval, or
+  anyone. Admins never see anyone else's times.
+
 ## 0.1.12 · 2026-10-23
 
 - **Connect your phone** from the sidebar: while your Mac is connected to a Gnomon server and no phone is yet, a small
