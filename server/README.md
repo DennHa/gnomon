@@ -25,6 +25,36 @@ What the phone can do:
 - **Device:** which device this is, "Connect another device" (shows a QR code), and "Disconnect", which revokes its key.
 - Follows the phone's language (English/German) and dark mode. The app shell works offline; tracking needs the server.
 
+## Web app (`/app`)
+
+**`/app`** is the Mac app's own interface (Track, Week, Reports, Projects, Settings) in a laptop browser, signed in
+with the account's email and password, on that person's data on this server. Changes reach the Mac and the phone on
+their next sync, and theirs show up here (every minute, or on reload). It's built with the server (`npm run build`
+writes `dist/web/app/`), so nothing else needs setting up.
+
+- **What's not there:** what needs the Mac: menu bar, global shortcuts and the quick switcher, idle detection, the
+  activity trail, Float and Personio, the local API, pairing a phone, updates and feedback. Appearance follows the
+  system. No offline mode: the page needs the server.
+- **Sessions:** signing in makes a device of yours, listed on the account page as "Browser · Safari" (or Chrome,
+  Firefox…), so removing it there or *Sign out everywhere* ends the session. Its key is only in a cookie,
+  `__Host-gnomon_session`: HttpOnly (scripts can't read it), Secure (HTTPS only; browsers also allow it on
+  `http://localhost`), SameSite=Strict, scoped to this host. It lasts 30 days and starts over each time the app
+  opens, so it ends after 30 days unused. *Sign out* in Settings → Account revokes it.
+- **CSRF:** requests with the cookie also need the token from `/web/login` or `/web/session` in an `X-Gnomon-CSRF`
+  header (other sites can't read it), and when the browser sends `Origin` or `Sec-Fetch-Site`, they must say this
+  server. Wrong passwords lock like everywhere else (5 tries, then 15 minutes).
+- **Content-Security-Policy:** scripts, styles, images and requests only from this server; no inline scripts or
+  styles, no framing.
+- *Forgot your password?* opens `/account/forgot`, which sends a reset link by email.
+
+| Method & path | What it does |
+|---|---|
+| `POST /web/login` | `{ email, password }` → `{ csrf, me, device }` and the session cookie. |
+| `GET /web/session` | With the cookie: `{ csrf, me, device }` (renews the cookie), or 401. |
+| `POST /web/logout` | Revokes the session's device and clears the cookie. |
+
+With the cookie and the token, every other route under `/api/v1` works as for a device key.
+
 ## Run it locally
 
 ```bash
@@ -259,8 +289,8 @@ limits. In addition, the server has:
 | `POST /activities` | `{ name, color? }`, creates an activity or returns the one with that name. |
 | `POST /day/break` | Start or end a break (stops the timer, like the Mac app). |
 | `POST /timer/activity` | `{ activityId }`, switches the running timer to another activity. |
-| `GET /sync?since=<cursor>&limit=` | Changes since a cursor (see below). |
-| `POST /sync` | Push changes from another copy of the data (see below). |
+| `GET /sync?since=<cursor>&limit=` | Changes since a cursor, and the account settings (see below). |
+| `POST /sync` | Push changes from another copy of the data, and changed account settings (see below). |
 | `GET /healthz` | Liveness, no key (used by Docker). |
 
 ### Sync (used by the Mac app)
@@ -295,8 +325,21 @@ It remembers the cursor and the last agreed version of every record (`server-syn
 on both sides between two syncs, the later edit wins: the Mac notes when each record changed there, the server stamps
 the phone's changes (a Mac edit made before a restart counts as made at the next sync). The very first sync joins projects and activities with the
 same name (the Mac's ids stay), drops the server's unused starter activities, and combines a day stamped on both
-devices (earliest arrival, latest leaving). Float plans, settings and the activity trail stay on the Mac.
-Status and "Sync now" are in the same Settings card.
+devices (earliest arrival, latest leaving). Float plans, the device's own settings and the activity trail stay on the
+Mac. Status and "Sync now" are in the same Settings card.
+
+**Account settings:** with an account, the server is where the settings that belong to the person live, so every
+Mac, the phone and the web app use the same ones: language, daily target and work schedule, starting balance, your
+name, the way of working, reminders and the morning welcome, activities and billable on or off, clocking in and
+reviewing on leave, stopping at midnight, and the weeks marked done (`ACCOUNT_SETTINGS` in `src/sync.ts`). Menu bar,
+shortcuts, idle detection, appearance and the Float/Personio connections stay per device.
+
+- Every pull has `"account": { "values": { … }, "updatedAt": "…" }`, or `null` while no device has sent any.
+- A push may carry `"account": { values, updatedAt }`; it's taken if it's newer than the server's (unknown keys are
+  dropped), also into the person's settings for the phone and the API. The answer has the server's current `account`.
+- The first Mac to sync gives the account its settings. A Mac that signs in later, or a second Mac, takes the
+  account's instead of overwriting them. After that, when both sides changed them between two syncs, the later change
+  wins, as for records.
 
 ## Layout
 
@@ -304,11 +347,12 @@ Status and "Sync now" are in the same Settings card.
 server/
   src/store.ts       SQLite: records (JSON + seq + updatedAt + tombstones), devices, pairing codes
   src/app.ts         HTTP: auth, body limits, server-only routes, sync, static files with CSP
+  src/web.ts         the web app's session cookie and CSRF checks (/app; the app itself is ../src/web)
   src/mail.ts        sending email: SMTP (own small client) and Microsoft Graph
   src/emails.ts      the emails' texts (English, German)   src/invites.ts  inviting a list of people
   src/server.ts      entry point          src/admin.ts   gnomon-admin CLI
   roadmap/           the /roadmap page, rendered from docs/ROADMAP.md at build time
-  web/               the PWA (React, bundled with esbuild; Material Symbols inlined)
+  web/               the PWA (React, bundled with esbuild; Material Symbols inlined), the account and Admin pages
   tests/             node:test end-to-end tests
   Dockerfile, docker-compose.yml, deploy/deploy-to-pi.sh
 ```

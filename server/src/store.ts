@@ -597,7 +597,7 @@ export class Store {
     if (id === this.ownerId || !this.person(id)) return false;
     this.db.transaction(() => {
       for (const t of ['records', 'devices', 'pair_codes', 'invites', 'password_resets']) this.db.prepare(`DELETE FROM ${t} WHERE person_id = ?`).run(id);
-      this.db.prepare('DELETE FROM meta WHERE key IN (?, ?)').run(`settings:${id}`, `seeded:${id}`);
+      this.db.prepare('DELETE FROM meta WHERE key IN (?, ?, ?)').run(`settings:${id}`, `seeded:${id}`, `account:${id}`);
       this.db.prepare('DELETE FROM people WHERE id = ?').run(id);
     })();
     this.slots.delete(id);

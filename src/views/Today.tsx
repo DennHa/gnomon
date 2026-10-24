@@ -9,6 +9,7 @@ import { dayKey, entryMs, fmtClock, fmtDayLong, useNow } from '../time';
 import { DayReview, ProjectGoals, StaleBanner } from './day';
 import { t } from '../i18n';
 import { prettyAccel } from '../shortcuts';
+import { isWeb } from '../platform';
 
 function greeting(now: number) {
   const h = new Date(now).getHours();
@@ -156,7 +157,7 @@ export default function Today({ onOpenDay, onOpenProjects }: { onOpenDay: (d: st
           <h3>{t('entries')}</h3>
           <span className="muted">{t('today.totalTime', { time: fmtClock(tracked) })}</span>
         </div>
-        {entries.length === 0 && <p className="muted empty-state">{t('today.empty', { key: prettyAccel(data.settings.shortcuts.quick) || '—' })}</p>}
+        {entries.length === 0 && <p className="muted empty-state">{isWeb() ? t('today.emptyWeb') : t('today.empty', { key: prettyAccel(data.settings.shortcuts.quick) || '—' })}</p>}
         <EntryFeed day={today} entries={entries} mode="times" />
         <button className="link-add" onClick={() => update((d) => addEntry(d, today))}>
           + {t('today.addEntry')}

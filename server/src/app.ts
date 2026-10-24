@@ -5,11 +5,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { handleApiRequest, type ApiRequest, type ApiResponse } from '../../src/api';
 import { phoneApi } from '../../src/phone';
-import type { Data, Entry } from '../../src/types';
+import type { Data, Entry, Settings } from '../../src/types';
+import { ACCOUNT_SETTINGS, type AccountSettings, type RemoteAccount } from '../../src/sync';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
 import { pickLang, readRelease, releasePage } from './releases';
 import { applyConfigUpdate, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
 import { randomBytes } from 'node:crypto';
+import { clearSessionCookie, csrfFor, csrfOk, sameOrigin, sessionCookie, setSessionCookie, webDeviceName } from './web';
 import { resetEmail, testEmail, type Lang } from './emails';
 import { invitePeople, sendInvitation, type InviteDeps } from './invites';
 import { MailError, type Transport } from './mail';
@@ -49,6 +51,9 @@ const MIME: Record<string, string> = {
   '.woff2': 'font/woff2',
   '.jpeg': 'image/jpeg',
 };
+
+// The web app (/app): like the phone app's, without the camera; forms only post to this server.
+const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 // The web demo (/example) is the Mac app's own interface, which sets some styles inline; it never talks to the server.
 // The one-page site (/about): static, nothing inline, nothing from elsewhere.
@@ -96,9 +101,9 @@ export function describeDevice(ua: string, standalone = false): string {
 }
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function send(res: ServerResponse, status: number, body: unknown) {
+function send(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
   const json = JSON.stringify(body);
-  res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(json) });
+  res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(json), ...headers });
   res.end(json);
 }
 
@@ -175,7 +180,40 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     const changes = store.changesSince(since, limit + 1, personId);
     const more = changes.length > limit;
     const page = changes.slice(0, limit);
-    return { cursor: page.length ? page[page.length - 1].seq : Math.max(since, 0), more, changes: page.map(({ seq: _seq, ...c }) => c) };
+    return { cursor: page.length ? page[page.length - 1].seq : Math.max(since, 0), more, changes: page.map(({ seq: _seq, ...c }) => c), account: remoteAccount(personId) };
+  }
+
+  // Account settings (src/sync.ts): the person's targets, schedule, balance, language…, the same on every device. Kept
+  // with the time they last changed; also put into the person's Data, so the phone and the API use the same targets.
+  function remoteAccount(personId: string): RemoteAccount | null {
+    const raw = store.getMeta(`account:${personId}`);
+    return raw ? (JSON.parse(raw) as RemoteAccount) : null;
+  }
+
+  /** Pushed account settings, checked: only the known keys. */
+  function validAccount(a: unknown): RemoteAccount {
+    if (!isObj(a) || !isObj(a.values) || typeof a.updatedAt !== 'string' || Number.isNaN(Date.parse(a.updatedAt))) throw bad('account must be { values, updatedAt }');
+    const updatedAt = new Date(a.updatedAt).toISOString();
+    if (updatedAt > new Date(Date.now() + 5 * 60_000).toISOString()) throw bad('account.updatedAt is in the future; check the device clock');
+    const values: Record<string, unknown> = {};
+    for (const k of ACCOUNT_SETTINGS) if (a.values[k] !== undefined) values[k] = a.values[k];
+    const weeks = a.values.reviewedWeeks;
+    if (weeks !== undefined) {
+      if (!Array.isArray(weeks) || weeks.length > 5000 || !weeks.every((w) => typeof w === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w))) throw bad('account.values.reviewedWeeks must be dates (YYYY-MM-DD)');
+      values.reviewedWeeks = weeks;
+    }
+    if (JSON.stringify(values).length > 64 * 1024) throw bad('account.values is too large');
+    return { values: values as AccountSettings, updatedAt };
+  }
+
+  /** Take account settings if they're newer than the server's (last writer wins, like records). */
+  function pushAccount({ values, updatedAt }: RemoteAccount, personId: string) {
+    const current = remoteAccount(personId);
+    if (current && current.updatedAt >= updatedAt) return;
+    store.setMeta(`account:${personId}`, JSON.stringify({ values, updatedAt }));
+    const { reviewedWeeks: _w, ...settings } = values;
+    const d = store.get(personId);
+    store.commit({ ...d, settings: { ...d.settings, ...settings } as Settings }, undefined, personId);
   }
 
   function validRecord(kind: Kind, id: string, data: unknown): boolean {
@@ -195,6 +233,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   function push(body: unknown, personId: string) {
     if (!isObj(body) || !Array.isArray(body.changes)) throw bad('Send { "changes": [ { kind, id, updatedAt, deleted, data } ] }');
     if (body.changes.length > 20_000) throw bad('At most 20000 changes per request');
+    const account = body.account !== undefined ? validAccount(body.account) : undefined;
     const d = store.get(personId);
     const lists = Object.fromEntries(KINDS.map((k) => [k, new Map((d[k] as { id?: string; date?: string }[]).map((r) => [keyOf(k, r as never), r]))])) as Record<Kind, Map<string, unknown>>;
     const stamps = new Map<string, string>();
@@ -220,7 +259,8 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     let next = { ...d, ...Object.fromEntries(KINDS.map((k) => [k, [...lists[k].values()]])) } as Data;
     next = oneRunningTimer(next, stamps);
     store.commit(next, (kind, id) => stamps.get(`${kind}:${id}`) ?? new Date().toISOString(), personId);
-    return { applied, skipped, cursor: store.cursor() };
+    if (account) pushAccount(account, personId);
+    return { applied, skipped, cursor: store.cursor(), account: remoteAccount(personId) };
   }
 
   /** Two devices may each have started a timer while offline: keep the newest, end the others when it began. */
@@ -896,9 +936,11 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     // The setup wizard and Admin page have their own sign-in (a one-time admin code, then a short session).
     if (p === '/admin' || p.startsWith('/admin/')) return send(res, ...(await adminRoute(req, method, p, body)));
     if (p.startsWith('/account/')) return send(res, ...accountRoute(req, method, p, body));
+    if (p.startsWith('/web/')) return webRoute(req, res, method, p, body);
 
+    // Devices send their key; the web app's session cookie works for the same routes, with the CSRF checks (web.ts).
     const auth = String(req.headers.authorization ?? '');
-    const device = auth.startsWith('Bearer ') ? store.authenticate(auth.slice(7).trim()) : undefined;
+    const device = auth.startsWith('Bearer ') ? store.authenticate(auth.slice(7).trim()) : webDevice(req);
     if (!device) throw new HttpError(401, 'unauthorized', 'Missing or wrong API key');
 
     const query = Object.fromEntries(url.searchParams);
@@ -906,6 +948,42 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     const r = own ?? scoped(device.personId).api(method, p, query, body);
     if (r.status === 200 && p === '/health') (r.body as Record<string, unknown>).server = true;
     send(res, r.status, r.body);
+  }
+
+  // ---- The web app's sessions (web.ts) ---------------------------------------------------------------------
+
+  /** The web session's device, when the request has the cookie, the CSRF token and comes from this server. */
+  function webDevice(req: IncomingMessage): Device | undefined {
+    const key = sessionCookie(req);
+    if (!key) return undefined;
+    if (!sameOrigin(req) || !csrfOk(req, key)) throw new HttpError(403, 'csrf', 'This request didn’t come from the Gnomon web app. Reload the page.');
+    const device = store.authenticate(key);
+    return device?.client === 'web' ? device : undefined;
+  }
+
+  function webRoute(req: IncomingMessage, res: ServerResponse, method: string, p: string, body: unknown) {
+    if (!sameOrigin(req)) throw new HttpError(403, 'csrf', 'This request didn’t come from the Gnomon web app.');
+    const out = (key: string, personId: string, deviceId: string) => {
+      const x = store.person(personId)!;
+      return { csrf: csrfFor(key), me: { name: x.name, email: x.email, role: x.role }, device: deviceId };
+    };
+    if (method === 'POST' && p === '/web/login') {
+      const b = isObj(body) ? body : {};
+      const person = checkLogin(req, b.email, b.password);
+      const { device, key } = store.addDevice(webDeviceName(String(req.headers['user-agent'] ?? '')), 'web', person.id);
+      return send(res, 201, out(key, person.id, device.id), { 'Set-Cookie': setSessionCookie(key) });
+    }
+    const key = sessionCookie(req);
+    const device = key ? store.authenticate(key) : undefined;
+    if (!device || device.client !== 'web') return send(res, 401, { error: 'unauthorized', message: 'Sign in again' }, key ? { 'Set-Cookie': clearSessionCookie() } : {});
+    // Loading the app: who's signed in and the CSRF token; the cookie starts its 30 days over.
+    if (method === 'GET' && p === '/web/session') return send(res, 200, out(key, device.personId, device.id), { 'Set-Cookie': setSessionCookie(key) });
+    if (!csrfOk(req, key)) throw new HttpError(403, 'csrf', 'This request didn’t come from the Gnomon web app. Reload the page.');
+    if (method === 'POST' && p === '/web/logout') {
+      store.revokeDevice(device.id);
+      return send(res, 200, { signedOut: true }, { 'Set-Cookie': clearSessionCookie() });
+    }
+    throw new HttpError(404, 'not_found', 'Unknown web route');
   }
 
   function serveStatic(req: IncomingMessage, res: ServerResponse, url: URL) {
@@ -1002,6 +1080,8 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       if (url.pathname === '/example' || url.pathname.startsWith('/example/'))
         return serveFolder(req, res, url, '/example', demoDir, { 'X-Frame-Options': 'SAMEORIGIN', 'Content-Security-Policy': DEMO_CSP });
       if (url.pathname === '/about' || url.pathname.startsWith('/about/')) return serveFolder(req, res, url, '/about', siteDir, { 'Content-Security-Policy': SITE_CSP });
+      // The web app: the Mac app's interface, built into web/app/ (scripts/build.mjs), signed in with a cookie (web.ts).
+      if (url.pathname === '/app' || url.pathname.startsWith('/app/')) return serveFolder(req, res, url, '/app', webDir && path.join(webDir, 'app'), { 'Content-Security-Policy': APP_CSP });
       // The roadmap page links its stylesheet absolutely, so /roadmap is served as it is, without the redirect.
       if (url.pathname === '/roadmap' || url.pathname.startsWith('/roadmap/'))
         return serveFolder(req, res, url.pathname === '/roadmap' ? new URL('/roadmap/', url) : url, '/roadmap', roadmapDir, { 'Content-Security-Policy': SITE_CSP });

@@ -61,8 +61,9 @@ declare global {
       onFeedbackUnread(cb: (n: number) => void): () => void;
       serverSyncState(): Promise<import('./sync').SyncState | null>;
       serverSetSyncState(state: import('./sync').SyncState): Promise<boolean>;
-      serverSyncPull(since: number): Promise<ServerResult<{ cursor: number; more: boolean; changes: import('./sync').Change[] }>>;
-      serverSyncPush(changes: import('./sync').Change[]): Promise<ServerResult<{ applied: number; skipped: { kind: string; id: string; reason: string }[]; cursor: number }>>;
+      /** `account`: the account settings (src/sync.ts); missing from servers that don't keep them yet. */
+      serverSyncPull(since: number): Promise<ServerResult<{ cursor: number; more: boolean; changes: import('./sync').Change[]; account?: import('./sync').RemoteAccount | null }>>;
+      serverSyncPush(changes: import('./sync').Change[], account?: import('./sync').RemoteAccount): Promise<ServerResult<{ applied: number; skipped: { kind: string; id: string; reason: string }[]; cursor: number }>>;
       floatSetToken(token: string | null): Promise<void>;
       floatHasToken(): Promise<boolean>;
       floatGet(

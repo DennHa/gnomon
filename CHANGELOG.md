@@ -3,6 +3,16 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Gnomon in the browser:** on your Gnomon server, `/app` opens the Mac app's Track, Week, Reports and Projects in
+  your browser. Sign in with your account's email and password; your changes show up on your Mac and phone at their
+  next sync. Each browser is listed as a device on your account page, so *Sign out everywhere* ends it too.
+- **Your settings follow your account:** daily target, work schedule, starting balance, language, your way of
+  working and the weeks you marked done are kept with your account, so your Macs, phone and browser use the same.
+  The first Mac to sync brings its settings along; a Mac that signs in later takes the account's. Menu bar, shortcuts
+  and appearance stay per device.
+
 ## 0.1.17 · 2026-10-24
 
 - **Invite from a list** (Admin → People): upload a CSV file or paste a list, one person per line with name and email

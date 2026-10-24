@@ -1298,7 +1298,8 @@ ipcMain.handle('server:syncState', () => {
 ipcMain.handle('server:setSyncState', (_e, state) => {
   const s = readServer();
   if (!s || !state || typeof state.cursor !== 'number' || typeof state.base !== 'object') return false;
-  writeAtomic(syncStateFile(), JSON.stringify({ url: s.url, cursor: state.cursor, base: state.base, at: new Date().toISOString() }));
+  const account = state.account && typeof state.account.json === 'string' && typeof state.account.at === 'string' ? { json: state.account.json, at: state.account.at } : undefined;
+  writeAtomic(syncStateFile(), JSON.stringify({ url: s.url, cursor: state.cursor, base: state.base, account, at: new Date().toISOString() }));
   return true;
 });
 ipcMain.handle('server:syncPull', async (_e, since) => {
@@ -1307,11 +1308,12 @@ ipcMain.handle('server:syncPull', async (_e, since) => {
   const r = await serverCall(s.url, 'GET', `/sync?since=${Math.max(0, Math.floor(Number(since) || 0))}&limit=5000`, undefined, s.key, 30_000);
   return r.ok ? { ok: true, ...r.data } : r;
 });
-ipcMain.handle('server:syncPush', async (_e, changes) => {
+ipcMain.handle('server:syncPush', async (_e, changes, account) => {
   const s = readServer();
   if (!s) return { ok: false, error: 'not_connected' };
   if (!Array.isArray(changes)) return { ok: false, error: 'invalid' };
-  const r = await serverCall(s.url, 'POST', '/sync', { changes }, s.key, 60_000);
+  // The account settings (src/sync.ts) go along when they changed.
+  const r = await serverCall(s.url, 'POST', '/sync', { changes, ...(account && typeof account === 'object' && { account }) }, s.key, 60_000);
   return r.ok ? { ok: true, ...r.data } : r;
 });
 ipcMain.handle('float:get', (_e, { path: apiPath, contact }) => floatGet(apiPath, contact));

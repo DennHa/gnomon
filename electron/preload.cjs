@@ -85,7 +85,7 @@ contextBridge.exposeInMainWorld('api', {
   serverSyncState: () => ipcRenderer.invoke('server:syncState'),
   serverSetSyncState: (state) => ipcRenderer.invoke('server:setSyncState', state),
   serverSyncPull: (since) => ipcRenderer.invoke('server:syncPull', since),
-  serverSyncPush: (changes) => ipcRenderer.invoke('server:syncPush', changes),
+  serverSyncPush: (changes, account) => ipcRenderer.invoke('server:syncPush', changes, account),
   floatSetToken: (token) => ipcRenderer.invoke('float:setToken', token),
   floatHasToken: () => ipcRenderer.invoke('float:hasToken'),
   floatGet: (path, contact) => ipcRenderer.invoke('float:get', { path, contact }),

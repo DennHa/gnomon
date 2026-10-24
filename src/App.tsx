@@ -22,6 +22,7 @@ import Morning, { morningDue } from './views/Morning';
 import PhoneTile from './views/PhoneTile';
 import Tour from './views/Tour';
 import About from './views/About';
+import { isWeb } from './platform';
 import { locale, t, trayStrings, type MsgKey } from './i18n';
 
 const VIEWS = [
@@ -534,7 +535,8 @@ export default function App() {
         <nav>{topViews(data.settings.workStyle).map(navButton)}</nav>
         <span className="spacer" />
         <Attendance onOpenDay={openDay} />
-        <PhoneTile />
+        {/* In the browser you're signed in already; the phone signs in with the same account. */}
+        {!isWeb() && <PhoneTile />}
         <nav className="nav-bottom">
           {VIEWS.filter((v) => v.bottom).map(navButton)}
         </nav>
