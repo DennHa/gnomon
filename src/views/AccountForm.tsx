@@ -54,6 +54,12 @@ export default function AccountForm({ onDone }: { onDone: () => void }) {
     onDone();
   };
 
+  // A forgotten password is reset on the server's account page, in the browser (the link comes by email).
+  const forgot = () => {
+    const base = server.trim().replace(/\/+$/, '');
+    window.api.openLink(`${/^https?:\/\//i.test(base) ? base : `https://${base}`}/account/forgot`);
+  };
+
   if (pending) return <p className="acc-note">{t('acc.pending')}</p>;
   const tab = (m: typeof mode, label: MsgKey) => (
     <button type="button" className={mode === m ? 'active' : ''} onClick={() => (setMode(m), setError(null))}>
@@ -119,6 +125,11 @@ export default function AccountForm({ onDone }: { onDone: () => void }) {
         <button className="btn primary" disabled={busy || !server.trim() || (mode === 'code' ? !code.trim() : !email.trim() || !password || (mode === 'register' && !name.trim()))}>
           <Icon name="login" size={18} /> {busy ? t('acc.busy') : t(mode === 'register' ? 'acc.create' : mode === 'code' ? 'acc.connect' : 'acc.signIn')}
         </button>
+        {mode === 'signin' && (
+          <button type="button" className="link-btn muted small" disabled={!server.trim()} onClick={forgot}>
+            {t('acc.forgot')}
+          </button>
+        )}
         {mode !== 'code' && (
           <button type="button" className="link-btn muted small" onClick={() => (setMode('code'), setError(null))}>
             {t('acc.useCode')}

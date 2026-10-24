@@ -134,6 +134,56 @@ people. Afterwards `gnomon-admin admin-link` opens the Admin page for changes. S
 Docker secret) to keep the encryption key out of the data folder; without it, a key file `secret.key` is created there.
 Personal use can ignore all of this. Details: [docs/company-setup.md](../docs/company-setup.md).
 
+## Email: invitations and password resets (optional)
+
+With email set up (Admin → Settings → Email), inviting someone emails them their link, people can reset a forgotten
+password themselves (*Forgot your password?* on the sign-in pages: a link that works once, for 30 minutes), and an
+admin can send someone a reset link from the People page. The link always goes to the person's own email; admins never
+see it. Without email, invitations are links you pass on by hand, as before. Invitations are valid for 14 days by
+default (People → *Invitations are valid for*); expired ones show as expired and can be sent again.
+
+The server's address (Settings → Company, or `GNOMON_PUBLIC_URL`) must be set: the links in emails point to it. Emails
+come from the sender address you enter, with the server's name (Settings → Company) as the sender name. The password
+or client secret is stored encrypted like the Float and Personio tokens and is never shown again. *Send a test email*
+checks everything and says what went wrong.
+
+**SMTP** works with any provider:
+
+| Provider | Host | Port and security | User and password |
+|---|---|---|---|
+| Gmail / Google Workspace | `smtp.gmail.com` | 465 TLS or 587 STARTTLS | your address and an [app password](https://myaccount.google.com/apppasswords) (needs 2-step verification) |
+| Hetzner | `mail.your-server.de` | 587 STARTTLS | the mailbox address and its password |
+| others | from your provider | 465 TLS or 587 STARTTLS | usually the mailbox address |
+
+The sender address usually has to be that mailbox or one of its aliases. A password is never sent unencrypted: “None”
+is only for a mail relay on the same machine.
+
+**Microsoft 365** sends through Microsoft Graph with an app registration, because Microsoft is retiring SMTP sign-in with
+a password. Once, as a Microsoft 365 admin:
+
+1. Create a mailbox to send from, for example a shared mailbox `gnomon@example.com` (shared mailboxes need no licence).
+2. [Entra admin center](https://entra.microsoft.com) → Applications → **App registrations** → **New registration**: a
+   name like *Gnomon mail*, "Accounts in this organizational directory only", no redirect URI.
+3. On its **Overview**, copy the **Directory (tenant) ID** and the **Application (client) ID**.
+4. **Certificates & secrets** → **New client secret**: copy its **Value** (not the Secret ID). Note when it expires and
+   enter a new one in Gnomon before then.
+5. Let the app send **only as that mailbox**, with RBAC for Applications in Exchange Online (PowerShell,
+   `Connect-ExchangeOnline`). The Object ID is the one under Entra → **Enterprise applications** → *Gnomon mail*:
+
+   ```powershell
+   New-ServicePrincipal -AppId <client-id> -ObjectId <enterprise-app-object-id> -DisplayName "Gnomon mail"
+   New-ManagementScope -Name "Gnomon sender" -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'gnomon@example.com'"
+   New-ManagementRoleAssignment -App <client-id> -Role "Application Mail.Send" -CustomResourceScope "Gnomon sender"
+   Test-ServicePrincipalAuthorization -Identity <client-id> -Resource gnomon@example.com
+   ```
+
+   Don't also grant *Mail.Send* under the app's **API permissions** in Entra: that permission covers every mailbox
+   and would undo the restriction. (Older setups grant Mail.Send in Entra with admin consent and restrict it with
+   `New-ApplicationAccessPolicy -AppId <client-id> -PolicyScopeGroupId gnomon@example.com -AccessRight RestrictAccess`;
+   that works too, but Microsoft is replacing it with the above.)
+6. In Gnomon: Admin → Settings → Email → **Microsoft 365**: tenant ID, client ID, client secret and
+   `gnomon@example.com` as the sender. Save, then *Send a test email* (changes in Exchange can take a little while).
+
 ## Download page for the Mac app (optional)
 
 The server can also hand out the Mac app: **`/latest`** is a short page with the version, what's new, a download
@@ -231,6 +281,8 @@ Status and "Sync now" are in the same Settings card.
 server/
   src/store.ts       SQLite: records (JSON + seq + updatedAt + tombstones), devices, pairing codes
   src/app.ts         HTTP: auth, body limits, server-only routes, sync, static files with CSP
+  src/mail.ts        sending email: SMTP (own small client) and Microsoft Graph
+  src/emails.ts      the emails' texts (English, German)   src/invites.ts  inviting a list of people
   src/server.ts      entry point          src/admin.ts   gnomon-admin CLI
   web/               the PWA (React, bundled with esbuild; Material Symbols inlined)
   tests/             node:test end-to-end tests

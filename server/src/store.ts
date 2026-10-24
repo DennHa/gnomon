@@ -132,6 +132,11 @@ export class Store {
         person_id TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS password_resets (
+        token_hash TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS admin_codes (
         code_hash TEXT PRIMARY KEY,
         purpose TEXT NOT NULL,
@@ -493,6 +498,8 @@ export class Store {
     const salt = randomBytes(16);
     const hash = scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 });
     this.db.prepare('UPDATE people SET password_hash = ? WHERE id = ?').run(`scrypt$16384$${salt.toString('base64')}$${hash.toString('base64')}`, personId);
+    // A new password ends every open reset link.
+    this.db.prepare('DELETE FROM password_resets WHERE person_id = ?').run(personId);
   }
 
   hasPassword(personId: string): boolean {
@@ -513,13 +520,56 @@ export class Store {
     return row && this.person(row.id);
   }
 
-  /** An invitation for a person: a one-time code (in a link), 7 days by default. A new one replaces older ones. */
-  createInvite(personId: string, days = 7): string {
+  /**
+   * An invitation for a person: a one-time code (in a link), valid for as many days as the server says (see
+   * inviteDays). A new one replaces older ones. An expired one stays until then, so the People page can say so.
+   */
+  createInvite(personId: string, days = this.inviteDays()): { code: string; expiresAt: string } {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const code = Array.from({ length: 10 }, () => alphabet[randomInt(alphabet.length)]).join('');
-    this.db.prepare('DELETE FROM invites WHERE person_id = ? OR expires_at < ?').run(personId, new Date().toISOString());
-    this.db.prepare('INSERT INTO invites (code_hash, person_id, expires_at) VALUES (?, ?, ?)').run(sha256(code), personId, new Date(Date.now() + days * 86_400_000).toISOString());
-    return code;
+    const expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
+    this.db.prepare('DELETE FROM invites WHERE person_id = ?').run(personId);
+    this.db.prepare('INSERT INTO invites (code_hash, person_id, expires_at) VALUES (?, ?, ?)').run(sha256(code), personId, expiresAt);
+    return { code, expiresAt };
+  }
+
+  /** When a person's open invitation runs (or ran) out, or null when there is none. */
+  inviteExpiresAt(personId: string): string | null {
+    return (this.db.prepare('SELECT MAX(expires_at) AS at FROM invites WHERE person_id = ?').get(personId) as { at: string | null }).at;
+  }
+
+  /** How many days an invitation is valid: the admin sets it under People, 14 by default. */
+  inviteDays(): number {
+    const v = Number(this.getMeta('inviteDays'));
+    return Number.isInteger(v) && v >= 1 && v <= 90 ? v : 14;
+  }
+
+  setInviteDays(days: number) {
+    this.setMeta('inviteDays', String(days));
+  }
+
+  // ---- Password resets --------------------------------------------------------------------------
+
+  /** A reset link's token: long and random, only its hash is kept, and it works once within `minutes`. */
+  createReset(personId: string, minutes = 30): string {
+    const token = randomBytes(32).toString('base64url');
+    this.db.prepare('DELETE FROM password_resets WHERE expires_at < ?').run(new Date().toISOString());
+    this.db.prepare('INSERT INTO password_resets (token_hash, person_id, expires_at) VALUES (?, ?, ?)').run(sha256(token), personId, new Date(Date.now() + minutes * 60_000).toISOString());
+    return token;
+  }
+
+  /** Whose reset token this is, without using it, or undefined when unknown or expired. */
+  resetFor(token: string): Person | undefined {
+    const row = this.db.prepare('SELECT person_id, expires_at FROM password_resets WHERE token_hash = ?').get(sha256(token)) as { person_id: string; expires_at: string } | undefined;
+    return row && row.expires_at > new Date().toISOString() ? this.person(row.person_id) : undefined;
+  }
+
+  /** Use a reset token up: returns its person once, and ends every other open link of theirs. */
+  useReset(token: string): Person | undefined {
+    const person = this.resetFor(token);
+    this.db.prepare('DELETE FROM password_resets WHERE token_hash = ?').run(sha256(token));
+    if (person) this.db.prepare('DELETE FROM password_resets WHERE person_id = ?').run(person.id);
+    return person;
   }
 
   /** Who an invitation is for (without using it up), or undefined when unknown or expired. */
@@ -546,7 +596,7 @@ export class Store {
   removePerson(id: string): boolean {
     if (id === this.ownerId || !this.person(id)) return false;
     this.db.transaction(() => {
-      for (const t of ['records', 'devices', 'pair_codes', 'invites']) this.db.prepare(`DELETE FROM ${t} WHERE person_id = ?`).run(id);
+      for (const t of ['records', 'devices', 'pair_codes', 'invites', 'password_resets']) this.db.prepare(`DELETE FROM ${t} WHERE person_id = ?`).run(id);
       this.db.prepare('DELETE FROM meta WHERE key IN (?, ?)').run(`settings:${id}`, `seeded:${id}`);
       this.db.prepare('DELETE FROM people WHERE id = ?').run(id);
     })();
