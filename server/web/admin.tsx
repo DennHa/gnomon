@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import qrcode from 'qrcode-generator';
 import { Icon, type IconName } from './icons';
+import { toCsv } from '../src/csv';
 import './styles.css';
 import './admin.css';
 
@@ -267,6 +268,38 @@ const EN = {
   pResetSent: 'Sent {email} a link to set a new password.',
   pInviteDays: 'Invitations are valid for',
   pDays: 'days',
+  imTitle: 'Invite from a list',
+  imIntro: 'Upload a CSV file or paste a list: one person per line, name and email, separated by comma, semicolon or tab. A header line is fine. You see what happens before anything is sent.',
+  imFile: 'Choose a CSV file',
+  imPaste: 'Jane Doe; jane.doe@example.com',
+  imCheck: 'Check the list',
+  imXlsx: 'This is an Excel file. In Excel, save it as “CSV UTF-8” first, then choose that file.',
+  imNew: 'New',
+  imAccount: 'Has an account',
+  imInvited: 'Already invited',
+  imDuplicate: 'Twice in the list',
+  imInvalid: 'Not an email',
+  imAll: 'All',
+  imLine: 'Line',
+  imName: 'Name',
+  imNobody: 'Nobody new in this list: everyone has an account or an invitation already.',
+  imOnlyNew: 'Only the {n} new people are invited, as members. Their links are valid for {days} days.',
+  imSend: 'Send {n} invitations by email',
+  imLinks: 'Create {n} links without email',
+  imLinksOnly: 'Create {n} invitation links',
+  imBack: 'Change the list',
+  imProgress: 'Inviting… {done} of {total}',
+  imKeepOpen: 'Keep this page open until it’s done.',
+  imDone: 'Done.',
+  imSent: '{n} invited by email',
+  imMade: '{n} links to pass on',
+  imFailed: '{n} didn’t work',
+  imRetry: 'Try again',
+  imCsv: 'Download links (CSV)',
+  imCsvHint: 'Name, email, link and valid until, for each invitation that wasn’t emailed. Hand them out yourself or send them through your own mail.',
+  imAnother: 'Import another list',
+  imCsvHead: 'Name|Email|Link|Valid until',
+  imLeave: 'Invitations are still being sent.',
   loginForgot: 'Forgot your password?',
 };
 type Key = keyof typeof EN;
@@ -520,6 +553,38 @@ const DE: Record<Key, string> = {
   pResetSent: '{email} hat einen Link für ein neues Passwort bekommen.',
   pInviteDays: 'Einladungen gelten',
   pDays: 'Tage',
+  imTitle: 'Aus einer Liste einladen',
+  imIntro: 'Lade eine CSV-Datei hoch oder füge eine Liste ein: eine Person pro Zeile, Name und E-Mail, getrennt durch Komma, Semikolon oder Tab. Eine Kopfzeile ist in Ordnung. Du siehst, was passiert, bevor etwas verschickt wird.',
+  imFile: 'CSV-Datei wählen',
+  imPaste: 'Erika Muster; erika.muster@example.com',
+  imCheck: 'Liste prüfen',
+  imXlsx: 'Das ist eine Excel-Datei. Speichere sie in Excel zuerst als „CSV UTF-8“ und wähle dann diese Datei.',
+  imNew: 'Neu',
+  imAccount: 'Hat ein Konto',
+  imInvited: 'Schon eingeladen',
+  imDuplicate: 'Doppelt in der Liste',
+  imInvalid: 'Keine E-Mail',
+  imAll: 'Alle',
+  imLine: 'Zeile',
+  imName: 'Name',
+  imNobody: 'Niemand Neues in dieser Liste: Alle haben schon ein Konto oder eine Einladung.',
+  imOnlyNew: 'Nur die {n} neuen Personen werden eingeladen, als Mitglieder. Ihre Links gelten {days} Tage.',
+  imSend: '{n} Einladungen per E-Mail senden',
+  imLinks: '{n} Links ohne E-Mail erstellen',
+  imLinksOnly: '{n} Einladungslinks erstellen',
+  imBack: 'Liste ändern',
+  imProgress: 'Lädt ein… {done} von {total}',
+  imKeepOpen: 'Lass diese Seite offen, bis es fertig ist.',
+  imDone: 'Fertig.',
+  imSent: '{n} per E-Mail eingeladen',
+  imMade: '{n} Links zum Weitergeben',
+  imFailed: '{n} hat nicht geklappt',
+  imRetry: 'Noch mal versuchen',
+  imCsv: 'Links herunterladen (CSV)',
+  imCsvHint: 'Name, E-Mail, Link und gültig bis, für jede Einladung, die nicht per E-Mail ging. Gib sie selbst weiter oder verschick sie über eure eigene Mail.',
+  imAnother: 'Weitere Liste importieren',
+  imCsvHead: 'Name|E-Mail|Link|Gültig bis',
+  imLeave: 'Einladungen werden noch verschickt.',
   loginForgot: 'Passwort vergessen?',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
@@ -1190,6 +1255,237 @@ function InviteBox({ invite }: { invite: Invite }) {
   );
 }
 
+// Inviting from a list: check it (nothing happens yet), then invite the new people in small batches, by email or as
+// links, and download the links as CSV. The server does the parsing (server/src/people-import.ts).
+type ImportStatus = 'new' | 'account' | 'invited' | 'duplicate' | 'invalid';
+type PreviewRow = { line: number; name: string; email: string; status: ImportStatus };
+type Preview = { rows: PreviewRow[]; counts: Record<ImportStatus, number>; email: boolean; inviteDays: number };
+type Imported = Invite & { name: string };
+const IMPORT_KEY: Record<ImportStatus, Key> = { new: 'imNew', account: 'imAccount', invited: 'imInvited', duplicate: 'imDuplicate', invalid: 'imInvalid' };
+/** People per request: emails go out one after another, so fewer at a time keeps each request short. */
+const BATCH = { email: 10, link: 50 };
+/** A failure worth trying again: the email didn't go out, or the request didn't get through (not "has an account"). */
+const retryable = (r: Imported) => Boolean(r.error) && (Boolean(r.expiresAt) || !r.personId);
+
+/** A file as text: UTF-8, or else Windows-1252 (what Excel's plain "CSV" is on many computers). */
+async function readList(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) throw new Error(t('imXlsx'));
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder('windows-1252').decode(bytes);
+  }
+}
+
+function linksCsv(done: Imported[]) {
+  const sep = L === DE ? ';' : ',';
+  const stamp = (iso?: string) => (iso ? new Date(iso).toLocaleString(L === DE ? 'de-DE' : 'en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+  const rows = done.filter((r) => r.link).map((r) => [r.name, r.email, r.link!, stamp(r.expiresAt)]);
+  saveFile(`gnomon-invitations-${new Date().toISOString().slice(0, 10)}.csv`, toCsv([t('imCsvHead').split('|'), ...rows], sep), 'text/csv;charset=utf-8');
+}
+
+function ImportList({ reload, setErr }: { reload: () => void; setErr: (e: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [show, setShow] = useState<ImportStatus | 'all'>('all');
+  const [done, setDone] = useState<Imported[] | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [by, setBy] = useState<'email' | 'link'>('email');
+  useEffect(() => {
+    if (!progress) return;
+    const warn = (e: BeforeUnloadEvent) => (e.preventDefault(), (e.returnValue = t('imLeave')));
+    addEventListener('beforeunload', warn);
+    return () => removeEventListener('beforeunload', warn);
+  }, [Boolean(progress)]);
+
+  const check = async (list = text) => {
+    try {
+      setErr(null);
+      setPreview(await call<Preview>('POST', '/people/import/preview', { text: list }));
+      setShow('all');
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  /** Invite people batch by batch; results replace earlier ones for the same email (a retry). */
+  const invite = async (people: { name: string; email: string }[], how: 'email' | 'link', again: boolean) => {
+    setErr(null);
+    setBy(how);
+    const results = new Map((done ?? []).map((r) => [r.email, r]));
+    setProgress({ done: 0, total: people.length });
+    for (let i = 0; i < people.length; i += BATCH[how]) {
+      const batch = people.slice(i, i + BATCH[how]);
+      try {
+        const r = await call<{ results: Invite[] }>('POST', '/people/import', { people: batch, by: how, again });
+        r.results.forEach((x, j) => results.set(x.email, { ...x, name: batch[j]?.name ?? '' }));
+      } catch (e) {
+        // Stop here: the rest stays in the list as not done, to try again.
+        for (const x of people.slice(i)) results.set(x.email, { email: x.email, name: x.name, sent: false, error: (e as Error).message });
+        setErr((e as Error).message);
+        break;
+      }
+      setDone([...results.values()]);
+      setProgress({ done: Math.min(i + batch.length, people.length), total: people.length });
+    }
+    setDone([...results.values()]);
+    setProgress(null);
+    reload();
+  };
+  const reset = () => (setText(''), setPreview(null), setDone(null));
+
+  if (!open)
+    return (
+      <button className="soft a-save" onClick={() => setOpen(true)}>
+        <Icon name="group" size={18} /> {t('imTitle')}
+      </button>
+    );
+  const fresh = preview?.rows.filter((r) => r.status === 'new') ?? [];
+  const failed = done?.filter(retryable) ?? [];
+  return (
+    <div className="a-card a-import">
+      <strong>
+        <Icon name="group" size={18} /> {t('imTitle')}
+      </strong>
+      {!preview && !done && (
+        <>
+          <span className="a-hint">{t('imIntro')}</span>
+          <textarea rows={6} placeholder={t('imPaste')} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />
+          <div className="a-inline">
+            <label className="soft a-file">
+              {t('imFile')}
+              <input
+                type="file"
+                accept=".csv,.tsv,.txt,text/csv,text/plain"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  try {
+                    const list = await readList(f);
+                    setText(list);
+                    await check(list);
+                  } catch (err) {
+                    setErr((err as Error).message);
+                  }
+                }}
+              />
+            </label>
+            <button className="primary" disabled={!text.trim()} onClick={() => check()}>
+              {t('imCheck')}
+            </button>
+          </div>
+        </>
+      )}
+      {preview && !done && !progress && (
+        <>
+          <div className="a-chips">
+            <button className={show === 'all' ? 'on' : ''} onClick={() => setShow('all')}>
+              {t('imAll')} {preview.rows.length}
+            </button>
+            {(Object.keys(IMPORT_KEY) as ImportStatus[]).filter((k) => preview.counts[k]).map((k) => (
+              <button key={k} className={`${show === k ? 'on' : ''} ${k}`} onClick={() => setShow(k)}>
+                {t(IMPORT_KEY[k])} {preview.counts[k]}
+              </button>
+            ))}
+          </div>
+          <div className="a-import-list">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t('imLine')}</th>
+                  <th>{t('imName')}</th>
+                  <th>{t('pEmail')}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {preview.rows.filter((r) => show === 'all' || r.status === show).map((r) => (
+                  <tr key={r.line} className={r.status}>
+                    <td>{r.line}</td>
+                    <td>{r.name || '—'}</td>
+                    <td>{r.email || '—'}</td>
+                    <td>
+                      <span className={`a-status ${r.status}`}>{t(IMPORT_KEY[r.status])}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {fresh.length ? <span className="a-hint">{t('imOnlyNew', { n: fresh.length, days: preview.inviteDays })}</span> : <p className="a-warn">{t('imNobody')}</p>}
+          <div className="a-inline a-wrap">
+            {fresh.length > 0 && preview.email && (
+              <button className="primary" onClick={() => invite(fresh, 'email', false)}>
+                <Icon name="mail" size={18} /> {t('imSend', { n: fresh.length })}
+              </button>
+            )}
+            {fresh.length > 0 && (
+              <button className={preview.email ? 'soft' : 'primary'} onClick={() => invite(fresh, 'link', false)}>
+                <Icon name="link" size={18} /> {t(preview.email ? 'imLinks' : 'imLinksOnly', { n: fresh.length })}
+              </button>
+            )}
+            <button className="soft" onClick={() => setPreview(null)}>
+              {t('imBack')}
+            </button>
+          </div>
+        </>
+      )}
+      {progress && (
+        <>
+          <progress max={progress.total} value={progress.done} />
+          <span className="a-hint">
+            {t('imProgress', progress)} {t('imKeepOpen')}
+          </span>
+        </>
+      )}
+      {done && !progress && (
+        <>
+          <div className="a-ok">
+            <Icon name="check_circle" /> {t('imDone')}{' '}
+            {[
+              done.filter((r) => r.sent).length && t('imSent', { n: done.filter((r) => r.sent).length }),
+              done.filter((r) => r.link).length && t('imMade', { n: done.filter((r) => r.link).length }),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </div>
+          {failed.length > 0 && (
+            <div className="a-warn">
+              <strong>{t('imFailed', { n: failed.length })}</strong>
+              <ul>
+                {failed.map((r) => (
+                  <li key={r.email}>
+                    {r.name ? `${r.name} · ` : ''}
+                    {r.email}: {r.error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {done.some((r) => r.link) && <span className="a-hint">{t('imCsvHint')}</span>}
+          <div className="a-inline a-wrap">
+            {failed.length > 0 && (
+              <button className="primary" onClick={() => invite(failed.map(({ name, email }) => ({ name, email })), by, true)}>
+                {t('imRetry')}
+              </button>
+            )}
+            {done.some((r) => r.link) && (
+              <button className={failed.length ? 'soft' : 'primary'} onClick={() => linksCsv(done)}>
+                <Icon name="download" size={18} /> {t('imCsv')}
+              </button>
+            )}
+            <button className="soft" onClick={reset}>
+              {t('imAnother')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function People(ctx: Ctx) {
   const [people, setPeople] = useState<PersonRow[] | null>(null);
   const [registration, setRegistration] = useState<'invite' | 'approval' | 'open'>('invite');
@@ -1243,6 +1539,7 @@ function People(ctx: Ctx) {
         </div>
         {invite && <InviteBox invite={invite} />}
       </form>
+      <ImportList reload={load} setErr={ctx.setErr} />
       <div className="a-card">
         <strong>{t('pRegTitle')}</strong>
         <div className="a-seg">

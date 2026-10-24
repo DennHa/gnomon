@@ -13,6 +13,15 @@ Gnomon server shows the newest entry.
   The first Mac to sync brings its settings along; a Mac that signs in later takes the account's. Menu bar, shortcuts
   and appearance stay per device.
 
+## 0.1.17 · 2026-10-24
+
+- **Invite from a list** (Admin → People): upload a CSV file or paste a list, one person per line with name and email
+  (comma, semicolon or tab; a header line and Excel's CSV are fine). A preview shows who is new, who already has an
+  account or an invitation, who is in the list twice and which emails are wrong. Only the new people are invited, by
+  email in small batches with progress, or as links. Emails that didn't go out are listed and can be tried again, and
+  the links download as a CSV file (name, email, link, valid until) to hand out yourself.
+- Updating a Gnomon server with the deploy script backs up its data first and leaves the server's own settings alone.
+
 ## 0.1.16 · 2026-10-24
 
 - **Email from your Gnomon server** (Admin → Settings → Email): through any mail provider (SMTP, for example Gmail

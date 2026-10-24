@@ -115,3 +115,22 @@ a.primary.a-button { background: var(--accent); color: var(--on-accent); }
 .a-row > input, .a-row > select { flex: 1; min-width: 140px; }
 .a-days { align-items: center; font-size: 14px; }
 .a-days input { flex: 0 0 72px; }
+/* People → Invite from a list */
+.a-import textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: var(--surface); color: var(--text); font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
+.a-file { position: relative; cursor: pointer; background: var(--surface); }
+.a-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.a-wrap { flex-wrap: wrap; }
+.a-import .soft { background: var(--surface); }
+.a-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.a-chips button { padding: 5px 12px; border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 600; }
+.a-chips button.on { background: var(--accent); color: var(--on-accent); }
+.a-import-list { max-height: 360px; overflow: auto; border-radius: 10px; background: var(--surface); }
+.a-import-list table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.a-import-list th { position: sticky; top: 0; background: var(--surface); text-align: left; color: var(--muted); font-weight: 600; }
+.a-import-list th, .a-import-list td { padding: 6px 10px; border-bottom: 1px solid var(--field); overflow-wrap: anywhere; }
+.a-import-list td:first-child, .a-import-list th:first-child, .a-import-list td:last-child { width: 1%; white-space: nowrap; overflow-wrap: normal; }
+.a-import-list td:first-child { color: var(--muted); }
+.a-import-list tr.duplicate, .a-import-list tr.account, .a-import-list tr.invited { color: var(--muted); }
+.a-status.invalid { background: var(--warn-soft); color: var(--warn); }
+.a-import progress { width: 100%; accent-color: var(--accent); }
+.a-import .a-warn ul { margin: 6px 0 0; padding-left: 18px; }

@@ -15,6 +15,7 @@ import { clearSessionCookie, csrfFor, csrfOk, sameOrigin, sessionCookie, setSess
 import { resetEmail, testEmail, type Lang } from './emails';
 import { invitePeople, sendInvitation, type InviteDeps } from './invites';
 import { MailError, type Transport } from './mail';
+import { importPeople, MAX_BATCH, MAX_IMPORT, parsePeopleList, previewImport } from './people-import';
 
 const MB = 1024 * 1024;
 const PAIR_MAX_FAILURES = 10;
@@ -739,6 +740,25 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       const [invite] = await invitePeople(inviteDeps(), [{ email, name, role }]);
       company.save(c, `Invited ${email}${invite.sent ? ' by email' : ''}`);
       return [201, { ...peopleOut(), invite }];
+    }
+    // Inviting from a list: a preview first (nothing changes), then the new people in batches, by email or as links.
+    if (method === 'POST' && p === '/admin/people/import/preview') {
+      const text = isObj(body) && typeof body.text === 'string' ? body.text : '';
+      const rows = parsePeopleList(text);
+      if (!rows.length) throw bad('The list is empty');
+      if (rows.length > MAX_IMPORT) throw bad(`A list can have up to ${MAX_IMPORT} people`);
+      return [200, { ...previewImport(store, rows), email: canEmail(), inviteDays: store.inviteDays() }];
+    }
+    if (method === 'POST' && p === '/admin/people/import') {
+      const list = isObj(body) && Array.isArray(body.people) ? body.people : [];
+      if (!list.length || list.length > MAX_BATCH) throw bad(`Send 1 to ${MAX_BATCH} people at a time`);
+      const byEmail = isObj(body) && body.by === 'email';
+      if (byEmail && !canEmail()) throw bad('Set up email first (Settings → Email)');
+      const people = list.map((x) => ({ email: isObj(x) && typeof x.email === 'string' ? x.email : '', name: isObj(x) && typeof x.name === 'string' ? x.name : undefined }));
+      const results = await importPeople({ ...inviteDeps(), transport: byEmail ? transport() : undefined }, people, isObj(body) && body.again === true);
+      const done = results.filter((r) => r.expiresAt).length;
+      if (done) company.save(c, `Invited ${done} ${done === 1 ? 'person' : 'people'} from a list${byEmail ? ' by email' : ''}`);
+      return [200, { results }];
     }
     const pid = p.match(/^\/admin\/people\/([\w-]{36})(\/invite|\/reset)?$/);
     if (pid) {
