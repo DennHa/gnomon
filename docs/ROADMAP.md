@@ -1,16 +1,14 @@
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-24 (0.1.17).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-24 (0.1.18).
 
 ## Now
 
-- **Web app with sign-in.** Colleagues without a Mac can use Gnomon in the browser. Also the answer for Windows, at
-  least at first.
+- **Server that runs anywhere.** A server guide for any Linux machine with Docker, so a company server can run
+  wherever IT likes.
 
 ## Next
 
-- **Server that runs anywhere.** A server guide for any Linux machine with Docker, so a company server can run
-  wherever IT likes.
 - **A drafted day.** Suggest the day from the calendar plus the activity trail Gnomon already keeps, on the Mac only so
   it stays private.
 - **Calendar as a memory aid.** Show meetings next to the day; one click turns one into an entry. macOS Calendar first
@@ -46,6 +44,8 @@ What's coming to Gnomon, and what it already does well. Updated 2026-10-24 (0.1.
   invitation is valid.
 - **Bulk import of people.** Paste a list or upload a CSV, check the preview, invite everyone by email or as links.
 - **Password reset by email.** A link that works once, for 30 minutes, from every sign-in page.
+- **Web app with sign-in.** Track, Week, Reports and Projects in the browser at `/app`; your settings follow your
+  account.
 - **Public roadmap.** This page, at `/roadmap` on your Gnomon server and linked from Info & feedback.
 
 ## Left out on purpose
