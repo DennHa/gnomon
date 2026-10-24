@@ -72,4 +72,12 @@ if (process.argv.includes('--tests')) {
   for (const f of fs.readdirSync(path.join(root, 'web/public'))) fs.copyFileSync(path.join(root, 'web/public', f), path.join(out, 'web', f));
   const sw = path.join(out, 'web/sw.js');
   fs.writeFileSync(sw, fs.readFileSync(sw, 'utf8').replaceAll('__BUILD__', Date.now().toString(36)));
+  // The public roadmap (/roadmap) from docs/ROADMAP.md; without that file, /roadmap isn't served.
+  const roadmap = path.join(root, '../docs/ROADMAP.md');
+  if (fs.existsSync(roadmap)) {
+    const { roadmapPage } = await import('../roadmap/render.mjs');
+    fs.mkdirSync(path.join(out, 'roadmap'));
+    fs.writeFileSync(path.join(out, 'roadmap/index.html'), roadmapPage(fs.readFileSync(roadmap, 'utf8')));
+    fs.copyFileSync(path.join(root, 'roadmap/roadmap.css'), path.join(out, 'roadmap/roadmap.css'));
+  }
 }

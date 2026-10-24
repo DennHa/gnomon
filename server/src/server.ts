@@ -21,7 +21,7 @@ const siteDir = process.env.GNOMON_SITE_DIR ? path.resolve(process.env.GNOMON_SI
 // Company setup: settings and encrypted tokens for the wizard (src/company.ts).
 const secret = loadSecretKey(dataDir);
 const company = new Company(store, secret.key, secret.source);
-const server = http.createServer(createApp({ store, webDir: path.join(here, 'web'), releasesDir, company, demoDir, siteDir }));
+const server = http.createServer(createApp({ store, webDir: path.join(here, 'web'), releasesDir, company, demoDir, siteDir, roadmapDir: path.join(here, 'roadmap') }));
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
 server.listen(port, host, () => {

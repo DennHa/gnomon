@@ -388,6 +388,26 @@ describe('static folders (/about, /example)', () => {
     }
   });
 
+  test('the roadmap (/roadmap) is docs/ROADMAP.md as a page, as built by npm run build', async () => {
+    const roadmapDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../dist/roadmap');
+    const app = http.createServer(createApp({ store, webDir, roadmapDir }));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    try {
+      const page = await fetch(`${url}/roadmap`, { redirect: 'manual' });
+      assert.equal(page.status, 200);
+      const html = await page.text();
+      assert.match(html, /<section id="now"><h2>Now<\/h2>/);
+      assert.match(html, /<li><strong>/);
+      assert.doesNotMatch(html, /<script|style=/);
+      assert.match(page.headers.get('content-security-policy') ?? '', /script-src 'self'.*connect-src 'none'/);
+      assert.equal((await fetch(`${url}/roadmap/roadmap.css`)).headers.get('content-type'), 'text/css; charset=utf-8');
+      assert.equal((await fetch(`${url}/roadmap/%2e%2e/server.mjs`)).status, 404);
+    } finally {
+      await new Promise((r) => app.close(r));
+    }
+  });
+
   test('not served without a folder', async () => {
     const app = http.createServer(createApp({ store, webDir }));
     await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));

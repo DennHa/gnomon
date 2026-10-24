@@ -22,8 +22,9 @@ const PAIR_LOCK_MS = 15 * 60_000;
 /** company: the setup wizard's settings and secrets (company.ts); without it, /setup and /admin aren't served. */
 /** demoDir: optional folder with the web demo (npm run build:demo in the repo root), served at /example. */
 /** siteDir: optional folder with the one-page site (site/ in the repo), served at /about. */
+/** roadmapDir: the roadmap page built from docs/ROADMAP.md (dist/roadmap), served at /roadmap. */
 /** mail: how to send email instead of the one set up in Settings → Email (tests use a fake one). */
-export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string; siteDir?: string; mail?: Transport };
+export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string; siteDir?: string; roadmapDir?: string; mail?: Transport };
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -118,7 +119,7 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
 
 const RESET_MINUTES = 30;
 
-export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir, mail }: AppOptions) {
+export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir, roadmapDir, mail }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
@@ -981,6 +982,9 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       if (url.pathname === '/example' || url.pathname.startsWith('/example/'))
         return serveFolder(req, res, url, '/example', demoDir, { 'X-Frame-Options': 'SAMEORIGIN', 'Content-Security-Policy': DEMO_CSP });
       if (url.pathname === '/about' || url.pathname.startsWith('/about/')) return serveFolder(req, res, url, '/about', siteDir, { 'Content-Security-Policy': SITE_CSP });
+      // The roadmap page links its stylesheet absolutely, so /roadmap is served as it is, without the redirect.
+      if (url.pathname === '/roadmap' || url.pathname.startsWith('/roadmap/'))
+        return serveFolder(req, res, url.pathname === '/roadmap' ? new URL('/roadmap/', url) : url, '/roadmap', roadmapDir, { 'Content-Security-Policy': SITE_CSP });
       return serveStatic(req, res, url);
     } catch (err) {
       if (err instanceof HttpError) return send(res, err.status, { error: err.code, message: err.message });
