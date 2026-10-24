@@ -5,7 +5,7 @@ Gnomon server shows the newest entry.
 
 ## Unreleased
 
-- **Invite from a list** (Admin → People): upload a CSV file or paste a list, one person per line with name and email
+- **Invite from a list** (Admin → People → Invite people → From a list): upload a CSV file or paste a list, one person per line with name and email
   (comma, semicolon or tab; a header line and Excel's CSV are fine). A preview shows who is new, who already has an
   account or an invitation, who is in the list twice and which emails are wrong. Only the new people are invited, by
   email in small batches with progress, or as links. Emails that didn't go out are listed and can be tried again, and

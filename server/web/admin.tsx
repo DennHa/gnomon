@@ -196,7 +196,9 @@ const EN = {
   ownerSave: 'Save',
   peopleTitle: 'People',
   pIntro: 'Everyone with an account on this server, and their devices. Admins manage accounts here; nobody sees anyone’s times.',
-  pInviteTitle: 'Invite someone',
+  pInviteTitle: 'Invite people',
+  pOne: 'One person',
+  pList: 'From a list',
   pInviteIntro: 'They get a link to create their account (name and password). Pass it on by message or email.',
   pEmail: 'Email',
   pName: 'Name (optional)',
@@ -268,7 +270,6 @@ const EN = {
   pResetSent: 'Sent {email} a link to set a new password.',
   pInviteDays: 'Invitations are valid for',
   pDays: 'days',
-  imTitle: 'Invite from a list',
   imIntro: 'Upload a CSV file or paste a list: one person per line, name and email, separated by comma, semicolon or tab. A header line is fine. You see what happens before anything is sent.',
   imFile: 'Choose a CSV file',
   imPaste: 'Jane Doe; jane.doe@example.com',
@@ -481,7 +482,9 @@ const DE: Record<Key, string> = {
   ownerSave: 'Sichern',
   peopleTitle: 'Personen',
   pIntro: 'Alle mit einem Konto auf diesem Server, und ihre Geräte. Admins verwalten hier Konten; niemand sieht die Zeiten anderer.',
-  pInviteTitle: 'Jemanden einladen',
+  pInviteTitle: 'Personen einladen',
+  pOne: 'Eine Person',
+  pList: 'Aus einer Liste',
   pInviteIntro: 'Die Person bekommt einen Link, mit dem sie ihr Konto anlegt (Name und Passwort). Gib ihn per Nachricht oder E-Mail weiter.',
   pEmail: 'E-Mail',
   pName: 'Name (optional)',
@@ -553,7 +556,6 @@ const DE: Record<Key, string> = {
   pResetSent: '{email} hat einen Link für ein neues Passwort bekommen.',
   pInviteDays: 'Einladungen gelten',
   pDays: 'Tage',
-  imTitle: 'Aus einer Liste einladen',
   imIntro: 'Lade eine CSV-Datei hoch oder füge eine Liste ein: eine Person pro Zeile, Name und E-Mail, getrennt durch Komma, Semikolon oder Tab. Eine Kopfzeile ist in Ordnung. Du siehst, was passiert, bevor etwas verschickt wird.',
   imFile: 'CSV-Datei wählen',
   imPaste: 'Erika Muster; erika.muster@example.com',
@@ -1286,7 +1288,6 @@ function linksCsv(done: Imported[]) {
 }
 
 function ImportList({ reload, setErr }: { reload: () => void; setErr: (e: string | null) => void }) {
-  const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
   const [show, setShow] = useState<ImportStatus | 'all'>('all');
@@ -1335,19 +1336,10 @@ function ImportList({ reload, setErr }: { reload: () => void; setErr: (e: string
   };
   const reset = () => (setText(''), setPreview(null), setDone(null));
 
-  if (!open)
-    return (
-      <button className="soft a-save" onClick={() => setOpen(true)}>
-        <Icon name="group" size={18} /> {t('imTitle')}
-      </button>
-    );
   const fresh = preview?.rows.filter((r) => r.status === 'new') ?? [];
   const failed = done?.filter(retryable) ?? [];
   return (
-    <div className="a-card a-import">
-      <strong>
-        <Icon name="group" size={18} /> {t('imTitle')}
-      </strong>
+    <div className="a-import">
       {!preview && !done && (
         <>
           <span className="a-hint">{t('imIntro')}</span>
@@ -1496,6 +1488,7 @@ function People(ctx: Ctx) {
   const [inviteDays, setInviteDays] = useState(14);
   const [emailOn, setEmailOn] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [how, setHow] = useState<'one' | 'list'>('one');
   const take = (r: PeopleResponse) => (setPeople(r.people), setRegistration(r.registration), setInviteDays(r.inviteDays), setEmailOn(r.email));
   const load = () => call<PeopleResponse>('GET', '/people').then(take, (e) => ctx.setErr((e as Error).message));
   useEffect(() => {
@@ -1517,29 +1510,45 @@ function People(ctx: Ctx) {
   return (
     <>
       <p className="a-intro">{t('pIntro')}</p>
-      <form
-        className="a-card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run('POST', '/people', { email, name: name || undefined, role }).then(() => (setEmail(''), setName('')));
-        }}
-      >
-        <strong>
-          <Icon name="person" size={18} /> {t('pInviteTitle')}
-        </strong>
-        <span className="a-hint">{t(emailOn ? 'pInviteIntroEmail' : 'pInviteIntro')}</span>
-        <div className="a-row">
-          <input type="email" required placeholder={t('pEmail')} value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input placeholder={t('pName')} value={name} onChange={(e) => setName(e.target.value)} />
-          <select value={role} onChange={(e) => setRole(e.target.value as 'member' | 'admin')}>
-            <option value="member">{t('pMember')}</option>
-            <option value="admin">{t('pAdmin')}</option>
-          </select>
-          <button className="primary">{t('pInvite')}</button>
+      <div className="a-card">
+        <div className="a-card-head">
+          <strong>
+            <Icon name="person" size={18} /> {t('pInviteTitle')}
+          </strong>
+          <div className="a-seg">
+            <button className={how === 'one' ? 'on' : ''} onClick={() => setHow('one')}>
+              {t('pOne')}
+            </button>
+            <button className={how === 'list' ? 'on' : ''} onClick={() => setHow('list')}>
+              {t('pList')}
+            </button>
+          </div>
         </div>
-        {invite && <InviteBox invite={invite} />}
-      </form>
-      <ImportList reload={load} setErr={ctx.setErr} />
+        <form
+          className="a-import"
+          hidden={how !== 'one'}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run('POST', '/people', { email, name: name || undefined, role }).then(() => (setEmail(''), setName('')));
+          }}
+        >
+          <span className="a-hint">{t(emailOn ? 'pInviteIntroEmail' : 'pInviteIntro')}</span>
+          <div className="a-row">
+            <input type="email" required placeholder={t('pEmail')} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input placeholder={t('pName')} value={name} onChange={(e) => setName(e.target.value)} />
+            <select value={role} onChange={(e) => setRole(e.target.value as 'member' | 'admin')}>
+              <option value="member">{t('pMember')}</option>
+              <option value="admin">{t('pAdmin')}</option>
+            </select>
+            <button className="primary">{t('pInvite')}</button>
+          </div>
+          {invite && <InviteBox invite={invite} />}
+        </form>
+        {/* Stays mounted while hidden, so a running import goes on when switching to one person. */}
+        <div hidden={how !== 'list'}>
+          <ImportList reload={load} setErr={ctx.setErr} />
+        </div>
+      </div>
       <div className="a-card">
         <strong>{t('pRegTitle')}</strong>
         <div className="a-seg">

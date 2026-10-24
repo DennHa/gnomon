@@ -115,7 +115,12 @@ a.primary.a-button { background: var(--accent); color: var(--on-accent); }
 .a-row > input, .a-row > select { flex: 1; min-width: 140px; }
 .a-days { align-items: center; font-size: 14px; }
 .a-days input { flex: 0 0 72px; }
-/* People → Invite from a list */
+/* People → Invite people: one person or from a list */
+.a-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.a-card-head .a-seg { background: var(--surface); }
+.a-card-head .a-seg button.on { background: var(--field); }
+.a-import { display: flex; flex-direction: column; gap: 8px; }
+[hidden] { display: none !important; }
 .a-import textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: var(--surface); color: var(--text); font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
 .a-file { position: relative; cursor: pointer; background: var(--surface); }
 .a-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
