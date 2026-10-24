@@ -96,8 +96,22 @@ export function atTime(day: string, hhmm: string): string {
 
 export const entryMs = (e: Entry, now = Date.now()) => (e.end ? Date.parse(e.end) : now) - Date.parse(e.start);
 
+/** Break time inside the workday: overlapping breaks count once, and nothing before arrival or after leaving counts. */
 export function breakMs(w: Workday, now = Date.now()): number {
-  return w.breaks.reduce((sum, b) => sum + (b.end ? Date.parse(b.end) : now) - Date.parse(b.start), 0);
+  const from = Date.parse(w.start);
+  const until = w.end ? Date.parse(w.end) : now;
+  const spans = w.breaks
+    .map((b) => [Math.max(from, Date.parse(b.start)), Math.min(until, b.end ? Date.parse(b.end) : now)])
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0]);
+  let sum = 0;
+  let at = -Infinity;
+  for (const [a, b] of spans) {
+    if (b <= at) continue;
+    sum += b - Math.max(a, at);
+    at = b;
+  }
+  return sum;
 }
 
 /** Time at work minus breaks. */

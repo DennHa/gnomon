@@ -183,14 +183,26 @@ export function BillableToggle({ value, onChange }: { value?: boolean; onChange:
   );
 }
 
-/** Edits the time-of-day of an ISO timestamp, keeping its calendar day. */
+/**
+ * Edits the time-of-day of an ISO timestamp, keeping its calendar day. Saves on Enter or when you leave the field, not
+ * on every keystroke: typing "09:30" passes through "00:30", which would otherwise move your arrival to midnight.
+ */
 export function TimeField({ value, onChange, day }: { value: string; onChange: (iso: string) => void; day?: string }) {
+  const shown = toTimeInput(value);
+  const [draft, setDraft] = useState(shown);
+  useEffect(() => setDraft(shown), [shown]);
+  const commit = () => draft && draft !== shown && onChange(atTime(day ?? dayKey(value), draft));
   return (
     <input
       className="time-field"
       type="time"
-      value={toTimeInput(value)}
-      onChange={(e) => e.target.value && onChange(atTime(day ?? dayKey(value), e.target.value))}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') setDraft(shown);
+      }}
     />
   );
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as A from '../src/actions';
-import { parseDuration, dayKey, atTime } from '../src/time';
+import { parseDuration, dayKey, atTime, breakMs, workdayMs } from '../src/time';
 import { applyFloatImport, type FloatImport } from '../src/float';
 import { applyPersonioImport, mapPersonioAbsences, periodDays, type PersonioPeriod } from '../src/personio';
 import { goalFor } from '../src/plan';
@@ -513,6 +513,17 @@ test('reminders: time to assign, and the week reminder only for clocking in, on 
   assert.equal(weekReminderDue({ ...d, settings: { ...d.settings, weekReminded: '2026-10-12' } }, fri), null, 'once a week');
   assert.equal(weekReminderDue({ ...d, settings: { ...d.settings, reminders: false } }, fri), null);
   assert.equal(A.workStyleDefaults('clock').menuBarLabel, 'workday');
+});
+
+test('breaks: overlapping breaks count once, and only inside the workday', () => {
+  const day = '2026-10-14';
+  const w = { date: day, start: atTime(day, '09:00'), end: atTime(day, '17:00'), breaks: [
+    { start: atTime(day, '12:00'), end: atTime(day, '13:00') }, { start: atTime(day, '12:30'), end: atTime(day, '12:45') },
+    { start: atTime(day, '12:45'), end: atTime(day, '13:15') }, { start: atTime(day, '08:00'), end: atTime(day, '09:10') },
+    { start: atTime(day, '16:50'), end: atTime(day, '18:00') }, { start: atTime(day, '15:00'), end: atTime(day, '14:00') },
+  ] };
+  assert.equal(breakMs(w), 75 * M + 10 * M + 10 * M);
+  assert.equal(workdayMs(w), 8 * H - 95 * M);
 });
 
 console.log(`\n${passed} passed`);
