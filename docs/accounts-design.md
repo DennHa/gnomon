@@ -109,6 +109,10 @@ offline, the activity trail), but signing in no longer depends on it.
 - **Web app:** the Mac app's interface in the browser (the web demo already runs it on made-up data), signed in with
   email and password or the company login, reading and writing the account's data on the server. Sessions are
   cookies scoped to the server, with a sign-out on every device from the account page.
+- **Account settings:** with an account, the server is the main copy of the person's data *and* of the settings
+  that belong to them (targets, work schedule, balance, language, way of working, weeks marked done); every device
+  uses those. Device settings (menu bar, shortcuts, appearance, Float/Personio until step 5) stay on each device. The
+  first Mac to sync brings its settings; later ones take the account's. *(Decided.)*
 - With company login (OIDC), passwords and resets are the identity provider's job; the email server is then only
   needed for invitations.
 
@@ -155,7 +159,8 @@ seen; actions: invite again, change role, disable, remove (with their data, afte
 2. **Accounts and sign-in:** the account area, registration (invitations; who may register), email and password
    sign-in for the Mac and the phone, the People page, and the app's first screen (section 3).
 3. **Email server, confirmation and password reset** (section 3b).
-4. **Web app with sign-in** (section 3b).
+4. **Web app with sign-in** (section 3b), with the account settings kept on the server. *(Built: `/app`, see
+   server/README.md.)*
 5. **Float and Personio per person** (section 4).
 6. **Company login** (section 3B).
 

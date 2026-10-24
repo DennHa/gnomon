@@ -8,7 +8,7 @@ import { dayKey, uid } from './time';
 import { fullDayHours } from './schedule';
 import { t, useLanguage } from './i18n';
 import { fitAll, fitWorkdays, type FitNotice } from './fit';
-import { applyChanges, baseOf, markChanges, planSync, rebase, type Change } from './sync';
+import { accountJson, applyChanges, baseOf, markChanges, planAccount, planSync, rebase, withAccountSettings, type Change, type RemoteAccount } from './sync';
 
 const DEFAULT_DATA: Data = {
   version: 1,
@@ -81,6 +81,9 @@ type Store = {
 };
 
 const StoreContext = createContext<Store | null>(null);
+
+/** changedAt's key for the account settings (src/sync.ts, planAccount). */
+const ACCOUNT_KEY = 'settings:account';
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Data | null>(null);
@@ -188,14 +191,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const fail = (error: string) => setServerSync((s) => ({ ...s, busy: false, error }));
     try {
       const state = await window.api.serverSyncState();
+      // The account settings come along with every page; the last one's are the latest.
       const pullAll = async (since: number) => {
         const changes: Change[] = [];
+        let account: RemoteAccount | null | undefined;
         for (;;) {
           const r = await window.api.serverSyncPull(since);
           if (!r.ok) throw new Error(r.error);
           changes.push(...r.changes);
+          account = r.account;
           since = r.cursor;
-          if (!r.more) return { changes, cursor: since };
+          if (!r.more) return { changes, cursor: since, account };
         }
       };
       const first = !state;
@@ -204,8 +210,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const now = new Date().toISOString();
       const plan = planSync(before, state?.base ?? {}, pulled.changes, { first, now, changedAt: (k) => changedAt.current.get(k) });
       let merged = plan.merged;
-      for (let i = 0; i < plan.push.length; i += 2000) {
-        const r = await window.api.serverSyncPush(plan.push.slice(i, i + 2000));
+      const acct = planAccount(before, state?.account, pulled.account, { now, changedAt: changedAt.current.get(ACCOUNT_KEY) });
+      if (acct.take) merged = withAccountSettings(merged, acct.take);
+      // Changed account settings go with the first batch (or alone, when no record changed).
+      for (let i = 0; i < plan.push.length || (i === 0 && acct.push); i += 2000) {
+        const r = await window.api.serverSyncPush(plan.push.slice(i, i + 2000), i === 0 ? acct.push : undefined);
         if (!r.ok) throw new Error(r.error);
         // The server kept its own (newer) version of these: take it.
         for (const sk of r.skipped) {
@@ -216,9 +225,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // The server's final word after our push (our own changes come back, plus e.g. a timer it stopped).
       const after = plan.push.length ? await pullAll(pulled.cursor) : pulled;
       if (after !== pulled) merged = applyChanges(merged, after.changes);
-      await window.api.serverSetSyncState({ cursor: after.cursor, base: baseOf(merged) });
+      await window.api.serverSetSyncState({ cursor: after.cursor, base: baseOf(merged), account: acct.agreed });
       // Entries from the phone get their workday fitted too; that change syncs back on the next round.
-      setData((d) => (d ? fit(d, rebase(d, before, merged)) : d));
+      // The account's settings come in unless they were changed here during the sync (then they go out next time).
+      const take = acct.take;
+      setData((d) => {
+        if (!d) return d;
+        const next = rebase(d, before, merged);
+        return fit(d, take && accountJson(d) === accountJson(before) && accountJson(next) !== accountJson(withAccountSettings(next, take)) ? withAccountSettings(next, take) : next);
+      });
       // Edits up to the start of this sync are settled; later ones keep their time for the next sync.
       for (const [k, at] of changedAt.current) if (at <= now) changedAt.current.delete(k);
       setServerSync((s) => ({ ...s, busy: false, error: plan.invalid.length ? t('srv.syncInvalid', { n: plan.invalid.length }) : undefined, at: new Date().toISOString() }));
@@ -244,7 +259,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!data) return;
-    if (prevData.current) markChanges(prevData.current, data, changedAt.current, new Date().toISOString());
+    if (prevData.current) {
+      const now = new Date().toISOString();
+      markChanges(prevData.current, data, changedAt.current, now);
+      const prev = prevData.current;
+      if ((prev.settings !== data.settings || prev.reviewedWeeks !== data.reviewedWeeks) && accountJson(prev) !== accountJson(data)) changedAt.current.set(ACCOUNT_KEY, now);
+    }
     prevData.current = data;
   }, [data]);
 

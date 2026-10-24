@@ -68,6 +68,37 @@ if (process.argv.includes('--tests')) {
     outfile: path.join(out, 'web/account.js'),
     logLevel: 'warning',
   });
+  // The web app (/app): the Mac app's own interface (../src) with a bridge to this server (src/web/bridge.ts).
+  // Vite-style `?raw` imports (icons, the changelog) become text; a changelog that isn't there is left empty.
+  const raw = {
+    name: 'raw',
+    setup(build) {
+      build.onResolve({ filter: /\?raw$/ }, async (a) => {
+        const file = a.path.slice(0, -4);
+        if (file.startsWith('.')) return { path: path.resolve(a.resolveDir, file), namespace: 'raw' };
+        const r = await build.resolve(file, { resolveDir: a.resolveDir, kind: a.kind });
+        return r.errors.length ? { errors: r.errors } : { path: r.path, namespace: 'raw' };
+      });
+      build.onLoad({ filter: /.*/, namespace: 'raw' }, (a) => ({ contents: fs.existsSync(a.path) ? fs.readFileSync(a.path, 'utf8') : '', loader: 'text' }));
+    },
+  };
+  const appOut = path.join(out, 'web/app');
+  await esbuild.build({
+    entryPoints: { app: path.join(root, '../src/web/main.tsx') },
+    bundle: true,
+    minify: true,
+    format: 'esm',
+    target: ['safari16', 'chrome110'],
+    jsx: 'automatic',
+    nodePaths,
+    plugins: [raw],
+    loader: { '.png': 'file', '.jpg': 'file', '.svg': 'text', '.json': 'json' },
+    assetNames: 'assets/[name]-[hash]',
+    define: { 'process.env.NODE_ENV': '"production"' },
+    outdir: appOut,
+    logLevel: 'warning',
+  });
+  fs.copyFileSync(path.join(root, '../src/web/index.html'), path.join(appOut, 'index.html'));
   // Static files; the service worker gets a build id so a new deploy replaces the cached app.
   for (const f of fs.readdirSync(path.join(root, 'web/public'))) fs.copyFileSync(path.join(root, 'web/public', f), path.join(out, 'web', f));
   const sw = path.join(out, 'web/sw.js');

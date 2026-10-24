@@ -6,7 +6,7 @@
 // both, pushes the Mac's changes, and then stores the new agreed state. When the same record changed on both sides
 // between two syncs, the later edit wins: the store remembers when each record changed on the Mac (`changedAt`), the
 // server stamps the phone's changes.
-import type { Activity, Data, Entry, Project, Workday } from './types';
+import type { Activity, Data, Entry, Project, Settings, Workday } from './types';
 
 export const KINDS = ['projects', 'activities', 'entries', 'workdays'] as const;
 export type Kind = (typeof KINDS)[number];
@@ -15,7 +15,8 @@ type AnyRecord = Project | Activity | Entry | Workday;
 export type Change = { kind: Kind; id: string; updatedAt: string; deleted: boolean; data: AnyRecord | null };
 /** `${kind}:${id}` → JSON of the record as last agreed with the server. */
 export type Base = Record<string, string>;
-export type SyncState = { cursor: number; base: Base; at?: string };
+/** `account`: the account settings last agreed with the server (their JSON) and the server's time for them. */
+export type SyncState = { cursor: number; base: Base; at?: string; account?: AccountAgreed };
 
 /** When a record (by key) last changed on the Mac; records it doesn't know count as changed `now`. */
 export type ChangedAt = (key: string) => string | undefined;
@@ -235,4 +236,76 @@ export function applyChanges(d: Data, changes: Change[]): Data {
   const m = new Map<string, AnyRecord | null>();
   for (const c of changes) m.set(`${c.kind}:${c.id}`, c.deleted ? null : c.data);
   return applyRecords(d, m);
+}
+
+// ---- Account settings ----------------------------------------------------------------------------------------
+// With an account, the server holds the settings that belong to the person rather than to a device (targets, work
+// schedule, balance, language, the way of working, weeks marked done), so every Mac, the phone and the web app use
+// the same ones. Menu bar, shortcuts, idle detection, appearance and the Float/Personio connections stay per device.
+// Like records: when both sides changed them since the last sync, the later change wins.
+
+export const ACCOUNT_SETTINGS = [
+  'language',
+  'dailyTargetHours',
+  'schedules',
+  'countAllScheduledDays',
+  'balanceStartHours',
+  'balanceStartDate',
+  'userName',
+  'workStyle',
+  'reminders',
+  'morningWelcome',
+  'activitiesEnabled',
+  'activityPreset',
+  'billableEnabled',
+  'reviewOnLeave',
+  'autoStartDay',
+  'startDayWithTimer',
+  'autoStopMidnight',
+] as const satisfies readonly (keyof Settings)[];
+
+export type AccountSettings = Partial<Pick<Settings, (typeof ACCOUNT_SETTINGS)[number]>> & { reviewedWeeks?: string[] };
+/** The account settings as the server keeps them: `updatedAt` is when they last changed (on whichever device). */
+export type RemoteAccount = { values: AccountSettings; updatedAt: string };
+export type AccountAgreed = { json: string; at: string };
+
+/** A Data's account settings, always in the same key order (so their JSON can be compared). */
+export function accountSettingsOf(d: Data): AccountSettings {
+  const out: Record<string, unknown> = {};
+  for (const k of ACCOUNT_SETTINGS) if (d.settings[k] !== undefined) out[k] = d.settings[k];
+  out.reviewedWeeks = [...(d.reviewedWeeks ?? [])].sort();
+  return out as AccountSettings;
+}
+
+/** Put account settings into a Data; keys they don't name stay as they are. */
+export function withAccountSettings(d: Data, a: AccountSettings): Data {
+  const settings = { ...d.settings } as Record<string, unknown>;
+  for (const k of ACCOUNT_SETTINGS) if (a[k] !== undefined) settings[k] = a[k];
+  return { ...d, settings: settings as Settings, reviewedWeeks: Array.isArray(a.reviewedWeeks) ? [...a.reviewedWeeks] : d.reviewedWeeks };
+}
+
+export const accountJson = (d: Data) => JSON.stringify(accountSettingsOf(d));
+
+/**
+ * What to do with the account settings in a sync. `remote` is what the server sent: undefined from a server that
+ * doesn't know account settings yet (nothing happens), null when it has none.
+ * On the first sync with a server that has them, the server's win, so a second Mac takes over the account's
+ * settings instead of overwriting them. `changedAt`: when they last changed on this device.
+ */
+export function planAccount(local: Data, agreed: AccountAgreed | undefined, remote: RemoteAccount | null | undefined, opts: { now: string; changedAt?: string }): { take?: AccountSettings; push?: RemoteAccount; agreed?: AccountAgreed } {
+  if (remote === undefined) return { agreed };
+  const mine = accountJson(local);
+  const pushMine = (at: string) => ({ push: { values: JSON.parse(mine) as AccountSettings, updatedAt: at }, agreed: { json: mine, at } });
+  const takeTheirs = (r: RemoteAccount) => ({ take: r.values, agreed: { json: accountJson(withAccountSettings(local, r.values)), at: r.updatedAt } });
+  // Nothing on the server yet: this device's become the account's, unless it only has defaults it never changed (the
+  // web app, which starts from the server's settings).
+  if (remote === null) return agreed && mine === agreed.json ? { agreed } : pushMine(opts.changedAt ?? opts.now);
+  if (!agreed) return takeTheirs(remote);
+  const here = mine !== agreed.json;
+  const there = remote.updatedAt !== agreed.at;
+  if (!here && !there) return { agreed };
+  if (!here) return takeTheirs(remote);
+  const at = opts.changedAt ?? opts.now;
+  if (there && remote.updatedAt > at) return takeTheirs(remote);
+  return pushMine(at);
 }

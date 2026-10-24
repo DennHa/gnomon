@@ -10,6 +10,7 @@ import { workStyleDefaults } from '../actions';
 import { removeSchedule, SCHEDULE_PRESETS, scheduleOn, schedulesOf, setSchedule, SINCE_ALWAYS, weekTotal } from '../schedule';
 import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel, type LayoutMap } from '../shortcuts';
 import { LANGUAGE_NAMES, locale, resolveLanguage, t, type MsgKey } from '../i18n';
+import { isWeb } from '../platform';
 
 /** "Recording · 47 minutes today", so you can see the trail is working. */
 function TrailStatus() {
@@ -159,7 +160,7 @@ function ServerSettings() {
   }, []);
 
   const signOut = async () => {
-    if (!confirm(t('srv.disconnectConfirm'))) return;
+    if (!confirm(t(isWeb() ? 'web.signOutConfirm' : 'srv.disconnectConfirm'))) return;
     setStatus(await window.api.serverDisconnect());
     setAccount(null);
     await refreshServer();
@@ -421,7 +422,7 @@ export default function Settings() {
   const labs = s.labs ?? Boolean(s.daylightUnlocked);
   const [tab, setTab] = useState<SettingsTab>(() => {
     const first = initialTab();
-    return first === 'labs' && !labs ? 'general' : first;
+    return (first === 'labs' && !labs) || (first === 'menubar' && isWeb()) ? 'general' : first;
   });
   const choose = (id: SettingsTab) => {
     setTab(id);
@@ -435,10 +436,11 @@ export default function Settings() {
   return (
     <div className="page narrow settings-page">
       <nav className="settings-tabs" role="tablist">
-        {TABS.filter((x) => x.id !== 'labs' || labs).map((x) => (
+        {TABS.filter((x) => (x.id !== 'labs' || labs) && !(isWeb() && x.id === 'menubar')).map((x) => (
           <button key={x.id} role="tab" aria-selected={tab === x.id} className={`settings-tab ${tab === x.id ? 'active' : ''}`} onClick={() => choose(x.id)}>
             <Icon name={x.icon} size={18} />
-            {t(x.label)}
+            {/* In the browser, Connections holds only the account. */}
+            {t(isWeb() && x.id === 'connections' ? 'acc.title' : x.label)}
           </button>
         ))}
       </nav>
@@ -495,6 +497,8 @@ export default function Settings() {
             <option value="de">{LANGUAGE_NAMES.de}</option>
           </select>
         </label>
+        {/* The browser follows the system's appearance. */}
+        {!isWeb() && (
         <label className="field">
           <span>{t('set.appearance')}</span>
           <select value={s.appearance ?? 'system'} onChange={(e) => set({ appearance: e.target.value as S['appearance'] })}>
@@ -503,6 +507,7 @@ export default function Settings() {
             <option value="dark">{t('set.appearance.dark')}</option>
           </select>
         </label>
+        )}
         <div className="field">
           <span>{t('set.accent')}</span>
           <span className="accent-swatches" role="radiogroup" aria-label={t('set.accent')}>
@@ -549,6 +554,7 @@ export default function Settings() {
         </label>
           </section>
           <WorkScheduleCard />
+          {!isWeb() && (
           <section className="card onb-entry">
             <span className="onb-entry-text">
               <strong>{t('tour.open')}</strong>
@@ -558,6 +564,7 @@ export default function Settings() {
               <Icon name="waving_hand" size={18} /> {t('tour.open')}
             </button>
           </section>
+          )}
         </>
       )}
 
@@ -608,6 +615,8 @@ export default function Settings() {
           </section>
           <section className="card">
             <h3>{t('set.accurate')}</h3>
+        {/* Idle detection and the activity trail need the Mac. */}
+        {!isWeb() && (
         <label className="field">
           <span>{t('set.idleAsk')}</span>
           <select value={s.idleMinutes} onChange={(e) => set({ idleMinutes: Number(e.target.value) })}>
@@ -619,6 +628,7 @@ export default function Settings() {
             ))}
           </select>
         </label>
+        )}
         <label className="check-row">
           <input type="checkbox" checked={s.autoStopMidnight} onChange={(e) => set({ autoStopMidnight: e.target.checked })} />
           {t('set.autoStop')}
@@ -627,7 +637,7 @@ export default function Settings() {
           <input type="checkbox" checked={s.reviewOnLeave} onChange={(e) => set({ reviewOnLeave: e.target.checked })} />
           {t('set.reviewOnLeave')}
         </label>
-        {profile?.allowActivityTrail === false ? (
+        {isWeb() ? null : profile?.allowActivityTrail === false ? (
           <p className="muted small">{t('managed.trailOff')}</p>
         ) : (
           <>
@@ -638,12 +648,14 @@ export default function Settings() {
             {s.activityTrail && <TrailStatus />}
           </>
         )}
+        {!isWeb() && (
         <p className="muted small">
           {t('set.trailInfo')}{' '}
           <button className="link" onClick={() => confirm(t('set.deleteTrailConfirm')) && window.api.trailClear()}>
             {t('set.deleteTrail')}
           </button>
         </p>
+        )}
           </section>
         </>
       )}
@@ -705,7 +717,9 @@ export default function Settings() {
         </>
       )}
 
-      {tab === 'connections' && !profile?.managed && (
+      {tab === 'connections' && isWeb() && <ServerSettings />}
+
+      {tab === 'connections' && !profile?.managed && !isWeb() && (
         <>
       <ServerSettings />
       <section className="card onb-entry">

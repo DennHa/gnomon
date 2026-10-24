@@ -524,4 +524,48 @@ test('breaks: overlapping breaks count once, and only inside the workday', () =>
   assert.equal(workdayMs(w), 8 * H - 95 * M);
 });
 
+test('account settings: only the account keys, in a fixed order, and putting them back leaves the rest', () => {
+  const d = { ...base(), reviewedWeeks: ['2026-10-12', '2026-10-05'], settings: { ...base().settings, menuBarLabel: 'time' as const, dailyTargetHours: 7, language: 'de' as const } };
+  const a = Sync.accountSettingsOf(d);
+  assert.equal(a.dailyTargetHours, 7);
+  assert.deepEqual(a.reviewedWeeks, ['2026-10-05', '2026-10-12']);
+  assert.equal('menuBarLabel' in a, false, 'menu bar stays on the device');
+  assert.equal(Sync.accountJson(d), Sync.accountJson({ ...d, settings: { language: 'de', ...d.settings } }), 'same JSON whatever the key order');
+  const back = Sync.withAccountSettings(base(), { dailyTargetHours: 6, reviewedWeeks: ['2026-10-19'] });
+  assert.equal(back.settings.dailyTargetHours, 6);
+  assert.equal(back.settings.menuBarLabel, base().settings.menuBarLabel);
+  assert.deepEqual(back.reviewedWeeks, ['2026-10-19']);
+});
+
+test('account settings: the first sync takes the server’s, later the newer change wins', () => {
+  const T = '2026-10-17T10:00:00.000Z';
+  const mine = { ...base(), settings: { ...base().settings, dailyTargetHours: 7 } };
+  const theirs = { values: { dailyTargetHours: 6 }, updatedAt: T };
+  // An old server: nothing happens.
+  assert.deepEqual(Sync.planAccount(mine, undefined, undefined, { now: NOW }), { agreed: undefined });
+  // Nothing on the server yet: this Mac's settings become the account's.
+  const first = Sync.planAccount(mine, undefined, null, { now: NOW });
+  assert.equal(first.push?.values.dailyTargetHours, 7);
+  // A second Mac (or a new sign-in) takes over what the account has, instead of overwriting it.
+  const second = Sync.planAccount(mine, undefined, theirs, { now: NOW });
+  assert.equal(second.take?.dailyTargetHours, 6);
+  assert.equal(second.push, undefined);
+  const agreed = second.agreed!;
+  const synced = Sync.withAccountSettings(mine, second.take!);
+  assert.deepEqual(Sync.planAccount(synced, agreed, theirs, { now: NOW }), { agreed }, 'nothing changed: nothing to do');
+  // Changed here only: pushed with the time of the change.
+  const edited = { ...synced, settings: { ...synced.settings, dailyTargetHours: 5 } };
+  assert.deepEqual(Sync.planAccount(edited, agreed, theirs, { now: NOW, changedAt: '2026-10-17T11:00:00.000Z' }).push, { values: Sync.accountSettingsOf(edited), updatedAt: '2026-10-17T11:00:00.000Z' });
+  // Changed elsewhere only: taken.
+  const later = { values: { dailyTargetHours: 4 }, updatedAt: '2026-10-17T11:30:00.000Z' };
+  assert.equal(Sync.planAccount(synced, agreed, later, { now: NOW }).take?.dailyTargetHours, 4);
+  // Both: the later change wins.
+  assert.equal(Sync.planAccount(edited, agreed, later, { now: NOW, changedAt: '2026-10-17T11:00:00.000Z' }).take?.dailyTargetHours, 4);
+  assert.equal(Sync.planAccount(edited, agreed, later, { now: NOW, changedAt: '2026-10-17T11:45:00.000Z' }).push?.values.dailyTargetHours, 5);
+  // The web app starts from the server's (none yet) and sends nothing until something is changed there.
+  const web = { json: Sync.accountJson(mine), at: '' };
+  assert.equal(Sync.planAccount(mine, web, null, { now: NOW }).push, undefined);
+  assert.equal(Sync.planAccount(edited, web, null, { now: NOW }).push?.values.dailyTargetHours, 5);
+});
+
 console.log(`\n${passed} passed`);

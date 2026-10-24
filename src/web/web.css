@@ -1,0 +1,10 @@
+/* The web app (/app): the sign-in page; everything else is the Mac app's own styles. */
+.web-signin { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
+.web-signin-card { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; padding: 28px; }
+.web-signin-card h2 { margin: 4px 0 0; }
+.web-signin-card p { margin: 0; }
+.web-signin-card .field { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.web-signin-card .field input { width: 100%; }
+.web-signin-card .btn { margin-top: 4px; }
+.web-signin-links { display: flex; flex-direction: column; gap: 6px; }
+.web-signin-links a { color: var(--accent-strong); }

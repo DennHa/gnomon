@@ -5,6 +5,8 @@ WORKDIR /app/server
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY src /app/src
+# The web app (/app) shows the Mac app's version and changelog.
+COPY package.json CHANGELOG.md /app/
 COPY server /app/server
 RUN npm run build && npm prune --omit=dev
 

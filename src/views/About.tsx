@@ -8,6 +8,7 @@ import type { FeedbackThread } from '../global';
 import changelog from '../../CHANGELOG.md?raw';
 import credits from '../credits.json';
 import appIcon from '../assets/app-icon.png';
+import { isWeb } from '../platform';
 
 type Info = Awaited<ReturnType<Window['api']['appInfo']>>;
 type Check = Awaited<ReturnType<Window['api']['checkUpdate']>>;
@@ -250,12 +251,17 @@ export default function About({ onOpenLabs }: { onOpenLabs: () => void }) {
         </p>
       )}
 
-      <section className="card">
-        <h3>{t('about.updates')}</h3>
-        {info && <Updates info={info} />}
-      </section>
+      {/* The web app is updated with the server; feedback goes through the Mac app. */}
+      {!isWeb() && (
+        <>
+          <section className="card">
+            <h3>{t('about.updates')}</h3>
+            {info && <Updates info={info} />}
+          </section>
 
-      <FeedbackCard />
+          <FeedbackCard />
+        </>
+      )}
 
       <section className="card">
         <h3>{t('about.changes')}</h3>
