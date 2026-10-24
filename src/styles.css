@@ -770,6 +770,9 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .hero-clock.resting { opacity: 0.5; }
 .hero-btn .icon.morph { animation: m-morph 0.3s cubic-bezier(0.3, 1.4, 0.5, 1); }
 .feed-row.fresh { animation: m-slide 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* The entry you just added with Enter or +: lights up where it landed in the day. */
+.feed-row.just-added { animation: m-added 2.4s ease-out; border-radius: 10px; }
+@keyframes m-added { 0%, 30% { background: var(--accent-soft); } 100% { background: transparent; } }
 .week-done { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 .week-done.pop-in { animation: m-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
 .burst { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 2; }

@@ -6,7 +6,7 @@ import { BillableToggle, ProjectSelect, TimeField } from './components';
 import { Icon } from './icons';
 import { planItemsOn } from './plan';
 import type { Entry } from './types';
-import { dayKey, entryMs, fmtClock, fmtHM, parseDuration } from './time';
+import { dayKey, entryMs, fmtClock, fmtHM, parseDuration, uid } from './time';
 import { t } from './i18n';
 
 /** Compact Float task picker: an icon and the task name, "—" when none. Hidden when the project has no tasks that day. */
@@ -92,8 +92,13 @@ export function HoursInput({ ms, onCommit, disabled, autoFocus, inputRef }: { ms
   );
 }
 
-function FeedRow({ entry, mode, showProject, readOnly, tasks }: { entry: Entry; mode: 'hours' | 'times'; showProject: boolean; readOnly?: boolean; tasks: boolean }) {
+function FeedRow({ entry, mode, showProject, readOnly, tasks, added }: { entry: Entry; mode: 'hours' | 'times'; showProject: boolean; readOnly?: boolean; tasks: boolean; added?: boolean }) {
   const { update } = useStore();
+  const rowRef = useRef<HTMLDivElement>(null);
+  // A typed-in entry goes into the first free stretch of the day, often mid-list: show where it landed.
+  useEffect(() => {
+    if (added) rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [added]);
   const now = Date.now();
   const day = dayKey(entry.start);
   const set = (p: Partial<Entry>) => update((d) => updateEntry(d, entry.id, p));
@@ -101,7 +106,7 @@ function FeedRow({ entry, mode, showProject, readOnly, tasks }: { entry: Entry; 
 
   return (
     // Slides in when it was just started or stopped (not on every render of older rows).
-    <div className={`feed-row ${running ? 'running' : ''} ${now - Date.parse(entry.end ?? entry.start) < 3000 ? 'fresh' : ''}`}>
+    <div ref={rowRef} className={`feed-row ${running ? 'running' : ''} ${now - Date.parse(entry.end ?? entry.start) < 3000 ? 'fresh' : ''} ${added ? 'just-added' : ''}`}>
       <input className="feed-desc" value={entry.description} placeholder={t('feed.whatDidYouDo')} disabled={readOnly} onChange={(e) => set({ description: e.target.value })} />
       <div className="feed-meta">
         {showProject && <ProjectSelect value={entry.projectId} onChange={(projectId) => set({ projectId, taskId: undefined, taskName: undefined })} />}
@@ -148,7 +153,19 @@ function FeedRow({ entry, mode, showProject, readOnly, tasks }: { entry: Entry; 
  * The empty row at the end of a feed: description, Enter → hours, Enter or + → added, cursor back to the description.
  * Leaving the hours field never adds anything by itself.
  */
-function NewRow({ day, projectId, showProject, prefill }: { day: string; projectId?: string; showProject: boolean; prefill?: { ms: number; taskId?: number; taskName?: string } | null }) {
+function NewRow({
+  day,
+  projectId,
+  showProject,
+  prefill,
+  onAdded,
+}: {
+  day: string;
+  projectId?: string;
+  showProject: boolean;
+  prefill?: { ms: number; taskId?: number; taskName?: string } | null;
+  onAdded: (id: string) => void;
+}) {
   const { update } = useStore();
   const [description, setDescription] = useState('');
   const [project, setProject] = useState<string | undefined>(projectId);
@@ -172,7 +189,9 @@ function NewRow({ day, projectId, showProject, prefill }: { day: string; project
       hoursRef.current?.focus();
       return;
     }
-    update((d) => appendEntry(d, day, parsed!, { projectId: project, description: description.trim(), taskId: task.id, taskName: task.name, activityId }));
+    const id = uid();
+    update((d) => appendEntry(d, day, parsed!, { id, projectId: project, description: description.trim(), taskId: task.id, taskName: task.name, activityId }));
+    onAdded(id);
     setDescription('');
     setHours('');
     setTask({});
@@ -230,15 +249,16 @@ export function EntryFeed({
   prefill?: { ms: number; taskId?: number; taskName?: string } | null;
 }) {
   const { data } = useStore();
+  const [added, setAdded] = useState<string | null>(null);
   const showProject = projectId === undefined;
   // Only keep a column for the Float task when some entry of the day can have one; otherwise the activity gets the room.
   const tasks = entries.some((e) => e.taskId || (e.projectId && planItemsOn(data, e.projectId, day).length));
   return (
     <div className={`feed mode-${mode} ${showProject ? 'with-project' : ''} ${tasks ? '' : 'no-tasks'}`}>
       {entries.map((e) => (
-        <FeedRow key={e.id} entry={e} mode={mode} showProject={showProject} readOnly={readOnly} tasks={tasks} />
+        <FeedRow key={e.id} entry={e} mode={mode} showProject={showProject} readOnly={readOnly} tasks={tasks} added={e.id === added} />
       ))}
-      {!readOnly && mode === 'hours' && <NewRow day={day} projectId={projectId ?? undefined} showProject={showProject} prefill={prefill} />}
+      {!readOnly && mode === 'hours' && <NewRow day={day} projectId={projectId ?? undefined} showProject={showProject} prefill={prefill} onAdded={setAdded} />}
     </div>
   );
 }
