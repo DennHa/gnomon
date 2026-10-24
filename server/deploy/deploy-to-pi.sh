@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copy the server to the Pi and (re)build it there. Usage: server/deploy/deploy-to-pi.sh user@your-pi [dir]
-# Only src/ (shared API logic) and server/ are copied. The data lives in the Docker volume gnomon_gnomon-data, not in
+# Only src/ (shared API logic), server/ and docs/ROADMAP.md (the /roadmap page) are copied. The data lives in the Docker volume gnomon_gnomon-data, not in
 # the copied folder, so redeploying never touches it.
 set -euo pipefail
 
@@ -26,6 +26,8 @@ ssh "${PI_HOST}" "mkdir -p '${TARGET_DIR}'"
 rsync -az --delete \
   --exclude 'node_modules' --exclude 'dist' --exclude 'dist-test' --exclude '.data' --exclude '.env' --exclude 'docker-compose.override.yml' --exclude '.DS_Store' \
   "${REPO_DIR}/src" "${REPO_DIR}/server" "${PI_HOST}:${TARGET_DIR}/"
+ssh "${PI_HOST}" "mkdir -p '${TARGET_DIR}/docs'"
+rsync -az "${REPO_DIR}/docs/ROADMAP.md" "${PI_HOST}:${TARGET_DIR}/docs/ROADMAP.md"
 
 echo "[3/5] Build and start (the first build on a Pi takes a few minutes)"
 ssh "${PI_HOST}" "cd '${TARGET_DIR}/server' && docker compose config --quiet && docker compose up -d --build"

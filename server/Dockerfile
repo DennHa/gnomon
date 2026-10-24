@@ -6,6 +6,8 @@ COPY server/package.json server/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY src /app/src
 COPY server /app/server
+# The public roadmap page (/roadmap) is built from it.
+COPY docs/ROADMAP.md /app/docs/ROADMAP.md
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim

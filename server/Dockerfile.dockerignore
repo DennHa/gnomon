@@ -1,7 +1,8 @@
-# Only src/ and server/ are needed; keep everything else (and all secrets/data) out of the image.
+# Only src/, server/ and docs/ROADMAP.md (for /roadmap) are needed; keep everything else (and all secrets/data) out of the image.
 *
 !src/**
 !server/**
+!docs/ROADMAP.md
 server/node_modules
 server/dist
 server/dist-test

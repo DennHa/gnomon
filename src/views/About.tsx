@@ -1,4 +1,5 @@
-// Info & feedback: version, update check, feedback, what's new (CHANGELOG.md) and the open-source projects used.
+// Info & feedback: version, update check, feedback, what's new (CHANGELOG.md, plus a link to the server's /roadmap) and
+// the open-source projects used.
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useStore } from '../store';
 import { Burst } from '../motion';
@@ -258,7 +259,14 @@ export default function About({ onOpenLabs }: { onOpenLabs: () => void }) {
       <FeedbackCard />
 
       <section className="card">
-        <h3>{t('about.changes')}</h3>
+        <div className="card-head">
+          <h3>{t('about.changes')}</h3>
+          {info?.roadmap && (
+            <button className="link-btn small" onClick={() => window.api.openLink(info.roadmap!)}>
+              {t('about.coming')}
+            </button>
+          )}
+        </div>
         <Changelog />
       </section>
 

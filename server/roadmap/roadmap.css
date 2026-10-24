@@ -1,0 +1,44 @@
+/* The public roadmap (/roadmap): the one-page site's look (site/site.css), dark and calm, the sun yellow as the only
+   colour. Each section of docs/ROADMAP.md is a card. */
+:root {
+  --bg: #0d0f12;
+  --surface: #16191e;
+  --line: rgba(255, 255, 255, 0.08);
+  --text: #f2efe7;
+  --soft: #c9c6be;
+  --muted: #9aa0a8;
+  --sun: #f5b400;
+  --ok: #4cc38a;
+  --radius: 18px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-image: radial-gradient(1100px 700px at 85% -10%, rgba(245, 180, 0, 0.12), transparent 60%);
+  background-repeat: no-repeat;
+}
+a { color: inherit; }
+main { max-width: 760px; margin: 0 auto; padding: clamp(32px, 6vw, 72px) 16px 40px; }
+header { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; margin-bottom: 40px; }
+header img { border-radius: 9px; }
+h1 { margin: 0; font-size: clamp(38px, 6vw, 60px); font-weight: 750; letter-spacing: -0.03em; line-height: 1.08; }
+h1 + p { margin: 14px 0 0; color: var(--muted); }
+section { margin-top: 22px; padding: 24px clamp(18px, 3vw, 28px); border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+h1 + p + section { margin-top: 40px; }
+h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+#now { border-color: rgba(245, 180, 0, 0.35); }
+#now h2 { color: var(--sun); }
+#what-gnomon-does-today h2 { color: var(--ok); }
+section p { margin: 0 0 10px; color: var(--soft); }
+ul { list-style: none; margin: 0; padding: 0; }
+li { padding: 10px 0; color: var(--soft); }
+li + li { border-top: 1px solid var(--line); }
+li strong { display: block; color: var(--text); font-weight: 650; }
+#left-out-on-purpose li strong { color: var(--soft); }
+code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+footer { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; font-size: 14px; color: var(--muted); }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--text); }

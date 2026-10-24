@@ -158,6 +158,13 @@ or `serverUrl` of a company profile (see `docs/company-setup.md`), so the downlo
 **`/about`** serves the one-page site from `site/` in the repo: put that folder on the server and point `GNOMON_SITE_DIR`
 at it (in Docker: mount it read-only). Public, static, nothing from other servers.
 
+### Roadmap
+
+**`/roadmap`** shows `docs/ROADMAP.md`, read-only: `npm run build` turns it into a static page (`dist/roadmap/`, see
+`roadmap/render.mjs`), in the same look as `/about`, with the same strict CSP (no scripts, nothing from elsewhere). It's
+always on and public; the Docker image and `deploy/deploy-to-pi.sh` take the file along, so a redeploy publishes the
+current roadmap. Without the file at build time, `/roadmap` isn't served.
+
 ### Web demo
 
 Show Gnomon to people before they download it: **`/example`** is the Mac app's own interface in the browser, and
@@ -232,6 +239,7 @@ server/
   src/store.ts       SQLite: records (JSON + seq + updatedAt + tombstones), devices, pairing codes
   src/app.ts         HTTP: auth, body limits, server-only routes, sync, static files with CSP
   src/server.ts      entry point          src/admin.ts   gnomon-admin CLI
+  roadmap/           the /roadmap page, rendered from docs/ROADMAP.md at build time
   web/               the PWA (React, bundled with esbuild; Material Symbols inlined)
   tests/             node:test end-to-end tests
   Dockerfile, docker-compose.yml, deploy/deploy-to-pi.sh
