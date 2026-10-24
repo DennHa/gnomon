@@ -271,7 +271,11 @@ export function WorkdayEditor({ day }: { day: string }) {
           <Icon name="add" size={16} /> {t('break')}
         </button>
       </div>
-      {wd.fromEntries && <p className="muted small wd-from-entries">{t('fit.fromEntriesHint')}</p>}
+      {wd.fromEntries && (
+        <p className="muted small wd-from-entries">
+          <span className="from-bookings">{t('fit.fromEntries')}</span> {t('fit.fromEntriesHint')}
+        </p>
+      )}
     </div>
   );
 }
@@ -297,16 +301,29 @@ export function DayReview({ day, title }: { day: string; title?: string }) {
   return (
     <div className="review">
       {title && <h3>{complete ? t('review.complete') : title}</h3>}
+      {/* Work hours and bookings are separate; their difference is only a hint, with where each number comes from. */}
       <div className="review-stats">
-        <span>
-          {t('atWork')} <strong>{fmtDuration(atWork)}</strong>
-        </span>
-        <span>
-          {t('tracked')} <strong>{fmtDuration(tracked)}</strong>
-        </span>
-        <span className={unassigned >= 5 * 60_000 ? 'neg' : 'pos'}>
-          {unassigned >= 5 * 60_000 ? t('review.notAssigned', { duration: fmtDuration(unassigned) }) : t('review.allAssigned')}
-        </span>
+        {wd.fromEntries ? (
+          <span>
+            {t('review.booked')} <strong>{fmtDuration(tracked)}</strong> <span className="from-bookings">{t('fit.fromEntries')}</span>
+          </span>
+        ) : (
+          <>
+            <span>
+              {t('review.clockedIn')} <strong>{fmtDuration(atWork)}</strong>
+            </span>
+            <span>
+              {t('review.booked')} <strong>{fmtDuration(tracked)}</strong>
+            </span>
+            <span className="muted">
+              {unassigned >= 5 * 60_000
+                ? t('review.notAssigned', { duration: fmtDuration(unassigned) })
+                : unassigned <= -5 * 60_000
+                  ? t('review.overBooked', { duration: fmtDuration(-unassigned) })
+                  : t('review.allAssigned')}
+            </span>
+          </>
+        )}
       </div>
       <TrailSummary day={day} />
       {gaps.length > 0 && (

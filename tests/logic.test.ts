@@ -430,14 +430,14 @@ test('workday follows entries: created from entries, widened to cover them, hand
   assert.equal(w.breaks.length, 1);
   assert.equal(w.fromEntries, true);
   assert.equal(r.notices[0].kind, 'created');
-  // A day clocked in by hand 10:00–16:00 widens to the entries, and says so.
+  // A day clocked in by hand 10:00–16:00 stays as it is: bookings never move clock times.
   d = { ...base(), workdays: [{ date: '2026-10-16', start: atTime('2026-10-16', '10:00'), end: atTime('2026-10-16', '16:00'), breaks: [] }] };
   const before = d;
   d = { ...d, entries: [e('c', '2026-10-16', '08:30', '11:00'), e('d', '2026-10-16', '15:00', '18:15')] };
   r = fitWorkdays(before, d, now);
-  assert.equal(r.data.workdays[0].start, atTime('2026-10-16', '08:30'));
-  assert.equal(r.data.workdays[0].end, atTime('2026-10-16', '18:15'));
-  assert.deepEqual(r.notices.map((n) => n.kind), ['start', 'end']);
+  assert.equal(r.data.workdays[0].start, atTime('2026-10-16', '10:00'));
+  assert.equal(r.data.workdays[0].end, atTime('2026-10-16', '16:00'));
+  assert.equal(r.notices.length, 0);
   // Editing a derived day by hand stops it from following the entries.
   const edited = A.updateWorkday(fitAll({ ...base(), entries: [e('f', '2026-10-15', '09:00', '17:00')] }, now), '2026-10-15', { end: atTime('2026-10-15', '18:00') });
   assert.equal(edited.workdays[0].fromEntries, undefined);
@@ -446,26 +446,24 @@ test('workday follows entries: created from entries, widened to cover them, hand
   assert.equal(fitAll({ ...off, entries: [e('g', '2026-10-14', '09:00', '10:00')] }, now).workdays.length, 1);
 });
 
-test('arrival: never later on its own, Start day makes a derived day yours, every move can be undone', () => {
+test('a day from bookings follows them both ways; a typed-over arrival stays yours', () => {
   const e = (id: string, date: string, from: string, to?: string) => ({ id, description: '', start: atTime(date, from), ...(to && { end: atTime(date, to) }) });
   const now = Date.parse('2026-10-20T12:00:00');
-  // Today, made from entries at 08:00. Deleting that first entry leaves the arrival at 08:00 instead of jumping to 10:00.
+  // Today, made from entries at 08:00. Deleting that first entry moves the arrival to the next one, 10:00.
   const made = fitWorkdays(base(), { ...base(), entries: [e('a', '2026-10-20', '08:00', '09:00'), e('b', '2026-10-20', '10:00', '11:00')] }, now).data;
   assert.equal(made.workdays[0].start, atTime('2026-10-20', '08:00'));
   const shrunk = fitWorkdays(made, { ...made, entries: made.entries.filter((x) => x.id !== 'a') }, now);
-  assert.equal(shrunk.data.workdays[0].start, atTime('2026-10-20', '08:00'), 'not later on its own');
+  assert.equal(shrunk.data.workdays[0].start, atTime('2026-10-20', '10:00'));
   assert.equal(shrunk.notices.length, 0);
-  // An earlier entry still pulls it earlier, and the note says from when, so it can be undone.
-  const earlier = fitWorkdays(made, { ...made, entries: [...made.entries, e('c', '2026-10-20', '07:30', '08:00')] }, now);
-  assert.equal(earlier.data.workdays[0].start, atTime('2026-10-20', '07:30'));
-  assert.deepEqual(earlier.notices[0], { kind: 'start', date: '2026-10-20', at: atTime('2026-10-20', '07:30'), from: atTime('2026-10-20', '08:00') });
-  const undone = A.updateWorkday(earlier.data, '2026-10-20', { start: earlier.notices[0].from });
-  assert.equal(undone.workdays[0].start, atTime('2026-10-20', '08:00'));
-  assert.equal(undone.workdays[0].fromEntries, undefined, 'undo makes the day yours');
-  // A hand-clocked day that widens also tells where it came from.
-  const hand = { ...base(), workdays: [{ date: '2026-10-16', start: atTime('2026-10-16', '10:00'), end: atTime('2026-10-16', '16:00'), breaks: [] }] };
-  const widened = fitWorkdays(hand, { ...hand, entries: [e('d', '2026-10-16', '09:00', '17:00')] }, now);
-  assert.deepEqual(widened.notices.map((n) => [n.kind, n.from]), [['start', atTime('2026-10-16', '10:00')], ['end', atTime('2026-10-16', '16:00')]]);
+  // A past day ends with its last entry, also when that entry gets shorter.
+  const past = fitWorkdays(base(), { ...base(), entries: [e('c', '2026-10-15', '09:00', '17:00')] }, now).data;
+  const shorter = fitWorkdays(past, { ...past, entries: [e('c', '2026-10-15', '09:00', '15:00')] }, now).data;
+  assert.equal(shorter.workdays[0].end, atTime('2026-10-15', '15:00'));
+  // Once you set the arrival yourself, an earlier entry no longer moves it.
+  const mine = A.updateWorkday(made, '2026-10-20', { start: atTime('2026-10-20', '08:30') });
+  assert.equal(mine.workdays[0].fromEntries, undefined);
+  const after = fitWorkdays(mine, { ...mine, entries: [...mine.entries, e('d', '2026-10-20', '07:00', '07:30')] }, now);
+  assert.equal(after.data.workdays[0].start, atTime('2026-10-20', '08:30'));
 });
 
 test('Start day on a day made from entries makes it yours; breaks never end before they start', () => {

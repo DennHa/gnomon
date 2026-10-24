@@ -813,6 +813,7 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 /* Workday follows the entries (src/fit.ts) */
 .fit-toast { position: fixed; right: 20px; bottom: 20px; z-index: 50; max-width: 380px; display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow), 0 8px 24px rgba(0, 0, 0, 0.18); font-size: 13px; cursor: pointer; animation: m-toast 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .wd-from-entries { margin: 8px 0 0; }
+.from-bookings { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-weight: 600; }
 .ts-open { display: block; margin: 2px auto 0; border: 0; padding: 0 4px; border-radius: 6px; background: none; color: var(--accent-strong); font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .ts-open:hover { background: var(--accent-soft); }
 @media (prefers-reduced-motion: reduce) { .fit-toast { animation: none; } }
