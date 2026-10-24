@@ -172,7 +172,7 @@ admin can send someone a reset link from the People page. The link always goes t
 see it. Without email, invitations are links you pass on by hand, as before. Invitations are valid for 14 days by
 default (People → *Invitations are valid for*); expired ones show as expired and can be sent again.
 
-**Inviting many people at once:** People → *Invite from a list*. Upload a CSV file or paste a list, one person per
+**Inviting many people at once:** People → *Invite people* → *From a list*. Upload a CSV file or paste a list, one person per
 line with name and email, separated by comma, semicolon or tab, for example `Jane Doe; jane.doe@example.com`. A header
 line is optional; with one, columns such as *Name*, *First name* / *Last name* (*Vorname* / *Nachname*) and *Email*
 are recognised, in any order. Excel's CSV works (quotes, a byte order mark, and Windows' older encoding); an `.xlsx`
