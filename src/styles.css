@@ -912,7 +912,7 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .card h3 + h4 { margin-top: 4px; }
 .bar-col { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
 .bar-col:hover .bar-track { opacity: 0.85; }
-.bar-value { white-space: nowrap; }
+.bar-value { white-space: nowrap; max-width: 100%; overflow: hidden; } /* Never runs into the next day's number. */
 .bars.month .bar-value { font-size: 10px; }
 .breakdowns { margin-top: 10px; gap: 32px; }
 .breakdown h4 { margin-top: 18px; }

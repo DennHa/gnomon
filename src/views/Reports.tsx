@@ -12,7 +12,6 @@ import {
   fmtDate,
   fmtDayLabel,
   fmtDuration,
-  fmtHM,
   fmtHours,
   fmtTime,
   hoursToMs,
@@ -293,7 +292,7 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
             const total = segs.reduce((s, [, ms]) => s + ms, 0);
             return (
               <button key={d} className="bar-col" title={`${fmtDayLabel(d)}: ${fmtDuration(total)}`} onClick={() => onOpenDay(d)}>
-                <span className="bar-value">{total ? (kind === 'month' ? fmtHM(total) : fmtDuration(total)) : ''}</span>
+                <span className="bar-value">{total ? (kind === 'month' ? `${Math.max(1, Math.round(total / 3_600_000))}h` : fmtDuration(total)) : ''}</span>
                 <div className="bar-track">
                   <div className="bar-stack" style={{ height: `${(total / report.maxDay) * 100}%` }}>
                     {segs.map(([pid, ms]) => (
