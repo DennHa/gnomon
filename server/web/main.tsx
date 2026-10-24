@@ -202,6 +202,9 @@ function Pair({ onPaired }: { onPaired: (key: string) => void }) {
         <button className="primary big" disabled={busy || !email.trim() || !password}>
           {t('signIn')}
         </button>
+        <a className="muted small" href="/account/forgot">
+          {t('forgot')}
+        </a>
         <a className="muted small" href="/account/register">
           {t('noAccount')}
         </a>

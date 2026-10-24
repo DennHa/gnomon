@@ -226,6 +226,48 @@ const EN = {
   pRemove: 'Remove',
   pRemoveConfirm: 'Remove {name} with all their times and devices? This can’t be undone.',
   loginEmailless: 'This server’s first account has no email yet: leave the email empty and use the password.',
+  emailTitle: 'Email',
+  emailIntro: 'For invitations and password resets. Without email, invitations are links you pass on by hand, and nobody can reset a forgotten password themselves.',
+  emailSmtp: 'SMTP',
+  emailGraph: 'Microsoft 365',
+  emailSmtpHint: 'Any mail provider: Gmail (with an app password), Hetzner, your company’s mail server.',
+  emailGraphHint: 'Through an app registration in Microsoft Entra, because Microsoft is turning off SMTP sign-in with a password. The steps are in the server guide (server/README.md).',
+  emailHost: 'Mail server',
+  emailPort: 'Port',
+  emailSecurity: 'Security',
+  emailTls: 'TLS (usually port 465)',
+  emailStarttls: 'STARTTLS (usually port 587)',
+  emailNone: 'None (only for a relay on this machine)',
+  emailUser: 'User name',
+  emailPassword: 'Password',
+  emailTenant: 'Directory (tenant) ID',
+  emailClient: 'Application (client) ID',
+  emailSecret: 'Client secret (its Value)',
+  emailFrom: 'Sender address',
+  emailFromHint: 'Emails come from this address, with “{name}” as the sender name.',
+  emailFromGraphHint: 'The mailbox the app sends as, for example a shared mailbox. “{name}” is the sender name.',
+  emailSecretKept: 'Stored. Leave empty to keep it.',
+  emailTestTo: 'Send a test email to',
+  emailTest: 'Send a test email',
+  emailSending: 'Sending…',
+  emailTestOk: 'Sent to {to}. Check the inbox, and the spam folder.',
+  emailReady: 'Email works. Last successful test: {when}.',
+  emailUntested: 'Saved. Send a test email to check that it works.',
+  emailNoUrl: 'Enter the server’s address under Company first: the links in emails point to it.',
+  emailOff: 'Turn off email',
+  emailOffConfirm: 'Turn off email? Invitations become links to pass on by hand, and nobody can reset their password.',
+  pInviteIntroEmail: 'They get an email with a link to create their account (name and password).',
+  pInviteSent: 'Invitation sent to {email}. The link works once, until {date}.',
+  pInviteFailed: 'The email didn’t go out: {error} Pass on this link instead.',
+  pExpired: 'Invitation expired',
+  pInvitedUntil: 'Invitation valid until {date}',
+  pResend: 'Send invitation again',
+  pReset: 'Send password reset',
+  pResetConfirm: 'Send {name} an email with a link to set a new password? It works once, for 30 minutes.',
+  pResetSent: 'Sent {email} a link to set a new password.',
+  pInviteDays: 'Invitations are valid for',
+  pDays: 'days',
+  loginForgot: 'Forgot your password?',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -437,6 +479,48 @@ const DE: Record<Key, string> = {
   pRemove: 'Entfernen',
   pRemoveConfirm: '{name} mit allen Zeiten und Geräten entfernen? Das lässt sich nicht rückgängig machen.',
   loginEmailless: 'Das erste Konto dieses Servers hat noch keine E-Mail: Lass die E-Mail leer und nimm das Passwort.',
+  emailTitle: 'E-Mail',
+  emailIntro: 'Für Einladungen und zum Zurücksetzen von Passwörtern. Ohne E-Mail sind Einladungen Links zum Weitergeben, und ein vergessenes Passwort kann niemand selbst zurücksetzen.',
+  emailSmtp: 'SMTP',
+  emailGraph: 'Microsoft 365',
+  emailSmtpHint: 'Jeder Mail-Anbieter: Gmail (mit App-Passwort), Hetzner, der Mailserver deiner Firma.',
+  emailGraphHint: 'Über eine App-Registrierung in Microsoft Entra, weil Microsoft die SMTP-Anmeldung mit Passwort abschaltet. Die Schritte stehen in der Server-Anleitung (server/README.md).',
+  emailHost: 'Mailserver',
+  emailPort: 'Port',
+  emailSecurity: 'Verschlüsselung',
+  emailTls: 'TLS (meist Port 465)',
+  emailStarttls: 'STARTTLS (meist Port 587)',
+  emailNone: 'Keine (nur für einen Relay auf diesem Rechner)',
+  emailUser: 'Benutzername',
+  emailPassword: 'Passwort',
+  emailTenant: 'Verzeichnis-ID (Mandant)',
+  emailClient: 'Anwendungs-ID (Client)',
+  emailSecret: 'Geheimer Clientschlüssel (sein Wert)',
+  emailFrom: 'Absenderadresse',
+  emailFromHint: 'E-Mails kommen von dieser Adresse, mit „{name}“ als Absendername.',
+  emailFromGraphHint: 'Das Postfach, als das die App sendet, zum Beispiel ein freigegebenes Postfach. „{name}“ ist der Absendername.',
+  emailSecretKept: 'Gespeichert. Leer lassen, um es zu behalten.',
+  emailTestTo: 'Test-E-Mail senden an',
+  emailTest: 'Test-E-Mail senden',
+  emailSending: 'Sende…',
+  emailTestOk: 'An {to} gesendet. Schau in den Posteingang und in den Spam-Ordner.',
+  emailReady: 'E-Mail funktioniert. Letzter erfolgreicher Test: {when}.',
+  emailUntested: 'Gespeichert. Sende eine Test-E-Mail, um zu prüfen, ob es klappt.',
+  emailNoUrl: 'Gib zuerst unter Firma die Adresse des Servers ein: Die Links in den E-Mails führen dorthin.',
+  emailOff: 'E-Mail abschalten',
+  emailOffConfirm: 'E-Mail abschalten? Einladungen werden zu Links zum Weitergeben, und niemand kann sein Passwort zurücksetzen.',
+  pInviteIntroEmail: 'Sie bekommen eine E-Mail mit einem Link, um ihr Konto anzulegen (Name und Passwort).',
+  pInviteSent: 'Einladung an {email} gesendet. Der Link funktioniert einmal, bis {date}.',
+  pInviteFailed: 'Die E-Mail ging nicht raus: {error} Gib stattdessen diesen Link weiter.',
+  pExpired: 'Einladung abgelaufen',
+  pInvitedUntil: 'Einladung gültig bis {date}',
+  pResend: 'Einladung erneut senden',
+  pReset: 'Passwort-Link senden',
+  pResetConfirm: '{name} eine E-Mail mit einem Link für ein neues Passwort senden? Er funktioniert einmal, 30 Minuten lang.',
+  pResetSent: '{email} hat einen Link für ein neues Passwort bekommen.',
+  pInviteDays: 'Einladungen gelten',
+  pDays: 'Tage',
+  loginForgot: 'Passwort vergessen?',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -450,9 +534,11 @@ type Config = {
   float: { tested?: string; people?: number };
   personio: { tested?: string; people?: number; absenceTypes?: { id: string; name: string; unit?: string }[]; dayOffTypes?: string[] };
   rules: Record<'managed' | 'allowLocalApi' | 'allowActivityTrail' | 'phoneApp', boolean>;
+  email?: EmailSettings;
   audit: { at: string; what: string }[];
 };
-type State = { config: Config; secrets: { float: boolean; personio: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; me: { id: string; email: string | null; name: string }; registration: 'invite' | 'approval' | 'open'; pending: number };
+type EmailSettings = { provider: 'smtp'; host: string; port: number; security: 'tls' | 'starttls' | 'none'; user: string; from: string; tested?: string } | { provider: 'graph'; tenantId: string; clientId: string; from: string; tested?: string };
+type State = { config: Config; secrets: { float: boolean; personio: boolean; email: boolean }; email: { ready: boolean; publicUrl: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; me: { id: string; email: string | null; name: string }; registration: 'invite' | 'approval' | 'open'; pending: number };
 
 let token = '';
 try {
@@ -594,6 +680,138 @@ function CompanyStep({ s, setS, setErr }: Ctx) {
 
 function SignIn() {
   return <p className="a-intro">{t('signInSoon')}</p>;
+}
+
+function EmailStep({ s, setS, setErr }: Ctx) {
+  const e = s.config.email;
+  const [provider, setProvider] = useState<'smtp' | 'graph'>(e?.provider ?? 'smtp');
+  const [smtp, setSmtp] = useState({ host: '', port: 587, security: 'starttls' as 'tls' | 'starttls' | 'none', user: '', ...(e?.provider === 'smtp' && e) });
+  const [graph, setGraph] = useState({ tenantId: '', clientId: '', ...(e?.provider === 'graph' && e) });
+  const [from, setFrom] = useState(e?.from ?? '');
+  const [secret, setSecret] = useState('');
+  const [to, setTo] = useState(s.me.email ?? '');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const name = s.config.company.name || 'Gnomon';
+  // The stored secret belongs to the account that's set up; for another provider it has to be entered again.
+  const secretStored = s.secrets.email && e?.provider === provider;
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      await fn();
+      setErr(null);
+    } catch (err) {
+      setErr((err as Error).message);
+    }
+    setBusy(false);
+  };
+  const save = () =>
+    run(async () => {
+      setS(await call('PUT', '/email', { provider, from, secret: secret || undefined, ...(provider === 'smtp' ? smtp : graph) }));
+      setSecret('');
+      setNote(t('saved'));
+    });
+  const test = () =>
+    run(async () => {
+      const r = await call<State & { sentTo: string }>('POST', '/email/test', { to: to || undefined });
+      setS(r);
+      setNote(t('emailTestOk', { to: r.sentTo }));
+    });
+  const setPort = (port: number) => setSmtp({ ...smtp, port, security: port === 465 ? 'tls' : port === 587 ? 'starttls' : smtp.security });
+  return (
+    <>
+      <p className="a-intro">{t('emailIntro')}</p>
+      {!s.email.publicUrl && <p className="a-warn">{t('emailNoUrl')}</p>}
+      {e && s.email.ready && (e.tested ? (
+        <div className="a-ok">
+          <Icon name="check_circle" /> {t('emailReady', { when: new Date(e.tested).toLocaleString() })}
+        </div>
+      ) : (
+        <span className="a-hint">{t('emailUntested')}</span>
+      ))}
+      <div className="a-seg">
+        {(['smtp', 'graph'] as const).map((p) => (
+          <button key={p} className={provider === p ? 'on' : ''} onClick={() => (setProvider(p), setSecret(''))}>
+            {t(p === 'smtp' ? 'emailSmtp' : 'emailGraph')}
+          </button>
+        ))}
+      </div>
+      <span className="a-hint">{t(provider === 'smtp' ? 'emailSmtpHint' : 'emailGraphHint')}</span>
+      <form className="a-card" onSubmit={(ev) => (ev.preventDefault(), void save())}>
+        {provider === 'smtp' ? (
+          <>
+            <div className="a-row">
+              <Field label={t('emailHost')}>
+                <input value={smtp.host} onChange={(ev) => setSmtp({ ...smtp, host: ev.target.value })} placeholder="smtp.example.com" spellCheck={false} autoComplete="off" />
+              </Field>
+              <Field label={t('emailPort')}>
+                <input type="number" min={1} max={65535} value={smtp.port} onChange={(ev) => setPort(Number(ev.target.value))} />
+              </Field>
+              <Field label={t('emailSecurity')}>
+                <select value={smtp.security} onChange={(ev) => setSmtp({ ...smtp, security: ev.target.value as typeof smtp.security })}>
+                  <option value="starttls">{t('emailStarttls')}</option>
+                  <option value="tls">{t('emailTls')}</option>
+                  <option value="none">{t('emailNone')}</option>
+                </select>
+              </Field>
+            </div>
+            <div className="a-row">
+              <Field label={t('emailUser')}>
+                <input value={smtp.user} onChange={(ev) => setSmtp({ ...smtp, user: ev.target.value })} spellCheck={false} autoComplete="off" />
+              </Field>
+              <Field label={t('emailPassword')} hint={secretStored ? t('emailSecretKept') : undefined}>
+                <input type="password" value={secret} onChange={(ev) => setSecret(ev.target.value)} autoComplete="new-password" placeholder={secretStored ? '••••••••' : ''} />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="a-row">
+              <Field label={t('emailTenant')}>
+                <input value={graph.tenantId} onChange={(ev) => setGraph({ ...graph, tenantId: ev.target.value })} placeholder="00000000-0000-0000-0000-000000000000" spellCheck={false} autoComplete="off" />
+              </Field>
+              <Field label={t('emailClient')}>
+                <input value={graph.clientId} onChange={(ev) => setGraph({ ...graph, clientId: ev.target.value })} placeholder="00000000-0000-0000-0000-000000000000" spellCheck={false} autoComplete="off" />
+              </Field>
+            </div>
+            <Field label={t('emailSecret')} hint={secretStored ? t('emailSecretKept') : undefined}>
+              <input type="password" value={secret} onChange={(ev) => setSecret(ev.target.value)} autoComplete="new-password" placeholder={secretStored ? '••••••••' : ''} />
+            </Field>
+          </>
+        )}
+        <Field label={t('emailFrom')} hint={t(provider === 'smtp' ? 'emailFromHint' : 'emailFromGraphHint', { name })}>
+          <input type="email" value={from} onChange={(ev) => setFrom(ev.target.value)} placeholder="gnomon@example.com" spellCheck={false} autoComplete="off" />
+        </Field>
+        <button className="primary a-save" disabled={busy || !from.trim()}>
+          {t('save')}
+        </button>
+      </form>
+      {e && (
+        <form className="a-card" onSubmit={(ev) => (ev.preventDefault(), void test())}>
+          <div className="a-inline">
+            <input type="email" value={to} onChange={(ev) => setTo(ev.target.value)} placeholder={t('emailTestTo')} aria-label={t('emailTestTo')} />
+            <button className="soft" disabled={busy}>
+              <Icon name="send" size={18} /> {busy ? t('emailSending') : t('emailTest')}
+            </button>
+          </div>
+          {note && (
+            <div className="a-ok">
+              <Icon name="check_circle" /> {note}
+            </div>
+          )}
+          <button type="button" className="soft danger" onClick={() => confirm(t('emailOffConfirm')) && void run(async () => setS(await call('DELETE', '/email')))}>
+            {t('emailOff')}
+          </button>
+        </form>
+      )}
+      {!e && note && (
+        <div className="a-ok">
+          <Icon name="check_circle" /> {note}
+        </div>
+      )}
+    </>
+  );
 }
 
 function FloatStep({ s, setS, setErr }: Ctx) {
@@ -930,23 +1148,37 @@ function DeviceRow({ d, reload, setErr }: { d: Device; reload: () => void; setEr
 
 // ---- People: everyone with an account, their devices, invitations, who may register ------------------
 
-type PersonRow = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'pending' | 'active' | 'disabled'; owner: boolean; lastSeenAt: string | null; devices: Device[] };
-type Invite = { personId: string; email: string; link: string; expiresAt: string };
+type PersonRow = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'pending' | 'active' | 'disabled'; owner: boolean; lastSeenAt: string | null; inviteExpiresAt: string | null; devices: Device[] };
+/** An invitation just made: emailed (`sent`), or a link to pass on by hand (with `error` when the email failed). */
+type Invite = { personId?: string; email: string; sent: boolean; link?: string; error?: string; expiresAt?: string };
+type PeopleResponse = { people: PersonRow[]; registration: 'invite' | 'approval' | 'open'; inviteDays: number; email: boolean };
+const day = (iso: string) => new Date(iso).toLocaleDateString();
 const STATUS_KEY: Record<PersonRow['status'], Key> = { invited: 'pInvited', pending: 'pPending', active: 'pActive', disabled: 'pDisabled' };
 
 function InviteBox({ invite }: { invite: Invite }) {
   const [copied, setCopied] = useState(false);
+  if (invite.sent || !invite.link)
+    return invite.sent ? (
+      <div className="a-ok">
+        <Icon name="mail" /> {t('pInviteSent', { email: invite.email, date: day(invite.expiresAt!) })}
+      </div>
+    ) : (
+      <p className="a-warn">{invite.error}</p>
+    );
+  const link = invite.link;
   return (
     <div className="a-invite">
-      <Qr text={invite.link} />
+      <Qr text={link} />
       <div>
         <strong>{t('pInviteFor', { email: invite.email })}</strong>
-        <code>{invite.link}</code>
-        <span className="a-hint">{t('pInviteHow', { date: new Date(invite.expiresAt).toLocaleDateString() })}</span>
+        {invite.error && <span className="a-warn">{t('pInviteFailed', { error: invite.error })}</span>}
+        <code>{link}</code>
+        <span className="a-hint">{t('pInviteHow', { date: day(invite.expiresAt!) })}</span>
         <button
+          type="button"
           className="soft"
           onClick={() => {
-            navigator.clipboard?.writeText(invite.link);
+            navigator.clipboard?.writeText(link);
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
@@ -965,17 +1197,22 @@ function People(ctx: Ctx) {
   const [name, setName] = useState('');
   const [role, setRole] = useState<'member' | 'admin'>('member');
   const [invite, setInvite] = useState<Invite | null>(null);
-  const take = (r: { people: PersonRow[]; registration?: typeof registration }) => (setPeople(r.people), r.registration && setRegistration(r.registration));
-  const load = () => call<{ people: PersonRow[]; registration: typeof registration }>('GET', '/people').then(take, (e) => ctx.setErr((e as Error).message));
+  const [inviteDays, setInviteDays] = useState(14);
+  const [emailOn, setEmailOn] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const take = (r: PeopleResponse) => (setPeople(r.people), setRegistration(r.registration), setInviteDays(r.inviteDays), setEmailOn(r.email));
+  const load = () => call<PeopleResponse>('GET', '/people').then(take, (e) => ctx.setErr((e as Error).message));
   useEffect(() => {
     void load();
   }, []);
   const run = async (method: string, path: string, body?: unknown) => {
     try {
       ctx.setErr(null);
-      const r = await call<{ people: PersonRow[]; registration?: typeof registration; invite?: Invite }>(method, path, body);
+      setNotice(null);
+      const r = await call<PeopleResponse & { invite?: Invite; resetSentTo?: string }>(method, path, body);
       take(r);
       if (r.invite) setInvite(r.invite);
+      if (r.resetSentTo) setNotice(t('pResetSent', { email: r.resetSentTo }));
       call<State>('GET', '/state').then(ctx.setS);
     } catch (e) {
       ctx.setErr((e as Error).message);
@@ -994,7 +1231,7 @@ function People(ctx: Ctx) {
         <strong>
           <Icon name="person" size={18} /> {t('pInviteTitle')}
         </strong>
-        <span className="a-hint">{t('pInviteIntro')}</span>
+        <span className="a-hint">{t(emailOn ? 'pInviteIntroEmail' : 'pInviteIntro')}</span>
         <div className="a-row">
           <input type="email" required placeholder={t('pEmail')} value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder={t('pName')} value={name} onChange={(e) => setName(e.target.value)} />
@@ -1016,9 +1253,28 @@ function People(ctx: Ctx) {
           ))}
         </div>
         <span className="a-hint">{t(registration === 'invite' ? 'pRegInviteHint' : registration === 'approval' ? 'pRegApprovalHint' : 'pRegOpenHint')}</span>
+        <label className="a-inline a-days">
+          <span>{t('pInviteDays')}</span>
+          <input
+            type="number"
+            min={1}
+            max={90}
+            value={inviteDays}
+            onChange={(e) => setInviteDays(Number(e.target.value))}
+            onBlur={() => inviteDays >= 1 && inviteDays <= 90 && run('PUT', '/registration', { inviteDays: Math.round(inviteDays) })}
+          />
+          <span>{t('pDays')}</span>
+        </label>
       </div>
+      {notice && (
+        <div className="a-ok">
+          <Icon name="mail" /> {notice}
+        </div>
+      )}
       <ul className="a-people">
-        {people?.map((x) => (
+        {people?.map((x) => {
+          const expired = x.status === 'invited' && Boolean(x.inviteExpiresAt) && Date.parse(x.inviteExpiresAt!) < Date.now();
+          return (
           <li key={x.id} className={`a-person ${x.status}`}>
             <div className="a-person-head">
               <span className="a-device-icon">
@@ -1028,9 +1284,12 @@ function People(ctx: Ctx) {
                 <strong>
                   {x.name} {x.id === ctx.s.me.id && <span className="a-tag">{t('pYou')}</span>}
                 </strong>
-                <span className="a-hint">{x.email ?? '—'}</span>
+                <span className="a-hint">
+                  {x.email ?? '—'}
+                  {x.status === 'invited' && x.inviteExpiresAt && !expired && ` · ${t('pInvitedUntil', { date: day(x.inviteExpiresAt) })}`}
+                </span>
               </div>
-              <span className={`a-status ${x.status === 'pending' ? 'new' : ''}`}>{t(STATUS_KEY[x.status])}</span>
+              <span className={`a-status ${x.status === 'pending' || expired ? 'new' : ''}`}>{t(expired ? 'pExpired' : STATUS_KEY[x.status])}</span>
               <span className="a-status">{t(x.role === 'admin' ? 'pAdmin' : 'pMember')}</span>
             </div>
             {x.devices.length > 0 && (
@@ -1048,8 +1307,13 @@ function People(ctx: Ctx) {
                   </button>
                 )}
                 {x.status === 'invited' && (
-                  <button className="soft" onClick={() => run('POST', `/people/${x.id}/invite`)}>
-                    {t('pReinvite')}
+                  <button className={expired ? 'primary' : 'soft'} onClick={() => run('POST', `/people/${x.id}/invite`)}>
+                    {t(emailOn ? 'pResend' : 'pReinvite')}
+                  </button>
+                )}
+                {x.status === 'active' && x.email && emailOn && (
+                  <button className="soft" onClick={() => confirm(t('pResetConfirm', { name: x.name })) && run('POST', `/people/${x.id}/reset`)}>
+                    {t('pReset')}
                   </button>
                 )}
                 <button className="soft" onClick={() => run('PATCH', `/people/${x.id}`, { role: x.role === 'admin' ? 'member' : 'admin' })}>
@@ -1073,7 +1337,8 @@ function People(ctx: Ctx) {
               </div>
             )}
           </li>
-        ))}
+          );
+        })}
       </ul>
     </>
   );
@@ -1292,7 +1557,9 @@ function Login({ onIn, emailless }: { onIn: (s: State) => void; emailless: boole
           <input type="password" autoComplete="current-password" autoFocus={emailless} value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <footer className="a-foot">
-          <span className="a-hint">{t('pwForgot')}</span>
+          <span className="a-hint">
+            <a href="/account/forgot">{t('loginForgot')}</a> {t('pwForgot')}
+          </span>
           <span className="spacer" />
           <button className="primary" disabled={busy || !password}>
             {t('signIn')}
@@ -1355,11 +1622,12 @@ const PEOPLE: Section = { key: 'people', title: 'peopleTitle', icon: 'group', vi
 const FEEDBACK: Section = { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} /> };
 const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
 /** After the setup, these steps are Settings pages of their own (the others only make sense in the wizard). */
-const SETTINGS_KEYS = ['company', 'float', 'personio', 'rules', 'rollout', 'done'];
+const SETTINGS_KEYS = ['company', 'email', 'float', 'personio', 'rules', 'rollout', 'done'];
 const STEPS: Section[] = [
   { key: 'before', title: 'beforeTitle', icon: 'check_circle', view: (c) => <Before {...c} /> },
   { key: 'company', title: 'companyTitle', icon: 'apartment', view: (c) => <CompanyStep {...c} /> },
   { key: 'signin', title: 'signInTitle', icon: 'group', view: () => <SignIn /> },
+  { key: 'email', title: 'emailTitle', icon: 'mail', view: (c) => <EmailStep {...c} /> },
   { key: 'float', title: 'floatTitle', icon: 'link', view: (c) => <FloatStep {...c} /> },
   { key: 'personio', title: 'personioTitle', icon: 'link', view: (c) => <PersonioStep {...c} /> },
   { key: 'rules', title: 'rulesTitle', icon: 'lock', view: (c) => <RulesStep {...c} /> },

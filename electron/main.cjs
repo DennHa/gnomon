@@ -126,6 +126,8 @@ ipcMain.handle('app:info', () => ({
   chrome: process.versions.chrome,
   node: process.versions.node,
   updateSource: updateSource(),
+  // The public roadmap (server/README.md → Roadmap) on the same server feedback goes to.
+  roadmap: feedbackServer() ? `${feedbackServer()}/roadmap` : null,
 }));
 
 /** 1.2.10 > 1.2.9; anything after a "-" (pre-release) sorts below the plain version. */

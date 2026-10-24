@@ -158,7 +158,8 @@ seen; actions: invite again, change role, disable, remove (with their data, afte
    two people never see each other's entries, through every route and the sync. *(Built.)*
 2. **Accounts and sign-in:** the account area, registration (invitations; who may register), email and password
    sign-in for the Mac and the phone, the People page, and the app's first screen (section 3).
-3. **Email server, confirmation and password reset** (section 3b).
+3. **Email server, confirmation and password reset** (section 3b). *(Built: email settings for SMTP and Microsoft 365,
+   invitations by email with a validity the admin sets, password reset. Confirming a changed email is still to do.)*
 4. **Web app with sign-in** (section 3b), with the account settings kept on the server. *(Built: `/app`, see
    server/README.md.)*
 5. **Float and Personio per person** (section 4).

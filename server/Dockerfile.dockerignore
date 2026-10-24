@@ -1,8 +1,9 @@
-# Only src/ and server/ are needed (plus the app's version and changelog for the web app); keep everything else (and
-# all secrets/data) out of the image.
+# Only src/, server/, docs/ROADMAP.md (for /roadmap) and the app's version and changelog (for the web app) are needed;
+# keep everything else (and all secrets/data) out of the image.
 *
 !src/**
 !server/**
+!docs/ROADMAP.md
 !package.json
 !CHANGELOG.md
 server/node_modules

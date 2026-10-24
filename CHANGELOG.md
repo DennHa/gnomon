@@ -13,6 +13,18 @@ Gnomon server shows the newest entry.
   The first Mac to sync brings its settings along; a Mac that signs in later takes the account's. Menu bar, shortcuts
   and appearance stay per device.
 
+## 0.1.16 · 2026-10-24
+
+- **Email from your Gnomon server** (Admin → Settings → Email): through any mail provider (SMTP, for example Gmail
+  with an app password or Hetzner) or Microsoft 365 (an app registration, see the server guide). The password or
+  secret is stored encrypted, and *Send a test email* says plainly what went wrong.
+- **Invitations by email:** inviting someone sends them their link. Without email it's a link to pass on, as before.
+  You choose how long invitations are valid (14 days by default); expired ones show as expired and can be sent again.
+- **Forgot your password?** on the sign-in pages (account page, phone, Admin page and the Mac app) sends a link that
+  works once, for 30 minutes. Choosing a new password signs out your other devices only if you tick that box. Admins
+  can send someone a reset link from the People page.
+- **What's coming:** Info & feedback links to the roadmap, which your Gnomon server now shows at `/roadmap`.
+
 ## 0.1.15 · 2026-10-24
 
 - **See the entry you just added:** after Enter or +, the new entry lights up where it landed in the day and scrolls

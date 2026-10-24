@@ -1,6 +1,6 @@
 // Everyone's own account on a Gnomon server (docs/accounts-design.md, section 3), separate from the Admin page:
 // /account/register signs up (with an invitation link, or as the server allows); /account is your name, email,
-// password and devices. Nobody else's data, no settings. Sessions stay in this tab only.
+// password and devices; /account/forgot and /account/reset set a new password by email. Nobody else's data, no settings. Sessions stay in this tab only.
 import { useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Icon } from './icons';
@@ -52,6 +52,20 @@ const EN = {
   mac: 'Mac',
   phone: 'Phone',
   web: 'Browser',
+  forgot: 'Forgot your password?',
+  forgotTitle: 'Reset your password',
+  forgotIntro: 'Enter your account’s email. We’ll send you a link to set a new password.',
+  forgotSend: 'Send link',
+  forgotSent: 'If there’s an account for {email}, a link is on its way. It works once, for 30 minutes. Check your spam folder too.',
+  backToSignIn: 'Back to sign in',
+  resetTitle: 'Set a new password',
+  resetFor: 'For {email}',
+  resetBad: 'This link is wrong, used or expired.',
+  resetAgain: 'Ask for a new link',
+  resetOthers: 'Also sign out on all my other devices',
+  resetOthersHint: 'Do this if someone else might know your old password.',
+  resetSave: 'Save new password',
+  resetDone: 'Your new password is set.',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -99,6 +113,20 @@ const DE: Record<Key, string> = {
   mac: 'Mac',
   phone: 'Handy',
   web: 'Browser',
+  forgot: 'Passwort vergessen?',
+  forgotTitle: 'Passwort zurücksetzen',
+  forgotIntro: 'Gib die E-Mail deines Kontos ein. Wir senden dir einen Link für ein neues Passwort.',
+  forgotSend: 'Link senden',
+  forgotSent: 'Falls es ein Konto für {email} gibt, ist ein Link unterwegs. Er funktioniert einmal, 30 Minuten lang. Schau auch im Spam-Ordner nach.',
+  backToSignIn: 'Zurück zur Anmeldung',
+  resetTitle: 'Neues Passwort festlegen',
+  resetFor: 'Für {email}',
+  resetBad: 'Dieser Link ist falsch, schon benutzt oder abgelaufen.',
+  resetAgain: 'Neuen Link anfordern',
+  resetOthers: 'Auch auf allen anderen Geräten abmelden',
+  resetOthersHint: 'Mach das, wenn jemand anderes dein altes Passwort kennen könnte.',
+  resetSave: 'Neues Passwort sichern',
+  resetDone: 'Dein neues Passwort ist gesetzt.',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => vars[v] ?? '');
@@ -132,6 +160,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 function Page({ title, children }: { title: string; children: ReactNode }) {
+  useEffect(() => void (document.title = title), [title]);
   return (
     <main className="a-page a-account">
       <header className="a-head">
@@ -296,11 +325,155 @@ function SignIn({ onIn }: { onIn: (m: Me) => void }) {
         </Field>
         <footer className="a-foot">
           <span className="a-hint">
+            <a href="/account/forgot">{t('forgot')}</a>
+            <br />
             {t('noAccount')} <a href="/account/register">{t('register')}</a>
           </span>
           <span className="spacer" />
           <button className="primary">{t('signIn')}</button>
         </footer>
+      </form>
+    </Page>
+  );
+}
+
+// ---- /account/forgot and /account/reset ---------------------------------------------------------
+
+function Forgot() {
+  const [email, setEmail] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Page title={t('forgotTitle')}>
+      <form
+        className="a-panel"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          try {
+            await call('POST', '/forgot', { email });
+            setErr(null);
+            setSent(email.trim());
+          } catch (e) {
+            setErr((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {sent ? (
+          <div className="a-ok">
+            <Icon name="check_circle" /> {t('forgotSent', { email: sent })}
+          </div>
+        ) : (
+          <>
+            <p className="a-intro">{t('forgotIntro')}</p>
+            <Err e={err} />
+            <Field label={t('email')}>
+              <input type="email" autoComplete="email" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </Field>
+          </>
+        )}
+        <footer className="a-foot">
+          <a className="a-hint" href="/account">
+            {t('backToSignIn')}
+          </a>
+          <span className="spacer" />
+          {!sent && (
+            <button className="primary" disabled={busy}>
+              {t('forgotSend')}
+            </button>
+          )}
+        </footer>
+      </form>
+    </Page>
+  );
+}
+
+// The token comes in the link's #fragment (never sent to the server in a URL); it's taken out of the address bar at once.
+const RESET_TOKEN = /^\/account\/reset\/?$/.test(location.pathname) ? (new URLSearchParams(location.hash.slice(1)).get('token') ?? '') : '';
+if (RESET_TOKEN) history.replaceState(null, '', location.pathname);
+
+function Reset() {
+  const [email, setEmail] = useState<string | null>(null);
+  const [bad, setBad] = useState(false);
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  const [others, setOthers] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!RESET_TOKEN) return setBad(true);
+    call<{ email: string }>('POST', '/reset/check', { token: RESET_TOKEN }).then(
+      (r) => setEmail(r.email),
+      () => setBad(true),
+    );
+  }, []);
+  if (bad)
+    return (
+      <Page title={t('resetTitle')}>
+        <section className="a-panel">
+          <p className="a-warn">{t('resetBad')}</p>
+          <a className="primary a-button" href="/account/forgot">
+            {t('resetAgain')}
+          </a>
+        </section>
+      </Page>
+    );
+  if (done)
+    return (
+      <Page title={t('resetTitle')}>
+        <section className="a-panel">
+          <div className="a-ok">
+            <Icon name="check_circle" /> {t('resetDone')}
+          </div>
+          <a className="primary a-button" href="/account">
+            {t('toAccount')}
+          </a>
+        </section>
+      </Page>
+    );
+  return (
+    <Page title={t('resetTitle')}>
+      <form
+        className="a-panel"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (a.length < 10) return setErr(t('passwordHint'));
+          if (a !== b) return setErr(t('mismatch'));
+          setBusy(true);
+          try {
+            const r = await call<{ token: string }>('POST', '/reset', { token: RESET_TOKEN, password: a, signOutOthers: others });
+            keep(r.token);
+            setDone(true);
+          } catch (e) {
+            if ((e as { status?: number }).status === 404) setBad(true);
+            else setErr((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {email && <span className="a-hint">{t('resetFor', { email })}</span>}
+        <Err e={err} />
+        <Field label={t('passwordNew')} hint={t('passwordHint')}>
+          <input type="password" autoComplete="new-password" autoFocus required value={a} onChange={(e) => setA(e.target.value)} />
+        </Field>
+        <Field label={t('passwordRepeat')}>
+          <input type="password" autoComplete="new-password" required value={b} onChange={(e) => setB(e.target.value)} />
+        </Field>
+        <label className="a-check">
+          <input type="checkbox" checked={others} onChange={(e) => setOthers(e.target.checked)} />
+          <span>
+            <strong>{t('resetOthers')}</strong>
+            <span className="a-hint">{t('resetOthersHint')}</span>
+          </span>
+        </label>
+        <button className="primary a-save" disabled={busy || !email}>
+          {t('resetSave')}
+        </button>
       </form>
     </Page>
   );
@@ -479,4 +652,5 @@ function AccountApp() {
   return <Page title={t('title')}>{null}</Page>;
 }
 
-createRoot(document.getElementById('root')!).render(/^\/account\/register\/?$/.test(location.pathname) ? <Register /> : <AccountApp />);
+const route = location.pathname.replace(/\/+$/, '');
+createRoot(document.getElementById('root')!).render(route === '/account/register' ? <Register /> : route === '/account/forgot' ? <Forgot /> : route === '/account/reset' ? <Reset /> : <AccountApp />);

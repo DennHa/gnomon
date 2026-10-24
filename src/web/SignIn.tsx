@@ -48,9 +48,8 @@ export default function SignIn({ onSignedIn, unreachable = false }: { onSignedIn
           {busy ? t('acc.busy') : t('acc.signIn')}
         </button>
         <p className="small web-signin-links">
-          {/* TODO: password reset is being built (email server, step 3 of docs/accounts-design.md); keep this link
-              in step with the route it ends up on. */}
-          <a href="/account/reset">{t('web.forgot')}</a>
+          {/* The account page asks for the email and sends the reset link (server/web/account.tsx). */}
+          <a href="/account/forgot">{t('web.forgot')}</a>
           <a href="/account/register">{t('web.noAccount')}</a>
         </p>
         {phone && (

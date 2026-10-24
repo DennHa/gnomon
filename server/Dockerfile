@@ -8,6 +8,8 @@ COPY src /app/src
 # The web app (/app) shows the Mac app's version and changelog.
 COPY package.json CHANGELOG.md /app/
 COPY server /app/server
+# The public roadmap page (/roadmap) is built from it.
+COPY docs/ROADMAP.md /app/docs/ROADMAP.md
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim

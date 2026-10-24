@@ -4,6 +4,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Store } from './store';
+import { graphTransport, plainAddress, smtpTransport, type EmailConfig, type Transport } from './mail';
 
 // ---- Secrets ------------------------------------------------------------------------------------
 
@@ -61,6 +62,8 @@ export type CompanyConfig = {
   company: { name: string; publicUrl: string; timezone: string; dailyTargetHours: number; language: 'system' | 'en' | 'de' };
   float: { tested?: string; people?: number };
   personio: { tested?: string; people?: number; absenceTypes?: { id: string; name: string; unit?: string }[]; dayOffTypes?: string[] };
+  /** How the server sends email (Settings → Email); the password or client secret is a secret of its own. */
+  email?: EmailConfig & { tested?: string };
   rules: Rules;
   audit: { at: string; what: string }[];
 };
@@ -96,18 +99,58 @@ export class Company {
     this.store.setMeta('company', JSON.stringify(c));
   }
 
-  setSecret(name: 'float' | 'personio', value: string | null) {
+  setSecret(name: SecretName, value: string | null) {
     this.store.setMeta(`secret:${name}`, value === null ? '' : encrypt(this.key, value));
   }
 
-  hasSecret(name: 'float' | 'personio'): boolean {
+  hasSecret(name: SecretName): boolean {
     return Boolean(this.store.getMeta(`secret:${name}`));
   }
 
-  secret(name: 'float' | 'personio'): string | undefined {
+  secret(name: SecretName): string | undefined {
     const v = this.store.getMeta(`secret:${name}`);
     return v ? decrypt(this.key, v) : undefined;
   }
+
+  /** How to send email as set up in Settings → Email, or undefined when it isn't (or the secret can't be read). */
+  mailTransport(): Transport | undefined {
+    const e = this.get().email;
+    if (!e) return undefined;
+    const secret = this.secret('email');
+    if (e.provider === 'graph') return secret ? graphTransport(e, secret) : undefined;
+    // An SMTP relay may need no password; one that has a user needs it.
+    if (e.user && !secret) return undefined;
+    return smtpTransport(e, secret ?? '');
+  }
+}
+
+type SecretName = 'float' | 'personio' | 'email';
+
+/**
+ * Email settings from the Admin page, checked: the provider's fields with sensible values. The secret (SMTP password or
+ * client secret) is returned apart, so it can be stored encrypted; empty means "keep the one that's stored".
+ */
+export function parseEmailSettings(u: Record<string, unknown>): { config: EmailConfig; secret: string } {
+  const str = (k: string, max = 300) => (typeof u[k] === 'string' ? (u[k] as string).trim().slice(0, max) : '');
+  const from = str('from', 200).toLowerCase();
+  if (!plainAddress(from)) throw new Error('Enter the sender address, like gnomon@example.com');
+  const secret = typeof u.secret === 'string' ? u.secret.slice(0, 1000) : '';
+  if (u.provider === 'graph') {
+    const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const tenantId = str('tenantId').toLowerCase();
+    const clientId = str('clientId').toLowerCase();
+    if (!guid.test(tenantId) && !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(tenantId)) throw new Error('Enter the Directory (tenant) ID from the app registration');
+    if (!guid.test(clientId)) throw new Error('Enter the Application (client) ID from the app registration');
+    return { config: { provider: 'graph', tenantId, clientId, from }, secret };
+  }
+  if (u.provider !== 'smtp') throw new Error('Choose SMTP or Microsoft 365');
+  const host = str('host', 200).toLowerCase();
+  if (!/^[a-z0-9.-]+$/i.test(host) && !/^\[?[0-9a-f:]+\]?$/i.test(host)) throw new Error('Enter the mail server’s host name, like smtp.example.com');
+  const port = Number(u.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Enter the port: 465 for TLS, 587 for STARTTLS');
+  const security = u.security === 'tls' || u.security === 'starttls' || u.security === 'none' ? u.security : port === 465 ? 'tls' : 'starttls';
+  const user = str('user', 200);
+  return { config: { provider: 'smtp', host, port, security, user, from }, secret };
 }
 
 /** Merge a partial update from the wizard into the config, accepting only known keys with sensible values. */

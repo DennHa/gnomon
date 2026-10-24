@@ -9,9 +9,12 @@ import type { Data, Entry, Settings } from '../../src/types';
 import { ACCOUNT_SETTINGS, type AccountSettings, type RemoteAccount } from '../../src/sync';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
 import { pickLang, readRelease, releasePage } from './releases';
-import { applyConfigUpdate, mobileconfig, testFloat, testPersonio, type Company } from './company';
+import { applyConfigUpdate, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
 import { randomBytes } from 'node:crypto';
 import { clearSessionCookie, csrfFor, csrfOk, sameOrigin, sessionCookie, setSessionCookie, webDeviceName } from './web';
+import { resetEmail, testEmail, type Lang } from './emails';
+import { invitePeople, sendInvitation, type InviteDeps } from './invites';
+import { MailError, type Transport } from './mail';
 
 const MB = 1024 * 1024;
 const PAIR_MAX_FAILURES = 10;
@@ -21,7 +24,9 @@ const PAIR_LOCK_MS = 15 * 60_000;
 /** company: the setup wizard's settings and secrets (company.ts); without it, /setup and /admin aren't served. */
 /** demoDir: optional folder with the web demo (npm run build:demo in the repo root), served at /example. */
 /** siteDir: optional folder with the one-page site (site/ in the repo), served at /about. */
-export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string; siteDir?: string };
+/** roadmapDir: the roadmap page built from docs/ROADMAP.md (dist/roadmap), served at /roadmap. */
+/** mail: how to send email instead of the one set up in Settings → Email (tests use a fake one). */
+export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string; siteDir?: string; roadmapDir?: string; mail?: Transport };
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -117,9 +122,43 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
   });
 }
 
-export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir }: AppOptions) {
+const RESET_MINUTES = 30;
+
+export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir, roadmapDir, mail }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
+
+  // ---- Email: invitations and password resets (docs/accounts-design.md, section 3b) ---------------
+
+  const transport = (): Transport | undefined => mail ?? company?.mailTransport();
+  /** The server's own address for links in emails: only the one set up, never a request's Host header (which anyone can fake). */
+  const publicBase = () => (company?.get().company.publicUrl || process.env.GNOMON_PUBLIC_URL?.trim() || '').replace(/\/+$/, '');
+  const serverName = () => company?.get().company.name || 'Gnomon';
+  /** Email can go out: a way to send and an address for the links. */
+  const canEmail = () => Boolean(transport() && publicBase());
+  /** The language for an email: the server's, or else the asking browser's. */
+  const langFor = (req: IncomingMessage): Lang => {
+    const l = company?.get().company.language;
+    return l === 'en' || l === 'de' ? l : pickLang(req.headers['accept-language']);
+  };
+  /** Counts within a time window, in memory, for rate limits: true while under `max`. */
+  const windows = new Map<string, number[]>();
+  function allow(key: string, max: number, windowMs: number): boolean {
+    const now = Date.now();
+    const recent = (windows.get(key) ?? []).filter((t) => now - t < windowMs);
+    if (recent.length >= max) return (windows.set(key, recent), false);
+    windows.set(key, [...recent, now]);
+    if (windows.size > 10_000) for (const [k, v] of windows) if (!v.some((t) => now - t < 3_600_000)) windows.delete(k);
+    return true;
+  }
+  /** Send a password reset link to an active person with an email. Throws a MailError when it doesn't go out. */
+  async function sendReset(req: IncomingMessage, personId: string) {
+    const person = store.person(personId);
+    const send = transport();
+    if (!person?.email || person.status !== 'active' || !send || !publicBase()) return;
+    const token = store.createReset(person.id, RESET_MINUTES);
+    await send(resetEmail({ lang: langFor(req), to: person.email, server: serverName(), link: `${publicBase()}/account/reset#token=${token}` }));
+  }
 
   /**
    * Everything a request may touch, for the person whose device is asking: their data through the shared router
@@ -361,7 +400,9 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     const release = readRelease(releasesDir);
     return {
       config: { ...c, audit: c.audit.slice(-20).reverse() },
-      secrets: { float: company!.hasSecret('float'), personio: company!.hasSecret('personio') },
+      secrets: { float: company!.hasSecret('float'), personio: company!.hasSecret('personio'), email: company!.hasSecret('email') },
+      // Whether email goes out (set up, and the server knows its address for links), for invitations and resets.
+      email: { ready: canEmail(), publicUrl: Boolean(publicBase()) },
       keySource: company!.keySource,
       release: release ? { version: release.version, size: release.size } : null,
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
@@ -393,7 +434,37 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       const { device, key } = store.addDevice(name, client, personId);
       return { key, device: { id: device.id, name: device.name } };
     };
-    if (method === 'GET' && p === '/account/config') return [200, { registration: store.registration(), name: company?.get().company.name || null }];
+    if (method === 'GET' && p === '/account/config') return [200, { registration: store.registration(), name: company?.get().company.name || null, email: canEmail() }];
+    if (method === 'POST' && p === '/account/forgot') {
+      // The same answer whether the email has an account or not, so nobody can find out who's here. The email goes
+      // out in the background, so the time to answer doesn't tell either. Limits: 5 requests per address in 15
+      // minutes (answered as such), and at most 3 emails per account an hour (silently).
+      const address = clientAddress(req);
+      if (!allow(`forgot:${address}`, 5, 15 * 60_000)) throw new HttpError(429, 'too_many', 'Too many requests. Try again in 15 minutes.');
+      const email = validEmail(b.email);
+      if (!canEmail()) throw new HttpError(503, 'no_email', 'This server can’t send email yet. Ask its admin for help.');
+      const person = store.personByEmail(email);
+      if (person && person.status === 'active' && allow(`forgot-mail:${person.id}`, 3, 3_600_000))
+        sendReset(req, person.id).catch((err) => console.error(`Password reset email to ${email} failed: ${(err as Error).message}`));
+      return [202, { sent: true, minutes: RESET_MINUTES }];
+    }
+    if (method === 'POST' && p === '/account/reset/check') {
+      // Opening the link: whose it is, before a new password is chosen (the token stays usable).
+      const person = typeof b.token === 'string' && b.token.length <= 100 ? store.resetFor(b.token) : undefined;
+      if (!person || person.status !== 'active') throw new HttpError(404, 'invalid_reset', 'This link is wrong, used or expired. Ask for a new one.');
+      return [200, { email: person.email }];
+    }
+    if (method === 'POST' && p === '/account/reset') {
+      const password = validPassword(b.password); // checked first, so a too-short password doesn't use the link up
+      const person = typeof b.token === 'string' && b.token.length <= 100 ? store.useReset(b.token) : undefined;
+      if (!person || person.status !== 'active') throw new HttpError(404, 'invalid_reset', 'This link is wrong, used or expired. Ask for a new one.');
+      store.setPassword(person.id, password);
+      // Other devices stay signed in unless the person asks to sign them out (e.g. the password may have leaked).
+      if (b.signOutOthers === true) signOutEverywhere(person.id);
+      loginFails.delete(clientAddress(req));
+      company?.save(company.get(), `${person.email} reset their password${b.signOutOthers === true ? ' and signed out everywhere' : ''}`);
+      return [200, { token: newSession(person.id), ...meOut(person.id) }];
+    }
     const inv = p.match(/^\/account\/invite\/([A-Za-z0-9-]{4,20})$/);
     if (method === 'GET' && inv) {
       const person = store.inviteFor(inv[1]);
@@ -565,6 +636,45 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       company.save({ ...c, [which]: {} }, `Disconnected ${which === 'float' ? 'Float' : 'Personio'}`);
       return [200, adminState(me.id)];
     }
+    // Email (Settings → Email): SMTP or Microsoft 365. The password or client secret is stored encrypted and never
+    // sent back; leaving it empty keeps the stored one.
+    if (method === 'PUT' && p === '/admin/email') {
+      if (!isObj(body)) throw bad('Send the email settings as an object');
+      let parsed;
+      try {
+        parsed = parseEmailSettings(body);
+      } catch (err) {
+        throw bad((err as Error).message);
+      }
+      const before = c.email;
+      const sameAccount = before && before.provider === parsed.config.provider && (before.provider === 'graph' ? before.clientId === (parsed.config as typeof before).clientId : before.user === (parsed.config as { user: string }).user);
+      const needsSecret = parsed.config.provider === 'graph' || parsed.config.user;
+      if (parsed.secret) company.setSecret('email', parsed.secret);
+      else if (!sameAccount) {
+        if (needsSecret) throw bad(parsed.config.provider === 'graph' ? 'Paste the client secret' : 'Enter the password');
+        company.setSecret('email', null);
+      }
+      company.save({ ...c, email: parsed.config }, `Set up email (${parsed.config.provider === 'graph' ? 'Microsoft 365' : 'SMTP'})`);
+      return [200, adminState(me.id)];
+    }
+    if (method === 'POST' && p === '/admin/email/test') {
+      const send = transport();
+      if (!send) throw bad('Set up email first');
+      const to = isObj(body) && typeof body.to === 'string' && body.to.trim() ? validEmail(body.to) : me.email;
+      if (!to) throw bad('Enter an address to send the test to');
+      try {
+        await send(testEmail({ lang: langFor(req), to, server: serverName() }));
+      } catch (err) {
+        throw new HttpError(422, 'test_failed', err instanceof MailError ? err.message : `Sending failed: ${(err as Error).message}`);
+      }
+      if (c.email) company.save({ ...c, email: { ...c.email, tested: new Date().toISOString() } }, `Sent a test email to ${to}`);
+      return [200, { ...adminState(me.id), sentTo: to }];
+    }
+    if (method === 'DELETE' && p === '/admin/email') {
+      company.setSecret('email', null);
+      company.save({ ...c, email: undefined }, 'Turned off email');
+      return [200, adminState(me.id)];
+    }
     if (method === 'GET' && p === '/admin/profile') {
       if (!c.company.publicUrl) throw bad('Enter the server’s address first');
       company.save(c, 'Downloaded the settings profile');
@@ -607,30 +717,51 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     // People: everyone with an account, their devices, invitations, approvals, roles; who may register.
     const peopleList = () => {
       const devices = store.listDevices().filter((d) => !d.revokedAt);
-      return store.listPeople().map((x) => ({ ...x, owner: x.id === store.ownerId, hasPassword: store.hasPassword(x.id), devices: devices.filter((d) => d.personId === x.id).map(({ id, name, client, lastSeenAt, createdAt }) => ({ id, name, client, lastSeenAt, createdAt })) }));
+      return store.listPeople().map((x) => ({ ...x, owner: x.id === store.ownerId, hasPassword: store.hasPassword(x.id), inviteExpiresAt: x.status === 'invited' ? store.inviteExpiresAt(x.id) : null, devices: devices.filter((d) => d.personId === x.id).map(({ id, name, client, lastSeenAt, createdAt }) => ({ id, name, client, lastSeenAt, createdAt })) }));
     };
-    const inviteLink = (code: string) => `${(c.company.publicUrl || `https://${String(req.headers.host ?? 'localhost')}`).replace(/\/+$/, '')}/account/register#invite=${code}`;
-    if (method === 'GET' && p === '/admin/people') return [200, { people: peopleList(), registration: store.registration() }];
+    // Invitations: emailed when email is set up, otherwise (or when sending fails) a link to pass on by hand. The
+    // link's address is the server's own, or the one the admin is using.
+    const inviteDeps = (): InviteDeps => ({
+      store,
+      transport: canEmail() ? transport() : undefined,
+      baseUrl: publicBase() || `https://${String(req.headers.host ?? 'localhost')}`,
+      server: serverName(),
+      inviter: me.name,
+      lang: langFor(req),
+    });
+    const peopleOut = () => ({ people: peopleList(), registration: store.registration(), inviteDays: store.inviteDays(), email: canEmail() });
+    if (method === 'GET' && p === '/admin/people') return [200, peopleOut()];
     if (method === 'POST' && p === '/admin/people') {
       const email = validEmail(isObj(body) ? body.email : undefined);
-      const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 80) : email.split('@')[0];
+      const name = isObj(body) && typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined;
       const role = isObj(body) && body.role === 'admin' ? 'admin' : 'member';
       if (store.personByEmail(email)) throw bad('There’s already an account with this email');
-      const person = store.addPerson({ email, name, role, status: 'invited' });
-      const code = store.createInvite(person.id);
-      company.save(c, `Invited ${email}`);
-      return [201, { people: peopleList(), invite: { personId: person.id, email, link: inviteLink(code), expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() } }];
+      const [invite] = await invitePeople(inviteDeps(), [{ email, name, role }]);
+      company.save(c, `Invited ${email}${invite.sent ? ' by email' : ''}`);
+      return [201, { ...peopleOut(), invite }];
     }
-    const pid = p.match(/^\/admin\/people\/([\w-]{36})(\/invite)?$/);
+    const pid = p.match(/^\/admin\/people\/([\w-]{36})(\/invite|\/reset)?$/);
     if (pid) {
       const target = store.person(pid[1]);
       if (!target) throw new HttpError(404, 'not_found', 'No such person');
       const otherAdmins = store.listPeople().filter((x) => x.role === 'admin' && x.status === 'active' && x.id !== target.id).length;
-      if (method === 'POST' && pid[2]) {
+      if (method === 'POST' && pid[2] === '/invite') {
         if (target.status !== 'invited') throw bad('This person has already signed up');
-        const code = store.createInvite(target.id);
-        company.save(c, `Invited ${target.email} again`);
-        return [201, { people: peopleList(), invite: { personId: target.id, email: target.email, link: inviteLink(code), expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() } }];
+        const invite = await sendInvitation(inviteDeps(), target);
+        company.save(c, `Invited ${target.email} again${invite.sent ? ' by email' : ''}`);
+        return [201, { ...peopleOut(), invite }];
+      }
+      if (method === 'POST' && pid[2] === '/reset') {
+        // A reset link goes to the person's own email, never to the admin: admins don't get into anyone's account.
+        if (!canEmail()) throw bad('Set up email first (Settings → Email)');
+        if (target.status !== 'active' || !target.email) throw bad('Only active accounts with an email can reset their password');
+        try {
+          await sendReset(req, target.id);
+        } catch (err) {
+          throw new HttpError(422, 'send_failed', err instanceof MailError ? err.message : `Sending failed: ${(err as Error).message}`);
+        }
+        company.save(c, `Sent ${target.email} a password reset link`);
+        return [200, { ...peopleOut(), resetSentTo: target.email }];
       }
       if (method === 'PATCH' && !pid[2]) {
         const role = isObj(body) && (body.role === 'admin' || body.role === 'member') ? body.role : undefined;
@@ -641,7 +772,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
         store.updatePerson(target.id, { role, status, name });
         if (status === 'disabled') signOutEverywhere(target.id);
         company.save(c, `${status === 'disabled' ? 'Disabled' : status === 'active' ? (target.status === 'pending' ? 'Approved' : 'Enabled') : 'Changed'} ${target.email ?? target.name}`);
-        return [200, { people: peopleList(), registration: store.registration() }];
+        return [200, peopleOut()];
       }
       if (method === 'DELETE' && !pid[2]) {
         if (target.id === me.id) throw bad('You can’t remove yourself');
@@ -649,15 +780,19 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
         signOutEverywhere(target.id);
         store.removePerson(target.id);
         company.save(c, `Removed ${target.email ?? target.name} and their data`);
-        return [200, { people: peopleList(), registration: store.registration() }];
+        return [200, peopleOut()];
       }
     }
     if (method === 'PUT' && p === '/admin/registration') {
+      // Who may register, and how many days an invitation is valid.
       const mode = isObj(body) ? body.mode : undefined;
-      if (mode !== 'invite' && mode !== 'approval' && mode !== 'open') throw bad('mode must be invite, approval or open');
-      store.setRegistration(mode);
-      company.save(c, `Registration: ${mode}`);
-      return [200, { people: peopleList(), registration: store.registration() }];
+      const days = isObj(body) ? body.inviteDays : undefined;
+      if (mode !== undefined && mode !== 'invite' && mode !== 'approval' && mode !== 'open') throw bad('mode must be invite, approval or open');
+      if (days !== undefined && !(typeof days === 'number' && Number.isInteger(days) && days >= 1 && days <= 90)) throw bad('An invitation is valid for 1 to 90 days');
+      if (mode) store.setRegistration(mode);
+      if (days !== undefined) store.setInviteDays(days);
+      company.save(c, [mode && `Registration: ${mode}`, days !== undefined && `Invitations valid for ${days} days`].filter(Boolean).join(', '));
+      return [200, peopleOut()];
     }
     // Feedback inbox: conversations, reading one marks it seen, replies, status, deleting.
     if (method === 'GET' && p === '/admin/feedback') return [200, { threads: store.listFeedback() }];
@@ -836,7 +971,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     let rel = decodeURIComponent(url.pathname);
     // The setup wizard and Admin page are their own small app; everything else is the phone app (no server routes).
     if (company && /^\/(setup|admin)\/?$/.test(rel)) rel = '/admin.html';
-    else if (/^\/account(\/register)?\/?$/.test(rel)) rel = '/account.html';
+    else if (/^\/account(\/register|\/forgot|\/reset)?\/?$/.test(rel)) rel = '/account.html';
     else if (rel === '/' || !path.extname(rel)) rel = '/index.html';
     const file = path.resolve(webDir, `.${rel}`);
     if (!file.startsWith(path.resolve(webDir) + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, { error: 'not_found', message: 'Not found' });
@@ -927,6 +1062,9 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       if (url.pathname === '/about' || url.pathname.startsWith('/about/')) return serveFolder(req, res, url, '/about', siteDir, { 'Content-Security-Policy': SITE_CSP });
       // The web app: the Mac app's interface, built into web/app/ (scripts/build.mjs), signed in with a cookie (web.ts).
       if (url.pathname === '/app' || url.pathname.startsWith('/app/')) return serveFolder(req, res, url, '/app', webDir && path.join(webDir, 'app'), { 'Content-Security-Policy': APP_CSP });
+      // The roadmap page links its stylesheet absolutely, so /roadmap is served as it is, without the redirect.
+      if (url.pathname === '/roadmap' || url.pathname.startsWith('/roadmap/'))
+        return serveFolder(req, res, url.pathname === '/roadmap' ? new URL('/roadmap/', url) : url, '/roadmap', roadmapDir, { 'Content-Security-Policy': SITE_CSP });
       return serveStatic(req, res, url);
     } catch (err) {
       if (err instanceof HttpError) return send(res, err.status, { error: err.code, message: err.message });

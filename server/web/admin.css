@@ -113,3 +113,5 @@ a.primary.a-button { background: var(--accent); color: var(--on-accent); }
 .a-person .a-device { background: var(--surface); padding: 8px 12px; }
 .a-person-actions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .a-row > input, .a-row > select { flex: 1; min-width: 140px; }
+.a-days { align-items: center; font-size: 14px; }
+.a-days input { flex: 0 0 72px; }
