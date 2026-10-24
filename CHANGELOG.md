@@ -3,6 +3,12 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.15 · 2026-10-24
+
+- **See the entry you just added:** after Enter or +, the new entry lights up where it landed in the day and scrolls
+  into view. Typed-in time goes into the first free stretch of your work hours, so it can land in the middle of the
+  list.
+
 ## 0.1.14 · 2026-10-24
 
 - **Work hours and bookings are kept apart:** your entries no longer move the times you clocked in or out. A day you
