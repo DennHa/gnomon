@@ -142,6 +142,22 @@ admin can send someone a reset link from the People page. The link always goes t
 see it. Without email, invitations are links you pass on by hand, as before. Invitations are valid for 14 days by
 default (People → *Invitations are valid for*); expired ones show as expired and can be sent again.
 
+**Inviting many people at once:** People → *Invite from a list*. Upload a CSV file or paste a list, one person per
+line with name and email, separated by comma, semicolon or tab, for example `Jane Doe; jane.doe@example.com`. A header
+line is optional; with one, columns such as *Name*, *First name* / *Last name* (*Vorname* / *Nachname*) and *Email*
+are recognised, in any order. Excel's CSV works (quotes, a byte order mark, and Windows' older encoding); an `.xlsx`
+file has to be saved as *CSV UTF-8* first. Up to 1000 lines per list.
+
+Before anything happens, a preview shows each line as *new*, *has an account*, *already invited*, *twice in the list*
+or *not an email*, with a count of each. Only the new people are invited, as members, with the validity set under
+*Invitations are valid for*. With email set up you choose: send the invitations by email (10 at a time, with
+progress; keep the page open) or only create links. Emails that didn't go out are listed with the reason and can be
+tried again. *Download links (CSV)* saves name, email, link and valid until for every invitation that wasn't emailed,
+to hand out yourself or send through your own mail. The links are shown only then, so keep the file safe and delete it
+once they're handed out. For scripts: `POST /api/v1/admin/people/import/preview {text}` and
+`POST /api/v1/admin/people/import {people: [{name, email}], by: "email" | "link", again?}` (up to 50 people per call),
+both for admins only.
+
 The server's address (Settings → Company, or `GNOMON_PUBLIC_URL`) must be set: the links in emails point to it. Emails
 come from the sender address you enter, with the server's name (Settings → Company) as the sender name. The password
 or client secret is stored encrypted like the Float and Personio tokens and is never shown again. *Send a test email*
