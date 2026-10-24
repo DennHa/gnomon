@@ -3,6 +3,17 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.14 · 2026-10-24
+
+- **Work hours and bookings are kept apart:** your entries no longer move the times you clocked in or out. A day you
+  didn't clock in follows your entries exactly and says "From your bookings". The day view shows clocked in, booked
+  and the difference between them as a plain hint.
+- **Typing a time no longer jumps your day:** time fields save when you press Enter or leave the field, not on every
+  keystroke (typing 09:30 used to pass through 00:30 and move your arrival to midnight).
+- **Breaks that overlap count once**, and only the part between arriving and leaving counts.
+- **Month report:** the numbers above the bars no longer run into each other.
+- Building Gnomon from a fresh copy of the code works again.
+
 ## 0.1.13 · 2026-10-23
 
 - **Start your way:** the first screen asks whether you use Gnomon on this Mac only, or with an account on a Gnomon
