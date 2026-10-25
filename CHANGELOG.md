@@ -3,6 +3,10 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Copy day**: one click copies a day's entries as bullet points (with hours, or without) for Weblog or a status message, from the day view, the Week view (*Copy week*) and the menu bar (*Copy today as text*).
+
 ## 0.1.20 · 2026-10-25
 
 - **The ready-made server image is published** with this release (`ghcr.io/dennha/gnomon-server`), so the one-command

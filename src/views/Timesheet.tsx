@@ -4,7 +4,7 @@ import { copyEntriesTo, fillGaps, lastDayEntries, planGaps, toggleWeekDone, week
 import { NewProjectInput, TrailSummary } from '../components';
 import { EntryFeed } from '../feed';
 import { Icon } from '../icons';
-import { DayReview, MISSING_LOOKBACK_DAYS, StaleBanner, WorkdayEditor, missingDays, shiftDay } from './day';
+import { CopyButton, DayReview, MISSING_LOOKBACK_DAYS, StaleBanner, WorkdayEditor, missingDays, shiftDay } from './day';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
 import { Burst } from '../motion';
@@ -127,7 +127,10 @@ function DayModal({ day, onClose, readOnly }: { day: string; onClose: () => void
     <Modal onClose={onClose} wide title={<strong>{fmtDayLong(day)}</strong>}>
       <WorkdayEditor day={day} />
       <div className="modal-section">
-        <h4>{t('entries')}</h4>
+        <div className="section-head">
+          <h4>{t('entries')}</h4>
+          {entries.length > 0 && <CopyButton days={[day]} />}
+        </div>
         <EntryFeed day={day} entries={entries} mode="hours" readOnly={readOnly} />
       </div>
       <div className="modal-section">
@@ -294,6 +297,7 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
           </span>
         ) : null}
         <span className="spacer" />
+        {weekTracked > 0 && <CopyButton days={days} week />}
         {!done && lastWeekMs >= 60_000 && (
           <button className="btn small" onClick={copyLastWeek} title={t('ts.copyHint')}>
             <Icon name="content_copy" size={18} /> {t('ts.copyLastWeek', { time: fmtHM(lastWeekMs) })}

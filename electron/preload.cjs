@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('api', {
   profile: () => ipcRenderer.invoke('profile:get'),
   setTheme: (value) => ipcRenderer.send('theme:set', value),
   notify: (title, body) => ipcRenderer.send('notify', { title, body }),
+  copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
   appInfo: () => ipcRenderer.invoke('app:info'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   openLink: (url) => ipcRenderer.send('link:open', url),

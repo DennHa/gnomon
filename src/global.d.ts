@@ -16,6 +16,8 @@ declare global {
       profile(): Promise<CompanyProfile | null>;
       setTheme(value: 'system' | 'light' | 'dark'): void;
       notify(title: string, body: string): void;
+      /** Plain text to the clipboard (Copy day). */
+      copyText(text: string): Promise<void>;
       appInfo(): Promise<{ version: string; electron: string; chrome: string; node: string; updateSource: string | null; roadmap: string | null }>;
       checkUpdate(): Promise<
         | { ok: true; newer: boolean; latest: { version: string; date?: string; notes: string[]; download?: string; page?: string } }

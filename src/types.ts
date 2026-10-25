@@ -161,6 +161,8 @@ export type Settings = {
   /** Minutes without keyboard/mouse input before Gnomon asks about a running timer (0 = off). */
   idleMinutes: number;
   reviewOnLeave: boolean;
+  /** Copy day (src/copytext.ts): hours after each line; on unless switched off. */
+  copyHours?: boolean;
   /** Opt-in: show a billable (€) switch on entries and billable totals in reports. */
   billableEnabled: boolean;
   /** Overtime balance carried over from elsewhere (e.g. the company system), valid at the start of balanceStartDate. */
@@ -246,4 +248,5 @@ export type TrayAction =
   | { type: 'resume' }
   | { type: 'idle'; since: string; choice: 'keep' | 'discard' | 'break' | 'leave' }
   | { type: 'show-review' }
+  | { type: 'copy-today' }
   | { type: 'show-feedback' };

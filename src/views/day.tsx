@@ -1,5 +1,5 @@
 // Day-level pieces shared by the Today page and the Timesheet's day modal.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 import {
   addBreak,
@@ -25,8 +25,48 @@ import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
 import { addDays, atTime, breakMs, dayKey, entryMs, fmtDayLabel, fmtDuration, fmtTime, hoursToMs, useNow, workdayMs } from '../time';
 import { t } from '../i18n';
+import { copyHoursOn, daysText, type CopyText } from '../copytext';
 
 export const MISSING_LOOKBACK_DAYS = 30;
+
+/** Copy day: puts the days' entries on the clipboard as bullet points; nothing when there are none. */
+export async function copyDays(data: Data, days: string[]): Promise<CopyText> {
+  const r = daysText(data, days, { hours: copyHoursOn(data) });
+  if (r.lines) await window.api.copyText(r.text);
+  return r;
+}
+
+/** "Copy day" / "Copy week", with a small switch for the hours per line; says what it copied for a moment. */
+export function CopyButton({ days, week }: { days: string[]; week?: boolean }) {
+  const { data, update } = useStore();
+  const [done, setDone] = useState<string | null>(null);
+  useEffect(() => {
+    if (!done) return;
+    const timer = setTimeout(() => setDone(null), 2500);
+    return () => clearTimeout(timer);
+  }, [done]);
+  const hours = copyHoursOn(data);
+  const copy = () =>
+    copyDays(data, days).then(
+      (r) => setDone(r.lines ? t('copy.done', { n: r.lines }) : t('copy.nothing')),
+      () => setDone(t('copy.nothing')),
+    );
+  return (
+    <span className="copy-day">
+      <button className="btn ghost small" onClick={copy} title={t(week ? 'copy.weekHint' : 'copy.dayHint')} aria-live="polite">
+        <Icon name={done ? 'check' : 'content_copy'} size={16} /> {done ?? t(week ? 'copy.week' : 'copy.day')}
+      </button>
+      <button
+        className={`icon-btn ${hours ? 'live' : ''}`}
+        title={t('copy.withHoursHint')}
+        aria-pressed={hours}
+        onClick={() => update((d) => ({ ...d, settings: { ...d.settings, copyHours: !hours } }))}
+      >
+        <Icon name="schedule" size={16} />
+      </button>
+    </span>
+  );
+}
 export const shiftDay = (day: string, n: number) => dayKey(addDays(new Date(`${day}T12:00`), n));
 
 /** Planned hours per project for a day (Float plan or manual goals), with progress. */
