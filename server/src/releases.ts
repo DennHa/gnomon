@@ -1,12 +1,91 @@
 // The download page for the Mac app: /latest (a short page), /latest/version.json (what the app's update check reads)
-// and /latest/download (the .dmg). Optional: only when GNOMON_RELEASES_DIR points at a folder with version.json and the
-// .dmg it names (made by `npm run release:manifest` in the app). Anyone who can reach the server can download the app,
-// so put it behind your own access control if it shouldn't be public. Read on every request, so replacing the files
-// publishes a new version without a restart.
+// and /latest/download (the .dmg). Where the app comes from, in this order:
+//   1. GNOMON_RELEASES_DIR: a folder with version.json and the .dmg it names (made by `npm run release:manifest`),
+//   2. an upload on the setup page (Mac app → "Upload your own"), kept in the data folder's releases/,
+//   3. the official release on GitHub (the default): the page and version.json come from GitHub's latest release, and
+//      the download goes straight there.
+// Anyone who can reach the server can see the page and download the app (it holds no data or secrets). Folders are read
+// on every request, so replacing the files publishes a new version without a restart.
 import fs from 'node:fs';
 import path from 'node:path';
 
-export type Release = { version: string; date?: string; notes: string[]; file: string; size: number };
+/** `url`: where the .dmg is downloaded from when it isn't a file on this server (the GitHub release). */
+export type Release = { version: string; date?: string; notes: string[]; file: string; size: number; url?: string };
+
+export const OFFICIAL_REPO = () => process.env.GNOMON_RELEASES_REPO?.trim() || 'DennHa/gnomon';
+const GITHUB_API = () => process.env.GNOMON_GITHUB_API?.trim() || 'https://api.github.com';
+
+let gh: { at: number; release: Release | null } | undefined;
+let ghPending: Promise<Release | null> | undefined;
+
+/**
+ * The latest official release from GitHub, cached for an hour (GitHub allows 60 unauthenticated requests an hour); after
+ * a failed request the last good answer is kept and asked again after 5 minutes.
+ */
+export async function githubRelease(): Promise<Release | null> {
+  if (gh && Date.now() - gh.at < (gh.release ? 3_600_000 : 300_000)) return gh.release;
+  ghPending ??= (async () => {
+    try {
+      const res = await fetch(`${GITHUB_API()}/repos/${OFFICIAL_REPO()}/releases/latest`, {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Gnomon server' },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const r = (await res.json()) as { tag_name?: string; published_at?: string; body?: string; assets?: { name: string; size: number; browser_download_url: string }[] };
+      const version = String(r.tag_name ?? '').replace(/^v/, '');
+      const dmg = r.assets?.find((a) => /\.dmg$/i.test(a.name) && /^https:\/\//.test(a.browser_download_url));
+      const release: Release | null =
+        /^\d+\.\d+\.\d+([-+][\w.]+)?$/.test(version) && dmg
+          ? {
+              version,
+              date: r.published_at?.slice(0, 10),
+              notes: String(r.body ?? '')
+                .split(/\r?\n/)
+                .filter((l) => /^\s*[-*] /.test(l))
+                .map((l) => l.replace(/^\s*[-*] /, '').replace(/\*\*|`/g, '').trim())
+                .slice(0, 20),
+              file: dmg.name,
+              size: dmg.size,
+              url: dmg.browser_download_url,
+            }
+          : null;
+      gh = { at: Date.now(), release };
+    } catch {
+      gh = { at: Date.now() - 3_300_000, release: gh?.release ?? null };
+    }
+    return gh.release;
+  })().finally(() => (ghPending = undefined));
+  return ghPending;
+}
+
+/** The cached GitHub answer without asking GitHub (for the Admin page's state). */
+export const peekGithubRelease = (): Release | null => gh?.release ?? null;
+
+/** For tests: forget the cached GitHub answer. */
+export const forgetGithubRelease = () => (gh = undefined);
+
+export type MacAppSource = 'github' | 'upload';
+
+/** The release /latest shows: the folder from GNOMON_RELEASES_DIR, else an upload, else GitHub (see the top). */
+export async function currentRelease(o: { releasesDir?: string; uploadDir?: string; source: MacAppSource }): Promise<{ release: Release | null; dir?: string; from: 'folder' | 'upload' | 'github' }> {
+  if (o.releasesDir) return { release: readRelease(o.releasesDir), dir: o.releasesDir, from: 'folder' };
+  if (o.source === 'upload') return { release: readRelease(o.uploadDir), dir: o.uploadDir, from: 'upload' };
+  return { release: await githubRelease(), from: 'github' };
+}
+
+/** A .dmg's last 512 bytes start with "koly" (the UDIF trailer); anything else isn't a disk image. */
+export function looksLikeDmg(file: string): boolean {
+  const size = fs.statSync(file).size;
+  if (size < 1024) return false;
+  const fd = fs.openSync(file, 'r');
+  try {
+    const b = Buffer.alloc(4);
+    fs.readSync(fd, b, 0, 4, size - 512);
+    return b.toString('latin1') === 'koly';
+  } finally {
+    fs.closeSync(fd);
+  }
+}
 
 export function readRelease(dir?: string): Release | null {
   if (!dir) return null;

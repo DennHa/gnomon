@@ -3,6 +3,25 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Installing a Gnomon server is one command** on any Linux machine with Docker (`server/deploy/install.sh`). It
+  asks how HTTPS is done (Caddy with an automatic or your own certificate, your own reverse proxy, a Cloudflare
+  Tunnel, or a local test), generates the secret key, starts the server and prints the link to the setup page.
+  Ready-made server images for x86-64 and arm64 come with every release (`ghcr.io/dennha/gnomon-server`, with an SBOM
+  and a signed build attestation); building from the code stays possible with `--build`.
+- **gnomon-admin on the server's machine:** `status`, `update` (backs up first), `backup`, `restore`, `logs`,
+  `restart`, and the links to the setup and Admin pages.
+- **Nightly encrypted backups, on by default:** the last 14 are kept on the server, encrypted with a backup password
+  that's shown once at install and can be changed on the setup page. The server can make backups but not read them;
+  without the password a backup can't be restored, so keep it in your password manager.
+- **The setup page starts with your admin account** (name, email, password) and now also covers the server's address
+  with an HTTPS check, who may register, where the Mac app comes from (the official release from GitHub, or your own
+  upload), backups, and ends with inviting people.
+- **The admin guide** ([docs/admin-guide.md](docs/admin-guide.md)) explains everything for IT: install, HTTPS, email
+  with SMTP or Microsoft 365, inviting people, handing out the apps, backups and restore, updates, security and
+  privacy, troubleshooting, and moving or removing a server.
+
 ## 0.1.18 · 2026-10-24
 
 - **Gnomon in the browser:** on your Gnomon server, `/app` opens the Mac app's Track, Week, Reports and Projects in

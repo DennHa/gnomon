@@ -7,6 +7,8 @@ import { printPairing } from './qr-terminal';
 import { databaseFile, Store } from './store';
 import { Company, loadSecretKey } from './company';
 import { terminalQr } from './qr-terminal';
+import { Backups } from './backups';
+import { VERSION } from './version';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.GNOMON_DATA_DIR ?? './data');
@@ -21,12 +23,17 @@ const siteDir = process.env.GNOMON_SITE_DIR ? path.resolve(process.env.GNOMON_SI
 // Company setup: settings and encrypted tokens for the wizard (src/company.ts).
 const secret = loadSecretKey(dataDir);
 const company = new Company(store, secret.key, secret.source);
-const server = http.createServer(createApp({ store, webDir: path.join(here, 'web'), releasesDir, company, demoDir, siteDir, roadmapDir: path.join(here, 'roadmap') }));
+// Nightly encrypted backups into <data>/backups (src/backups.ts), once a backup password is set.
+const backups = new Backups(store, dataDir);
+backups.schedule();
+const server = http.createServer(
+  createApp({ store, webDir: path.join(here, 'web'), releasesDir, company, demoDir, siteDir, roadmapDir: path.join(here, 'roadmap'), backups, macAppDir: path.join(dataDir, 'releases'), https: process.env.GNOMON_HTTPS?.trim() || undefined }),
+);
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
 server.listen(port, host, () => {
   const devices = store.listDevices().filter((d) => !d.revokedAt).length;
-  console.log(`Gnomon server on http://${host}:${port} (data: ${dataDir}, timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}, devices: ${devices})`);
+  console.log(`Gnomon ${VERSION} on http://${host}:${port} (data: ${dataDir}, timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}, devices: ${devices})`);
   // Until the company setup is finished, the log shows a one-time link to the setup wizard (60 minutes; a restart
   // makes a new one). Personal use can ignore it: pairing devices works without the wizard.
   if (!company.get().setupDone) {
@@ -37,6 +44,7 @@ server.listen(port, host, () => {
     if (process.env.GNOMON_PUBLIC_URL) console.log(`\n${terminalQr(link)}\n`);
     if (secret.source === 'file') console.log('Tokens entered in the setup are encrypted with a key file in the data folder; set GNOMON_SECRET_KEY to keep the key elsewhere.');
   }
+  if (!backups.key()) console.log('No backup password set, so there are no nightly backups yet: gnomon-admin backup-password, or the setup page.');
   if (!devices) {
     // First start: show a setup code right here, so the first device needs no server command. It's only
     // printed to this log (which only the server's owner sees) and expires; a restart makes a new one.
@@ -47,6 +55,7 @@ server.listen(port, host, () => {
 });
 
 function shutdown() {
+  backups.stop();
   server.close(() => {
     store.close();
     process.exit(0);

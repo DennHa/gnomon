@@ -1,5 +1,9 @@
 # Gnomon server & mobile web app
 
+> **Running a server for your company?** Read the [admin guide](../docs/admin-guide.md): a one-command install on any
+> Linux machine with Docker, HTTPS four ways, the setup page, email, backups, updates and security. This file is for
+> developers.
+
 Track time from your phone without publishing an app. The server keeps your Gnomon data in SQLite and serves a
 small web app (PWA) that you add to your home screen. It speaks the same REST API as the Mac app ([API.md](../API.md)),
 because it runs the Mac app's own API code (`../src/api.ts`, `actions.ts`), plus a few routes for the phone and for syncing.
@@ -60,7 +64,7 @@ With the cookie and the token, every other route under `/api/v1` works as for a 
 ```bash
 cd server
 npm install
-npm test                                        # 17 end-to-end tests against a temporary database
+npm test                                        # end-to-end tests against temporary databases
 npm run dev                                     # http://localhost:8787, data in server/.data/
 GNOMON_DATA_DIR=./.data npm run admin -- pair "Browser"   # pairing code to sign in
 ```
@@ -78,7 +82,15 @@ SHA-256 hashes, so the database doesn't hold them in a usable form.
 | `add-key "Mac"` | Create a key directly (for the Mac app or scripts); shown once. |
 | `devices` | List devices with last-seen time. |
 | `revoke <id or name>` | Revoke a key immediately. |
-| `backup /data/backup.db` | Consistent copy of the database while the server runs. |
+| `status` | Version, setup, people, devices, backups. |
+| `setup-link`, `admin-link` | One-time links to the setup page and the Admin page (60 minutes). |
+| `backup` | Encrypted backup into `<data>/backups` now (`--plain <file>`: an unencrypted copy). |
+| `backups` | List the backups. |
+| `backup-password` | Set the backup password (`--new` makes one and shows it once; `--stdin` reads it). |
+| `restore <file>` | Replace the database with a backup, while the server is stopped. |
+
+An install from `deploy/install.sh` also has a `gnomon-admin` on the machine itself (`deploy/gnomon-admin.sh`): it
+passes these on into the container and adds `update`, `restore` (stops and starts the server), `logs` and `restart`.
 
 **Pairing with a QR code instead of the server command:** once one device is connected, it can invite the next.
 In the Mac app, Settings → **Phone (Gnomon server)**: enter the server address and a pairing code once
@@ -91,9 +103,29 @@ app then connects by itself. If it still asks for a code, create a new one and t
 
 After 10 wrong pairing codes in a row, all open codes are dropped and pairing is locked for 15 minutes.
 
+## Backups
+
+`src/backups.ts` makes a backup every night (02:00 server time by default, the newest 14 kept) into `<data>/backups`,
+once a backup password is set. A backup is the whole database (SQLite's online backup), gzipped and encrypted by
+`src/backup-crypto.ts`, which is self-contained (only `node:crypto`) so other features can reuse it: the password
+becomes an X25519 key pair through scrypt (N=2^16, r=8), the server stores only the public key, and each file is
+AES-256-GCM under a key from an ephemeral X25519 exchange (HKDF-SHA256), with the header as additional data. So the
+server can make backups without the password, but only someone with the password can read them. File format and
+details are at the top of `backup-crypto.ts`.
+
+## Install script and images
+
+`deploy/install.sh` (see the [admin guide](../docs/admin-guide.md#install)) writes a folder with `compose.yml`
+and `.env`, and starts the published image `ghcr.io/dennha/gnomon-server`. `.github/workflows/server-image.yml` builds
+that image for amd64 and arm64 on every `v*` tag, with an SBOM and a build attestation, and tags it with the version,
+`major.minor` and `latest`. The package has to be made public once in GitHub (Packages → gnomon-server → Package
+settings), or installs can't pull it. `docker-compose.yml` here and `deploy/deploy-to-pi.sh` are the developer's own
+setup below, which builds from the checkout.
+
 ## Deploy on the Raspberry Pi (Cloudflare Tunnel)
 
-This follows the Pi's existing pattern (see `00_PiSetup/PI_DOCKER_BASELINE.md`): the container joins the shared
+This is the developer's own test server, built from a checkout. For a company server, use the install script in the
+[admin guide](../docs/admin-guide.md) (it has a Raspberry Pi example too). This follows the Pi's existing pattern (see `00_PiSetup/PI_DOCKER_BASELINE.md`): the container joins the shared
 `proxy-net` network, `cloudflared` forwards a public hostname to it, and **no host port is published**.
 
 1. **Check the Pi first** (read-only):
@@ -138,7 +170,8 @@ A Cloudflare Tunnel makes the app reachable **from the whole internet**. What pr
 
 ## Hosting it yourself (other setups)
 
-Anything that runs Docker on arm64 or x86-64 works. The web app needs **HTTPS** for the home-screen install and
+The [admin guide](../docs/admin-guide.md) covers installs with Caddy, your own proxy, a Cloudflare Tunnel or a local
+test. By hand: anything that runs Docker on arm64 or x86-64 works. The web app needs **HTTPS** for the home-screen install and
 offline shell (plain `http://localhost` is fine for testing).
 
 - **Without Cloudflare:** remove the `networks:` sections from `docker-compose.yml` and add
@@ -154,6 +187,12 @@ offline shell (plain `http://localhost` is fine for testing).
 | `HOST` | `0.0.0.0` | |
 | `GNOMON_DATA_DIR` | `./data` (`/data` in Docker) | Where `gnomon.db` lives |
 | `TZ` | system | Set by `GNOMON_TZ` in compose |
+| `GNOMON_SECRET_KEY` | key file in the data folder | Encrypts integration tokens and the email password |
+| `GNOMON_PUBLIC_URL` | | The public address, for links in the log and gnomon-admin |
+| `GNOMON_HTTPS` | | How the install did HTTPS (`caddy`, `caddy-own`, `proxy`, `tunnel`, `local`), shown on the setup page |
+| `GNOMON_TRUST_PROXY` | either header | Which header has the client's address for rate limits: `cloudflare` (CF-Connecting-IP), `proxy` (last X-Forwarded-For), `none` |
+| `GNOMON_RELEASES_DIR` | | A folder with the Mac app for `/latest`; wins over the setup page's choice |
+| `GNOMON_RELEASES_REPO`, `GNOMON_GITHUB_API` | `DennHa/gnomon`, `https://api.github.com` | Where the official Mac app release comes from (tests point the API elsewhere) |
 
 ## Company setup (optional)
 
@@ -230,9 +269,11 @@ a password. Once, as a Microsoft 365 admin:
 6. In Gnomon: Admin → Settings → Email → **Microsoft 365**: tenant ID, client ID, client secret and
    `gnomon@example.com` as the sender. Save, then *Send a test email* (changes in Exchange can take a little while).
 
-## Download page for the Mac app (optional)
+## Download page for the Mac app
 
-The server can also hand out the Mac app: **`/latest`** is a short page with the version, what's new, a download
+The server hands out the Mac app. By default `/latest` shows the newest official release from GitHub (cached for an
+hour) and `/latest/download` redirects there; the setup page can switch to an uploaded `.dmg` (kept in
+`<data>/releases`). A folder in `GNOMON_RELEASES_DIR`, as below, wins over both: **`/latest`** is a short page with the version, what's new, a download
 button and install steps (English or German, following the browser); **`/latest/version.json`** is what the app's
 update check under *Info & feedback* reads; **`/latest/download`** is the `.dmg`.
 
@@ -351,6 +392,8 @@ server/
   src/mail.ts        sending email: SMTP (own small client) and Microsoft Graph
   src/emails.ts      the emails' texts (English, German)   src/invites.ts  inviting a list of people
   src/server.ts      entry point          src/admin.ts   gnomon-admin CLI
+  src/backups.ts     nightly backups, restore      src/backup-crypto.ts  encrypting with a password's public key
+  deploy/            install.sh, gnomon-admin.sh (on the host), deploy-to-pi.sh
   roadmap/           the /roadmap page, rendered from docs/ROADMAP.md at build time
   web/               the PWA (React, bundled with esbuild; Material Symbols inlined), the account and Admin pages
   tests/             node:test end-to-end tests

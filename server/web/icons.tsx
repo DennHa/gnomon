@@ -38,8 +38,13 @@ import verified_user from '@material-symbols/svg-400/rounded/verified_user.svg';
 import apartment from '@material-symbols/svg-400/rounded/apartment.svg';
 import group from '@material-symbols/svg-400/rounded/group.svg';
 import mail from '@material-symbols/svg-400/rounded/mail.svg';
+import backup from '@material-symbols/svg-400/rounded/backup.svg';
+import upload from '@material-symbols/svg-400/rounded/upload.svg';
+import dns from '@material-symbols/svg-400/rounded/dns.svg';
+import how_to_reg from '@material-symbols/svg-400/rounded/how_to_reg.svg';
+import admin_panel_settings from '@material-symbols/svg-400/rounded/admin_panel_settings.svg';
 
-const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail };
+const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail, backup, upload, dns, how_to_reg, admin_panel_settings };
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {

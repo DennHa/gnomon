@@ -13,6 +13,9 @@ COPY docs/ROADMAP.md /app/docs/ROADMAP.md
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim
+LABEL org.opencontainers.image.title="Gnomon server" \
+      org.opencontainers.image.description="Gnomon time tracking server: accounts, sync, web and phone app" \
+      org.opencontainers.image.source="https://github.com/DennHa/gnomon"
 ENV NODE_ENV=production GNOMON_DATA_DIR=/data PORT=8080 HOST=0.0.0.0
 WORKDIR /app
 COPY --from=build /app/server/node_modules ./node_modules

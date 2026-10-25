@@ -9,8 +9,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'dist');
 // ../src imports react (for hooks the server never calls); resolve it from server/node_modules.
 const nodePaths = [path.join(root, 'node_modules')];
+// The version people see (gnomon-admin status, the setup page) is the app's, from the repository's package.json.
+const version = JSON.parse(fs.readFileSync(path.join(root, '..', 'package.json'), 'utf8')).version;
 const node = {
   bundle: true,
+  define: { __GNOMON_VERSION__: JSON.stringify(version) },
   platform: 'node',
   format: 'esm',
   target: 'node20',

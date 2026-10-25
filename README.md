@@ -87,11 +87,14 @@ The first time you open Gnomon on a workday, a short sunrise greets you, with on
 To have it ready every morning, add Gnomon under System Settings → General → Login Items. Updating: drag the new version
 over the old one; your data stays where it is.
 
-## For teams (planned)
+## For teams
 
-For teams, a company-run Gnomon server holds the Float and Personio admin tokens and gives each person only their own
-plan and absences. People sign in with the company login they already have, and IT deploys Gnomon preconfigured with a
-Mac management tool. The Mac app already supports managed settings; see [docs/company-setup.md](docs/company-setup.md).
+A company runs its own Gnomon server: one command installs it on any Linux machine with Docker, and a setup page walks
+through the admin account, HTTPS, email, who may register, the Mac app download and nightly encrypted backups, then
+invites people. Everyone signs in with their email on the Mac, the phone and the web, and sees only their own times.
+The server can also hold the Float and Personio admin tokens and give each person only their own plan and absences,
+and IT can roll out Gnomon preconfigured with a Mac management tool. For admins: the
+[admin guide](docs/admin-guide.md). The plan behind it: [docs/company-setup.md](docs/company-setup.md).
 
 <p align="center"><sub>A <i>gnomon</i> is the pointer on a sundial: the oldest time tracker there is. All pictures use made-up data.</sub></p>
 
@@ -115,7 +118,7 @@ Keep the project outside synced folders such as Nextcloud, which strip the execu
 **Releases.** Bump `version` in `package.json` and add a section to `CHANGELOG.md`, then
 `npm run dist && npm run release:manifest` and upload the `.dmg`. A Gnomon server can host the download and the
 `version.json` the app's update check reads (see
-[server/README.md](server/README.md#download-page-for-the-mac-app-optional)).
+[server/README.md](server/README.md#download-page-for-the-mac-app)).
 
 **Site and demo.** `site/` is a one-page site (static files, no build step); `npm run build:demo` builds the web demo
 into `dist-demo/`. A Gnomon server serves them at `/about` and `/example` (see

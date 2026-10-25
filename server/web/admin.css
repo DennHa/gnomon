@@ -139,3 +139,18 @@ a.primary.a-button { background: var(--accent); color: var(--on-accent); }
 .a-status.invalid { background: var(--warn-soft); color: var(--warn); }
 .a-import progress { width: 100%; accent-color: var(--accent); }
 .a-import .a-warn ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* Setup for admins: welcome status, address check, backups */
+.a-summary dd.a-good, .a-summary dd.a-meh { display: flex; align-items: center; gap: 6px; }
+.a-summary dd.a-good .icon { color: var(--ok); }
+.a-summary dd.a-meh .icon { color: var(--warn); }
+.a-check-address { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: -4px 0 8px; }
+.a-check-address .a-ok { font-weight: 500; font-size: 13px; }
+.a-check-address .a-warn .icon, .a-card .a-warn .icon { vertical-align: -3px; }
+.a-backups { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.a-backups li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; font-size: 14px; padding: 4px 0; border-bottom: 1px solid var(--field); }
+.a-backups li:last-child { border-bottom: 0; }
+.a-form { display: flex; flex-direction: column; gap: 14px; }
+.a-form.a-tight { gap: 8px; }
+/* Inputs straight in a row (the invitation form) look like the other fields. */
+.a-row > input, .a-row > select { font: inherit; border: 0; border-radius: 10px; background: var(--surface); color: var(--text); padding: 10px 12px; }

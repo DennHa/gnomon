@@ -73,7 +73,7 @@ const EN = {
   dayOffTypes: 'These absence types become days off:',
   hourly: 'by the hour, entered by hand',
   // 6
-  rulesTitle: 'Rules',
+  rulesTitle: 'Rules (optional)',
   rulesIntro: 'What Gnomon may do on your people’s Macs. In Germany, talk to the works council and data protection before rolling out a time-tracking tool.',
   rManaged: 'Hide personal setup on Macs',
   rManagedWhy: 'Float, Personio and server connections are handled here; people don’t see token fields.',
@@ -84,7 +84,7 @@ const EN = {
   rPhone: 'Phone web app on this server',
   rPhoneWhy: 'People can clock in and track from their phone at this address.',
   // 7
-  rolloutTitle: 'Roll-out',
+  rolloutTitle: 'Roll-out with Iru (optional)',
   rolloutIntro: 'Two files, and a checklist for your Mac management.',
   profile: 'Settings profile',
   profileWhy: 'Connects Gnomon to this server and applies your rules. It contains addresses and switches only, no tokens.',
@@ -93,7 +93,7 @@ const EN = {
   app: 'The app',
   appRelease: 'Gnomon {version} is ready to download from this server.',
   appDownload: 'Download Gnomon.dmg',
-  appNone: 'No app has been published on this server yet. Put the signed Gnomon .dmg and its version.json into the releases folder (GNOMON_RELEASES_DIR), or download the official build.',
+  appNone: 'No app to hand out yet: choose where it comes from in the step “The Mac app”.',
   appSigned: 'Use a build signed with an Apple Developer ID and notarized; otherwise Macs will block it.',
   iruTitle: 'In Iru (or your Mac management)',
   iru1: 'Add Gnomon.dmg as a custom app.',
@@ -302,6 +302,91 @@ const EN = {
   imCsvHead: 'Name|Email|Link|Valid until',
   imLeave: 'Invitations are still being sent.',
   loginForgot: 'Forgot your password?',
+  // Setup page for admins (docs/admin-guide.md)
+  guide: 'Admin guide',
+  welcomeTitle: 'Welcome',
+  welcomeIntro: 'This page sets up your Gnomon server in about ten minutes. Only your admin account is required; you can skip everything else and come back later.',
+  wServer: 'Server',
+  wHttps: 'HTTPS',
+  wKey: 'Secret key',
+  wBackups: 'Backups',
+  wVersion: 'Gnomon {v}',
+  httpsCaddy: 'Caddy with an automatic certificate',
+  httpsCaddyOwn: 'Caddy with your own certificate',
+  httpsProxy: 'your own reverse proxy',
+  httpsTunnel: 'Cloudflare Tunnel',
+  httpsLocal: 'local test, no HTTPS',
+  httpsManual: 'set up without the install script',
+  wBackupsOn: 'every night, the last {n} kept',
+  wBackupsNoKey: 'no backup password yet (step “Backups”)',
+  wBackupsOff: 'off',
+  wNeed: 'What you’ll need',
+  accountStepTitle: 'Your admin account',
+  accountStepIntro: 'You sign in to the Admin page with this from any browser, and it’s your own Gnomon account for tracking. More admins can be invited later.',
+  accountDone: 'Signed in as {name} ({email}). Change your password later under Admin → Admin password.',
+  accountCreate: 'Create account',
+  accountRequired: 'Create your admin account first.',
+  addrCheck: 'Check',
+  addrChecking: 'Checking…',
+  addr_ok: 'Reachable over HTTPS with a valid certificate, and it’s this server.',
+  addr_ok_local: 'Reachable, but only on this machine and without HTTPS: fine for a test.',
+  addr_not_https: 'The address has to start with https://',
+  addr_invalid: 'That isn’t an address like https://gnomon.example.com',
+  addr_dns: 'The name {host} isn’t found in DNS (yet).',
+  addr_refused: 'Nothing answers at this address. Is the proxy or tunnel running?',
+  addr_timeout: 'No answer within 10 seconds: a firewall, or the server can’t reach its own public address from inside.',
+  addr_certificate: 'The certificate isn’t valid for {host} ({detail}).',
+  addr_other_server: 'The address answers ({detail}), but not as this Gnomon server. Check that the proxy or tunnel forwards it here.',
+  addrBrowser: 'You opened this page at {here}, so a browser reaches it there.',
+  regStepTitle: 'Who may register',
+  regStepIntro: 'For a company, “Invited only” is right: nobody gets an account without an invitation from an admin.',
+  macTitle: 'The Mac app',
+  macIntro: 'People download the app at {url}/latest, and the app looks there for new versions.',
+  macGithub: 'The official release from GitHub',
+  macGithubHint: 'Always the newest version from github.com/{repo}. The download goes straight to GitHub.',
+  macUpload: 'Upload your own',
+  macUploadHint: 'For example a build signed with your company’s Apple Developer ID. Upload each new version here.',
+  macFolder: 'GNOMON_RELEASES_DIR is set, so the app comes from that folder; the choice here applies once it’s removed.',
+  macNow: 'Handed out now: Gnomon {v}',
+  macNowDate: 'Handed out now: Gnomon {v} from {date}',
+  macNone: 'Nothing to hand out yet.',
+  macLoading: 'Looking up the current version…',
+  macFile: 'Choose the .dmg',
+  macVersion: 'Version',
+  macUploadButton: 'Upload',
+  macUploading: 'Uploading… {p} %',
+  macUploaded: 'Uploaded. Gnomon {v} is handed out now.',
+  backupsTitle: 'Backups',
+  backupsIntro: 'Every night the server makes an encrypted copy of everything into its data folder and keeps the newest ones. Copy them somewhere else too (see the admin guide): a backup on the same disk doesn’t help when the disk dies.',
+  bNightly: 'Make a backup every night',
+  bNightlyWhy: 'At the hour below, in the server’s time zone.',
+  bHour: 'At',
+  bKeep: 'Keep the newest',
+  bPassword: 'Backup password',
+  bPasswordSet: 'Set {when}. Backups can only be restored with it.',
+  bPasswordNone: 'No backup password yet, so no backups are made. Set one now.',
+  bLost: 'Keep the backup password in your password manager. Without it, a backup can’t be restored: nobody can recover it, not even the Gnomon project. The server keeps only a key that can encrypt, not decrypt.',
+  bCurrent: 'Current backup password',
+  bNew: 'New backup password (at least 12 characters)',
+  bRepeat: 'Repeat it',
+  bSetPassword: 'Set password',
+  bChange: 'Change password',
+  bChanged: 'Saved. New backups need this password; older ones still need the one they were made with.',
+  bShort: 'At least 12 characters.',
+  bRun: 'Back up now',
+  bRunning: 'Backing up…',
+  bFiles: 'On the server',
+  bNoFiles: 'No backups yet.',
+  bLastFailed: 'The last backup failed ({when}): {error}',
+  bDownload: 'Download',
+  inviteStepTitle: 'Invite people',
+  inviteStepIntro: 'Invite one person or a whole list. You can do this any time later under People.',
+  optional: '(optional)',
+  sEmail: 'Email',
+  sMacApp: 'Mac app',
+  sBackups: 'Backups',
+  sAdmin: 'Admin',
+  doneIntroNew: 'The server is set up. After finishing, the setup link stops working; sign in at {url}/admin with your account for changes.',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -361,7 +446,7 @@ const DE: Record<Key, string> = {
   personioMore: 'Verbunden · mehr als {n} Personen',
   dayOffTypes: 'Diese Abwesenheitsarten werden zu freien Tagen:',
   hourly: 'stundenweise, wird selbst eingetragen',
-  rulesTitle: 'Regeln',
+  rulesTitle: 'Regeln (optional)',
   rulesIntro: 'Was Gnomon auf den Macs deiner Leute darf. In Deutschland vor der Einführung eines Zeiterfassungs-Tools mit Betriebsrat und Datenschutz sprechen.',
   rManaged: 'Persönliche Einrichtung auf Macs ausblenden',
   rManagedWhy: 'Float, Personio und Server-Verbindung laufen hier; niemand sieht Token-Felder.',
@@ -371,7 +456,7 @@ const DE: Record<Key, string> = {
   rTrailWhy: 'Eine freiwillige Gedächtnisstütze: welche App vorne war, einmal pro Minute. Sie verlässt den Mac nie.',
   rPhone: 'Handy-Web-App auf diesem Server',
   rPhoneWhy: 'Alle können sich unter dieser Adresse auch per Handy einstempeln und Zeiten erfassen.',
-  rolloutTitle: 'Verteilen',
+  rolloutTitle: 'Verteilen mit Iru (optional)',
   rolloutIntro: 'Zwei Dateien und eine Checkliste für deine Mac-Verwaltung.',
   profile: 'Einstellungsprofil',
   profileWhy: 'Verbindet Gnomon mit diesem Server und setzt deine Regeln. Es enthält nur Adressen und Schalter, keine Tokens.',
@@ -380,7 +465,7 @@ const DE: Record<Key, string> = {
   app: 'Die App',
   appRelease: 'Gnomon {version} liegt auf diesem Server zum Herunterladen bereit.',
   appDownload: 'Gnomon.dmg herunterladen',
-  appNone: 'Auf diesem Server liegt noch keine App. Leg die signierte Gnomon-.dmg und ihre version.json in den Releases-Ordner (GNOMON_RELEASES_DIR) oder lade die offizielle Version herunter.',
+  appNone: 'Noch keine App zum Ausgeben: Wähl im Schritt „Die Mac-App“, woher sie kommt.',
   appSigned: 'Nimm eine mit Apple-Developer-ID signierte und notarisierte Version, sonst blockieren die Macs sie.',
   iruTitle: 'In Iru (oder deiner Mac-Verwaltung)',
   iru1: 'Gnomon.dmg als eigene App hinzufügen.',
@@ -588,6 +673,90 @@ const DE: Record<Key, string> = {
   imCsvHead: 'Name|E-Mail|Link|Gültig bis',
   imLeave: 'Einladungen werden noch verschickt.',
   loginForgot: 'Passwort vergessen?',
+  guide: 'Anleitung für Admins',
+  welcomeTitle: 'Willkommen',
+  welcomeIntro: 'Diese Seite richtet deinen Gnomon-Server in etwa zehn Minuten ein. Nötig ist nur dein Admin-Konto; alles andere kannst du überspringen und später nachholen.',
+  wServer: 'Server',
+  wHttps: 'HTTPS',
+  wKey: 'Geheimer Schlüssel',
+  wBackups: 'Backups',
+  wVersion: 'Gnomon {v}',
+  httpsCaddy: 'Caddy mit automatischem Zertifikat',
+  httpsCaddyOwn: 'Caddy mit eigenem Zertifikat',
+  httpsProxy: 'euer eigener Reverse Proxy',
+  httpsTunnel: 'Cloudflare Tunnel',
+  httpsLocal: 'lokaler Test, ohne HTTPS',
+  httpsManual: 'ohne das Installationsskript eingerichtet',
+  wBackupsOn: 'jede Nacht, die letzten {n} bleiben',
+  wBackupsNoKey: 'noch kein Backup-Passwort (Schritt „Backups“)',
+  wBackupsOff: 'aus',
+  wNeed: 'Was du brauchst',
+  accountStepTitle: 'Dein Admin-Konto',
+  accountStepIntro: 'Damit meldest du dich in jedem Browser in der Verwaltung an, und es ist dein eigenes Gnomon-Konto zum Erfassen. Weitere Admins kannst du später einladen.',
+  accountDone: 'Angemeldet als {name} ({email}). Das Passwort änderst du später unter Verwaltung → Admin-Passwort.',
+  accountCreate: 'Konto anlegen',
+  accountRequired: 'Leg zuerst dein Admin-Konto an.',
+  addrCheck: 'Prüfen',
+  addrChecking: 'Prüft…',
+  addr_ok: 'Über HTTPS mit gültigem Zertifikat erreichbar, und es ist dieser Server.',
+  addr_ok_local: 'Erreichbar, aber nur auf diesem Rechner und ohne HTTPS: gut für einen Test.',
+  addr_not_https: 'Die Adresse muss mit https:// anfangen.',
+  addr_invalid: 'Das ist keine Adresse wie https://gnomon.example.com',
+  addr_dns: 'Den Namen {host} gibt es (noch) nicht im DNS.',
+  addr_refused: 'Unter dieser Adresse antwortet nichts. Läuft der Proxy oder Tunnel?',
+  addr_timeout: 'Keine Antwort in 10 Sekunden: eine Firewall, oder der Server erreicht seine eigene öffentliche Adresse von innen nicht.',
+  addr_certificate: 'Das Zertifikat gilt nicht für {host} ({detail}).',
+  addr_other_server: 'Die Adresse antwortet ({detail}), aber nicht als dieser Gnomon-Server. Prüf, ob der Proxy oder Tunnel hierher weiterleitet.',
+  addrBrowser: 'Du hast diese Seite unter {here} geöffnet, ein Browser erreicht sie also dort.',
+  regStepTitle: 'Wer sich registrieren darf',
+  regStepIntro: 'Für eine Firma ist „Nur mit Einladung“ richtig: Niemand bekommt ein Konto ohne Einladung von einem Admin.',
+  macTitle: 'Die Mac-App',
+  macIntro: 'Die App gibt es unter {url}/latest, und die App sucht dort nach neuen Versionen.',
+  macGithub: 'Die offizielle Version von GitHub',
+  macGithubHint: 'Immer die neueste Version von github.com/{repo}. Der Download kommt direkt von GitHub.',
+  macUpload: 'Eigene hochladen',
+  macUploadHint: 'Zum Beispiel eine mit eurer eigenen Apple-Developer-ID signierte Version. Jede neue Version hier hochladen.',
+  macFolder: 'GNOMON_RELEASES_DIR ist gesetzt, die App kommt also aus diesem Ordner; die Wahl hier gilt, sobald er entfernt ist.',
+  macNow: 'Ausgegeben wird: Gnomon {v}',
+  macNowDate: 'Ausgegeben wird: Gnomon {v} vom {date}',
+  macNone: 'Noch nichts zum Ausgeben.',
+  macLoading: 'Aktuelle Version wird gesucht…',
+  macFile: '.dmg auswählen',
+  macVersion: 'Version',
+  macUploadButton: 'Hochladen',
+  macUploading: 'Lädt hoch… {p} %',
+  macUploaded: 'Hochgeladen. Ausgegeben wird jetzt Gnomon {v}.',
+  backupsTitle: 'Backups',
+  backupsIntro: 'Jede Nacht macht der Server eine verschlüsselte Kopie von allem in seinen Datenordner und behält die neuesten. Kopier sie auch woandershin (siehe Anleitung): Ein Backup auf derselben Platte hilft nicht, wenn die Platte kaputtgeht.',
+  bNightly: 'Jede Nacht ein Backup machen',
+  bNightlyWhy: 'Zur Stunde unten, in der Zeitzone des Servers.',
+  bHour: 'Um',
+  bKeep: 'Behalten: die neuesten',
+  bPassword: 'Backup-Passwort',
+  bPasswordSet: 'Gesetzt am {when}. Nur damit lassen sich Backups wiederherstellen.',
+  bPasswordNone: 'Noch kein Backup-Passwort, deshalb werden keine Backups gemacht. Setz jetzt eins.',
+  bLost: 'Bewahr das Backup-Passwort in deinem Passwort-Manager auf. Ohne es lässt sich ein Backup nicht wiederherstellen: Niemand kann es zurückholen, auch nicht das Gnomon-Projekt. Der Server hat nur einen Schlüssel, der verschlüsseln kann, nicht entschlüsseln.',
+  bCurrent: 'Aktuelles Backup-Passwort',
+  bNew: 'Neues Backup-Passwort (mindestens 12 Zeichen)',
+  bRepeat: 'Noch einmal',
+  bSetPassword: 'Passwort setzen',
+  bChange: 'Passwort ändern',
+  bChanged: 'Gespeichert. Neue Backups brauchen dieses Passwort; ältere weiter das, mit dem sie gemacht wurden.',
+  bShort: 'Mindestens 12 Zeichen.',
+  bRun: 'Jetzt sichern',
+  bRunning: 'Sichert…',
+  bFiles: 'Auf dem Server',
+  bNoFiles: 'Noch keine Backups.',
+  bLastFailed: 'Das letzte Backup ist fehlgeschlagen ({when}): {error}',
+  bDownload: 'Herunterladen',
+  inviteStepTitle: 'Leute einladen',
+  inviteStepIntro: 'Lade eine Person oder eine ganze Liste ein. Das geht auch jederzeit später unter Personen.',
+  optional: '(optional)',
+  sEmail: 'E-Mail',
+  sMacApp: 'Mac-App',
+  sBackups: 'Backups',
+  sAdmin: 'Admin',
+  doneIntroNew: 'Der Server ist eingerichtet. Nach dem Abschließen funktioniert der Einrichtungslink nicht mehr; für Änderungen meldest du dich unter {url}/admin mit deinem Konto an.',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -602,10 +771,16 @@ type Config = {
   personio: { tested?: string; people?: number; absenceTypes?: { id: string; name: string; unit?: string }[]; dayOffTypes?: string[] };
   rules: Record<'managed' | 'allowLocalApi' | 'allowActivityTrail' | 'phoneApp', boolean>;
   email?: EmailSettings;
+  macApp: { source: 'github' | 'upload' };
   audit: { at: string; what: string }[];
 };
 type EmailSettings = { provider: 'smtp'; host: string; port: number; security: 'tls' | 'starttls' | 'none'; user: string; from: string; tested?: string } | { provider: 'graph'; tenantId: string; clientId: string; from: string; tested?: string };
-type State = { config: Config; secrets: { float: boolean; personio: boolean; email: boolean }; email: { ready: boolean; publicUrl: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; me: { id: string; email: string | null; name: string }; registration: 'invite' | 'approval' | 'open'; pending: number };
+type State = {
+  version: string;
+  https: string | null;
+  macApp: { from: 'folder' | 'upload' | 'github'; upload: string | null };
+  backups: BackupStatus | null;
+  config: Config; secrets: { float: boolean; personio: boolean; email: boolean }; email: { ready: boolean; publicUrl: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; me: { id: string; email: string | null; name: string }; registration: 'invite' | 'approval' | 'open'; pending: number };
 
 let token = '';
 try {
@@ -722,6 +897,7 @@ function CompanyStep({ s, setS, setErr }: Ctx) {
       <Field label={t('publicUrl')} hint={t('publicUrlHint')}>
         <input value={v.publicUrl} onChange={(e) => setV({ ...v, publicUrl: e.target.value })} placeholder="https://gnomon.example.com" spellCheck={false} />
       </Field>
+      <AddressCheck url={v.publicUrl.trim()} />
       {v.publicUrl && v.publicUrl.replace(/\/$/, '') !== here && <p className="a-warn">{t('publicUrlMismatch', { here })}</p>}
       <div className="a-row">
         <Field label={t('timezone')} hint={t('timezoneHint')}>
@@ -743,10 +919,6 @@ function CompanyStep({ s, setS, setErr }: Ctx) {
       </button>
     </>
   );
-}
-
-function SignIn() {
-  return <p className="a-intro">{t('signInSoon')}</p>;
 }
 
 function EmailStep({ s, setS, setErr }: Ctx) {
@@ -1058,49 +1230,16 @@ function Rollout({ s, setErr }: Ctx) {
   );
 }
 
-function Invite({ s }: Ctx) {
-  const [name, setName] = useState('');
-  const [link, setLink] = useState<{ name: string; code: string; link: string | null } | null>(null);
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="a-card">
-      <strong>{t('inviteTitle')}</strong>
-      <span className="a-hint">{t('inviteIntro')}</span>
-      <div className="a-inline">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('inviteName')} />
-        <button className="primary" onClick={async () => setLink(await call('POST', '/invite', { name }))}>
-          <Icon name="link" size={18} /> {t('invite')}
-        </button>
-      </div>
-      {link && (
-        <div className="a-invite">
-          {link.link && <Qr text={link.link} />}
-          <div>
-            <strong>{link.name}</strong>
-            <code>{link.link ?? link.code}</code>
-            <button
-              className="soft"
-              onClick={() => {
-                navigator.clipboard?.writeText(link.link ?? link.code);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              }}
-            >
-              {copied ? t('copied') : t('copy')}
-            </button>
-          </div>
-        </div>
-      )}
-      {!s.config.company.publicUrl && <p className="a-warn">{t('needUrl')}</p>}
-    </div>
-  );
-}
-
 function Done(ctx: Ctx) {
   const { s, setS } = ctx;
   const c = s.config;
+  const b = s.backups;
   const rows: [Key, string][] = [
+    ['sAdmin', s.me.email ? `${s.me.name} · ${s.me.email}` : '—'],
     ['sCompany', [c.company.name, c.company.publicUrl].filter(Boolean).join(' · ') || '—'],
+    ['sEmail', s.email.ready ? (c.email?.tested ? t('emailReady', { when: new Date(c.email.tested).toLocaleDateString() }) : t('emailUntested')) : t('notSet')],
+    ['sMacApp', s.release ? t('macNow', { v: s.release.version }) : t(c.macApp.source === 'github' ? 'macGithub' : 'macNone')],
+    ['sBackups', !b ? '—' : !b.keySet ? t('wBackupsNoKey') : b.enabled ? t('wBackupsOn', { n: b.keep }) : t('wBackupsOff')],
     ['sFloat', ctx.s.secrets.float ? t('floatOk', { n: c.float.people ?? 0 }) : t('notSet')],
     ['sPersonio', ctx.s.secrets.personio ? t('personioOk', { n: c.personio.people ?? 0 }) : t('notSet')],
     ['sRules', t(c.rules.managed ? 'yes' : 'no')],
@@ -1108,7 +1247,12 @@ function Done(ctx: Ctx) {
   ];
   return (
     <>
-      <p className="a-intro">{t('doneIntro')}</p>
+      <p className="a-intro">
+        {t('doneIntroNew', { url: c.company.publicUrl || location.origin })}{' '}
+        <a href={GUIDE} target="_blank" rel="noreferrer">
+          {t('guide')}
+        </a>
+      </p>
       <div className="a-card">
         <strong>{t('summary')}</strong>
         <dl className="a-summary">
@@ -1129,7 +1273,6 @@ function Done(ctx: Ctx) {
           </div>
         )}
       </div>
-      <Invite {...ctx} />
       {c.audit.length > 0 && (
         <div className="a-card">
           <strong>{t('history')}</strong>
@@ -1146,6 +1289,354 @@ function Done(ctx: Ctx) {
   );
 }
 
+
+// ---- Setup for admins: welcome, admin account, Mac app, backups (docs/admin-guide.md) --------------
+
+const GUIDE = 'https://github.com/DennHa/gnomon/blob/main/docs/admin-guide.md';
+const HTTPS_TEXT: Record<string, Key> = { caddy: 'httpsCaddy', 'caddy-own': 'httpsCaddyOwn', proxy: 'httpsProxy', tunnel: 'httpsTunnel', local: 'httpsLocal' };
+
+function Welcome(ctx: Ctx) {
+  const { s } = ctx;
+  const b = s.backups;
+  const rows: [Key, string, boolean][] = [
+    ['wServer', t('wVersion', { v: s.version }), true],
+    ['wHttps', t(HTTPS_TEXT[s.https ?? ''] ?? 'httpsManual'), s.https !== 'local'],
+    ['wKey', t(s.keySource === 'env' ? 'keyEnv' : 'keyFile'), s.keySource === 'env'],
+    ['wBackups', !b ? '—' : !b.keySet ? t('wBackupsNoKey') : b.enabled ? t('wBackupsOn', { n: b.keep }) : t('wBackupsOff'), Boolean(b?.keySet && b.enabled)],
+  ];
+  return (
+    <>
+      <p className="a-intro">
+        {t('welcomeIntro')}{' '}
+        <a href={GUIDE} target="_blank" rel="noreferrer">
+          {t('guide')}
+        </a>
+      </p>
+      <div className="a-card">
+        <dl className="a-summary">
+          {rows.map(([k, v, ok]) => (
+            <div key={k}>
+              <dt>{t(k)}</dt>
+              <dd className={ok ? 'a-good' : 'a-meh'}>
+                <Icon name={ok ? 'check_circle' : 'warning'} size={16} /> {v}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+      <h3>{t('wNeed')}</h3>
+      <Before {...ctx} />
+    </>
+  );
+}
+
+function AccountStep({ s, setS, setErr }: Ctx) {
+  const [name, setName] = useState(s.me.name === 'Owner' ? '' : s.me.name);
+  const [email, setEmail] = useState(s.me.email ?? '');
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  if (s.passwordSet && s.me.email)
+    return (
+      <>
+        <p className="a-intro">{t('accountStepIntro')}</p>
+        <div className="a-ok">
+          <Icon name="check_circle" /> {t('accountDone', { name: s.me.name, email: s.me.email })}
+        </div>
+      </>
+    );
+  return (
+    <form
+      className="a-form"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (pw.length < 10) return setErr(t('pwShort'));
+        if (pw !== pw2) return setErr(t('pwMismatch'));
+        try {
+          setS(await call('POST', '/account', { name, email, password: pw }));
+          setErr(null);
+        } catch (e) {
+          setErr((e as Error).message);
+        }
+      }}
+    >
+      <p className="a-intro">{t('accountStepIntro')}</p>
+      <div className="a-row">
+        <Field label={t('ownerName')}>
+          <input autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label={t('ownerEmail')}>
+          <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+      </div>
+      <div className="a-row">
+        <Field label={t('pwNew')} hint={t('pwShort')}>
+          <input type="password" autoComplete="new-password" required minLength={10} value={pw} onChange={(e) => setPw(e.target.value)} />
+        </Field>
+        <Field label={t('pwRepeat')}>
+          <input type="password" autoComplete="new-password" required value={pw2} onChange={(e) => setPw2(e.target.value)} />
+        </Field>
+      </div>
+      <button className="primary a-save">{t('accountCreate')}</button>
+    </form>
+  );
+}
+
+/** The HTTPS check next to the server's address: the server opens its own address and must find itself there. */
+function AddressCheck({ url }: { url: string }) {
+  const [r, setR] = useState<{ ok: boolean; code?: string; message: string; host?: string; detail?: string } | 'busy' | null>(null);
+  useEffect(() => setR(null), [url]);
+  const here = location.origin;
+  return (
+    <div className="a-check-address">
+      <button
+        type="button"
+        className="soft"
+        disabled={!url || r === 'busy'}
+        onClick={async () => {
+          setR('busy');
+          setR(await call<{ ok: boolean; message: string }>('POST', '/check-address', { url }).catch((e) => ({ ok: false, message: (e as Error).message })));
+        }}
+      >
+        <Icon name="lock" size={16} /> {r === 'busy' ? t('addrChecking') : t('addrCheck')}
+      </button>
+      {r && r !== 'busy' && (
+        <p className={r.ok ? 'a-ok' : 'a-warn'}>
+          <Icon name={r.ok ? 'check_circle' : 'warning'} size={16} /> {r.code && `addr_${r.code}` in L ? t(`addr_${r.code}` as Key, { host: r.host ?? '', detail: r.detail ?? '' }) : r.message}
+          {!r.ok && url.replace(/\/$/, '') === here && ` ${t('addrBrowser', { here })}`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+type MacAppInfo = { from: 'folder' | 'upload' | 'github'; release: { version: string; date: string | null; size: number; file: string } | null };
+
+function MacAppStep({ s, setS, setErr }: Ctx) {
+  const [info, setInfo] = useState<MacAppInfo | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [version, setVersion] = useState('');
+  const [progress, setProgress] = useState<number | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const source = s.config.macApp.source;
+  const load = () => call<MacAppInfo>('GET', '/mac-app').then(setInfo, (e) => setErr((e as Error).message));
+  useEffect(() => {
+    setInfo(null);
+    void load();
+  }, [source]);
+  const choose = async (v: 'github' | 'upload') => {
+    try {
+      setS(await call('PUT', '/config', { macApp: { source: v } }));
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  const upload = () => {
+    if (!file) return;
+    setErr(null);
+    setDone(null);
+    // XMLHttpRequest for the progress bar; a .dmg is easily 100 MB.
+    const x = new XMLHttpRequest();
+    x.open('PUT', `/api/v1/admin/mac-app?version=${encodeURIComponent(version.trim())}`);
+    x.setRequestHeader('Authorization', `Bearer ${token}`);
+    x.setRequestHeader('Content-Type', 'application/octet-stream');
+    x.upload.onprogress = (e) => e.lengthComputable && setProgress(Math.round((e.loaded / e.total) * 100));
+    x.onload = () => {
+      setProgress(null);
+      const json = (() => {
+        try {
+          return JSON.parse(x.responseText);
+        } catch {
+          return {};
+        }
+      })();
+      if (x.status !== 200) return setErr(json.message || x.statusText);
+      setS(json as State);
+      setDone(version.trim());
+      setFile(null);
+      void load();
+    };
+    x.onerror = () => (setProgress(null), setErr(x.statusText || 'Upload failed'));
+    x.send(file);
+  };
+  const url = s.config.company.publicUrl || location.origin;
+  return (
+    <>
+      <p className="a-intro">{t('macIntro', { url })}</p>
+      {s.macApp.from === 'folder' && <p className="a-warn">{t('macFolder')}</p>}
+      <div className="a-list">
+        {(['github', 'upload'] as const).map((v) => (
+          <label key={v} className={`a-item ${source === v ? 'done' : ''}`}>
+            <input type="radio" name="mac-source" checked={source === v} onChange={() => choose(v)} />
+            <Icon name={v === 'github' ? 'download' : 'upload'} size={22} />
+            <span>
+              <strong>{t(v === 'github' ? 'macGithub' : 'macUpload')}</strong>
+              <span className="a-hint">{v === 'github' ? t('macGithubHint', { repo: 'DennHa/gnomon' }) : t('macUploadHint')}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {source === 'upload' && s.macApp.from !== 'folder' && (
+        <div className="a-card">
+          <div className="a-row">
+            <Field label={t('macFile')}>
+              <input
+                type="file"
+                accept=".dmg"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setFile(f);
+                  const v = f?.name.match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/)?.[1];
+                  if (v) setVersion(v);
+                }}
+              />
+            </Field>
+            <Field label={t('macVersion')}>
+              <input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="1.2.3" spellCheck={false} />
+            </Field>
+          </div>
+          <button className="primary a-save" disabled={!file || !version.trim() || progress !== null} onClick={upload}>
+            <Icon name="upload" size={18} /> {progress !== null ? t('macUploading', { p: progress }) : t('macUploadButton')}
+          </button>
+          {done && <p className="a-ok">{t('macUploaded', { v: done })}</p>}
+        </div>
+      )}
+      <p className="a-hint">
+        {!info ? t('macLoading') : info.release ? (info.release.date ? t('macNowDate', { v: info.release.version, date: info.release.date }) : t('macNow', { v: info.release.version })) : t('macNone')}
+      </p>
+      <p className="a-warn">{t('appSigned')}</p>
+    </>
+  );
+}
+
+type BackupStatus = { enabled: boolean; hour: number; keep: number; keySet: boolean; keySetAt?: string; files: { name: string; size: number; at: string }[]; last?: { at: string; ok: boolean; error?: string } };
+
+function BackupsStep({ s, setS, setErr }: Ctx) {
+  const [b, setB] = useState<BackupStatus | null>(s.backups);
+  const [current, setCurrent] = useState('');
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [changing, setChanging] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const run = async (method: string, path: string, body?: unknown) => {
+    try {
+      setErr(null);
+      const r = await call<BackupStatus>(method, path, body);
+      setB(r);
+      setS({ ...s, backups: r });
+      return true;
+    } catch (e) {
+      setErr((e as Error).message);
+      return false;
+    }
+  };
+  if (!b) return <p className="a-warn">—</p>;
+  const download = async (name: string) => {
+    const res = await fetch(`/api/v1/admin/backups/files/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return setErr(res.statusText);
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const size = (n: number) => (n > 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  return (
+    <>
+      <p className="a-intro">{t('backupsIntro')}</p>
+      <div className="a-card">
+        <Toggle on={b.enabled} onChange={(v) => run('PUT', '/backups', { enabled: v })} label={t('bNightly')} why={t('bNightlyWhy')} />
+        <div className="a-row">
+          <Field label={t('bHour')}>
+            <select value={b.hour} onChange={(e) => run('PUT', '/backups', { hour: Number(e.target.value) })}>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>
+                  {String(h).padStart(2, '0')}:00
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t('bKeep')}>
+            <input type="number" min={1} max={365} defaultValue={b.keep} onBlur={(e) => Number(e.target.value) !== b.keep && run('PUT', '/backups', { keep: Math.round(Number(e.target.value)) })} />
+          </Field>
+        </div>
+      </div>
+      <div className="a-card">
+        <strong>
+          <Icon name="lock" size={18} /> {t('bPassword')}
+        </strong>
+        <span className="a-hint">{b.keySet ? t('bPasswordSet', { when: b.keySetAt ? new Date(b.keySetAt).toLocaleDateString() : '' }) : t('bPasswordNone')}</span>
+        <p className="a-warn">
+          <Icon name="warning" size={16} /> {t('bLost')}
+        </p>
+        {b.keySet && !changing ? (
+          <button className="soft a-save" onClick={() => (setChanging(true), setNotice(null))}>
+            {t('bChange')}
+          </button>
+        ) : (
+          <form
+            className="a-form a-tight"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (pw.length < 12) return setErr(t('bShort'));
+              if (pw !== pw2) return setErr(t('pwMismatch'));
+              if (await run('POST', '/backups/password', { password: pw, current: b.keySet ? current : undefined })) {
+                setPw('');
+                setPw2('');
+                setCurrent('');
+                setChanging(false);
+                setNotice(t('bChanged'));
+              }
+            }}
+          >
+            {b.keySet && (
+              <Field label={t('bCurrent')}>
+                <input type="password" autoComplete="off" required value={current} onChange={(e) => setCurrent(e.target.value)} />
+              </Field>
+            )}
+            <div className="a-row">
+              <Field label={t('bNew')}>
+                <input type="password" autoComplete="new-password" required minLength={12} value={pw} onChange={(e) => setPw(e.target.value)} />
+              </Field>
+              <Field label={t('bRepeat')}>
+                <input type="password" autoComplete="new-password" required value={pw2} onChange={(e) => setPw2(e.target.value)} />
+              </Field>
+            </div>
+            <button className="primary a-save">{t(b.keySet ? 'bChange' : 'bSetPassword')}</button>
+          </form>
+        )}
+        {notice && <p className="a-ok">{notice}</p>}
+      </div>
+      <div className="a-card">
+        <div className="a-card-head">
+          <strong>
+            <Icon name="backup" size={18} /> {t('bFiles')}
+          </strong>
+          <button className="soft" disabled={!b.keySet || busy} onClick={async () => (setBusy(true), await run('POST', '/backups/run'), setBusy(false))}>
+            {busy ? t('bRunning') : t('bRun')}
+          </button>
+        </div>
+        {b.last && !b.last.ok && <p className="a-warn">{t('bLastFailed', { when: new Date(b.last.at).toLocaleString(), error: b.last.error ?? '' })}</p>}
+        {b.files.length ? (
+          <ul className="a-backups">
+            {b.files.map((f) => (
+              <li key={f.name}>
+                <span>{new Date(f.at).toLocaleString()}</span>
+                <span className="a-hint">{size(f.size)}</span>
+                <button className="soft" onClick={() => download(f.name)}>
+                  <Icon name="download" size={16} /> {t('bDownload')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="a-hint">{t('bNoFiles')}</span>
+        )}
+      </div>
+    </>
+  );
+}
 
 // ---- Devices (the Admin page's first section) -----------------------------------------------------
 
@@ -1478,7 +1969,8 @@ function ImportList({ reload, setErr }: { reload: () => void; setErr: (e: string
   );
 }
 
-function People(ctx: Ctx) {
+/** `part`: only the invitation card or only who may register (for the setup page's steps). */
+function People({ part, ...ctx }: Ctx & { part?: 'invite' | 'registration' }) {
   const [people, setPeople] = useState<PersonRow[] | null>(null);
   const [registration, setRegistration] = useState<'invite' | 'approval' | 'open'>('invite');
   const [email, setEmail] = useState('');
@@ -1509,8 +2001,8 @@ function People(ctx: Ctx) {
   };
   return (
     <>
-      <p className="a-intro">{t('pIntro')}</p>
-      <div className="a-card">
+      {!part && <p className="a-intro">{t('pIntro')}</p>}
+      <div className="a-card" hidden={part === 'registration'}>
         <div className="a-card-head">
           <strong>
             <Icon name="person" size={18} /> {t('pInviteTitle')}
@@ -1549,7 +2041,7 @@ function People(ctx: Ctx) {
           <ImportList reload={load} setErr={ctx.setErr} />
         </div>
       </div>
-      <div className="a-card">
+      <div className="a-card" hidden={part === 'invite'}>
         <strong>{t('pRegTitle')}</strong>
         <div className="a-seg">
           {(['invite', 'approval', 'open'] as const).map((m) => (
@@ -1577,7 +2069,7 @@ function People(ctx: Ctx) {
           <Icon name="mail" /> {notice}
         </div>
       )}
-      <ul className="a-people">
+      <ul className="a-people" hidden={Boolean(part)}>
         {people?.map((x) => {
           const expired = x.status === 'invited' && Boolean(x.inviteExpiresAt) && Date.parse(x.inviteExpiresAt!) < Date.now();
           return (
@@ -1928,17 +2420,21 @@ const PEOPLE: Section = { key: 'people', title: 'peopleTitle', icon: 'group', vi
 const FEEDBACK: Section = { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} /> };
 const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
 /** After the setup, these steps are Settings pages of their own (the others only make sense in the wizard). */
-const SETTINGS_KEYS = ['company', 'email', 'float', 'personio', 'rules', 'rollout', 'done'];
+const SETTINGS_KEYS = ['company', 'email', 'macapp', 'backups', 'float', 'personio', 'rules', 'rollout', 'done'];
 const STEPS: Section[] = [
-  { key: 'before', title: 'beforeTitle', icon: 'check_circle', view: (c) => <Before {...c} /> },
+  { key: 'welcome', title: 'welcomeTitle', icon: 'rocket_launch', view: (c) => <Welcome {...c} /> },
+  { key: 'admin', title: 'accountStepTitle', icon: 'admin_panel_settings', view: (c) => <AccountStep {...c} /> },
   { key: 'company', title: 'companyTitle', icon: 'apartment', view: (c) => <CompanyStep {...c} /> },
-  { key: 'signin', title: 'signInTitle', icon: 'group', view: () => <SignIn /> },
   { key: 'email', title: 'emailTitle', icon: 'mail', view: (c) => <EmailStep {...c} /> },
+  { key: 'registration', title: 'regStepTitle', icon: 'how_to_reg', view: (c) => (<><p className="a-intro">{t('regStepIntro')}</p><People {...c} part="registration" /></>) },
+  { key: 'macapp', title: 'macTitle', icon: 'laptop_mac', view: (c) => <MacAppStep {...c} /> },
+  { key: 'backups', title: 'backupsTitle', icon: 'backup', view: (c) => <BackupsStep {...c} /> },
   { key: 'float', title: 'floatTitle', icon: 'link', view: (c) => <FloatStep {...c} /> },
   { key: 'personio', title: 'personioTitle', icon: 'link', view: (c) => <PersonioStep {...c} /> },
   { key: 'rules', title: 'rulesTitle', icon: 'lock', view: (c) => <RulesStep {...c} /> },
   { key: 'rollout', title: 'rolloutTitle', icon: 'download', view: (c) => <Rollout {...c} /> },
-  { key: 'done', title: 'doneTitle', icon: 'rocket_launch', view: (c) => <Done {...c} /> },
+  { key: 'invite', title: 'inviteStepTitle', icon: 'group', view: (c) => (<><p className="a-intro">{t('inviteStepIntro')}</p><People {...c} part="invite" /></>) },
+  { key: 'done', title: 'doneTitle', icon: 'check_circle', view: (c) => <Done {...c} /> },
 ];
 
 function App() {
@@ -2083,7 +2579,10 @@ function App() {
             )}
             <span className="spacer" />
             {isStep && step < SECTIONS.length - 1 && (
-              <button className="primary" onClick={() => (setStep(step + 1), setErr(null))}>
+              <button
+                className="primary"
+                onClick={() => (cur.key === 'admin' && !(s.passwordSet && s.me.email) ? setErr(t('accountRequired')) : (setStep(step + 1), setErr(null)))}
+              >
                 {['float', 'personio'].includes(cur.key) && !s.secrets[cur.key as 'float' | 'personio'] ? t('skip') : t('next')} <Icon name="arrow_forward" size={18} />
               </button>
             )}

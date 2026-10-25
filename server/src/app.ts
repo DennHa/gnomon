@@ -8,7 +8,9 @@ import { phoneApi } from '../../src/phone';
 import type { Data, Entry, Settings } from '../../src/types';
 import { ACCOUNT_SETTINGS, type AccountSettings, type RemoteAccount } from '../../src/sync';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
-import { pickLang, readRelease, releasePage } from './releases';
+import { currentRelease, looksLikeDmg, peekGithubRelease, pickLang, readRelease, releasePage } from './releases';
+import type { Backups } from './backups';
+import { VERSION } from './version';
 import { applyConfigUpdate, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
 import { randomBytes } from 'node:crypto';
 import { clearSessionCookie, csrfFor, csrfOk, sameOrigin, sessionCookie, setSessionCookie, webDeviceName } from './web';
@@ -27,7 +29,22 @@ const PAIR_LOCK_MS = 15 * 60_000;
 /** siteDir: optional folder with the one-page site (site/ in the repo), served at /about. */
 /** roadmapDir: the roadmap page built from docs/ROADMAP.md (dist/roadmap), served at /roadmap. */
 /** mail: how to send email instead of the one set up in Settings → Email (tests use a fake one). */
-export type AppOptions = { store: Store; webDir?: string; releasesDir?: string; company?: Company; demoDir?: string; siteDir?: string; roadmapDir?: string; mail?: Transport };
+/** backups: the nightly encrypted backups (backups.ts), shown and set on the setup page. */
+/** macAppDir: where an uploaded Mac app is kept (the data folder's releases/). */
+/** https: how the install script set up HTTPS (GNOMON_HTTPS: caddy, proxy, tunnel or local), shown on the setup page. */
+export type AppOptions = {
+  store: Store;
+  webDir?: string;
+  releasesDir?: string;
+  company?: Company;
+  demoDir?: string;
+  siteDir?: string;
+  roadmapDir?: string;
+  mail?: Transport;
+  backups?: Backups;
+  macAppDir?: string;
+  https?: string;
+};
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -86,8 +103,16 @@ function validPassword(v: unknown): string {
 
 /** Who's asking, for rate limits: behind Cloudflare or a proxy its header, otherwise the connection. */
 function clientAddress(req: IncomingMessage): string {
+  // Which header to believe is set by the install script (GNOMON_TRUST_PROXY): `cloudflare` (a tunnel: Cloudflare sets
+  // CF-Connecting-IP), `proxy` (Caddy or the company's proxy, which adds the client last to X-Forwarded-For), `none`
+  // (nothing in front, so headers could be made up). Unset: either header, as before.
+  const trust = process.env.GNOMON_TRUST_PROXY?.trim();
+  const socket = req.socket.remoteAddress || 'unknown';
+  if (trust === 'none') return socket;
+  if (trust === 'cloudflare') return String(req.headers['cf-connecting-ip'] ?? '').trim() || socket;
+  if (trust === 'proxy') return String(req.headers['x-forwarded-for'] ?? '').split(',').pop()!.trim() || socket;
   const fwd = String(req.headers['cf-connecting-ip'] ?? req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
-  return fwd || req.socket.remoteAddress || 'unknown';
+  return fwd || socket;
 }
 
 /** Names that say nothing about which device it is; a device's own description replaces them when it connects. */
@@ -125,7 +150,43 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
 
 const RESET_MINUTES = 30;
 
-export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir, roadmapDir, mail }: AppOptions) {
+/** The page shows its own text for `code` (with `host` and `detail`); `message` is the same in English, for scripts. */
+export type AddressCheck = { ok: boolean; code: 'ok' | 'ok_local' | 'not_https' | 'dns' | 'refused' | 'timeout' | 'certificate' | 'other_server' | 'invalid'; message: string; host?: string; detail?: string };
+
+/**
+ * Whether the server's public address really leads back to this server over HTTPS with a valid certificate: it asks
+ * `<url>/.well-known/gnomon-check/<nonce>`, which only this process answers with 200. Node checks the certificate the
+ * way browsers do (a company's own certificate authority needs NODE_EXTRA_CA_CERTS, see docs/admin-guide.md).
+ */
+async function checkAddress(url: string, nonce: string): Promise<AddressCheck> {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return { ok: false, code: 'invalid', message: 'That isn’t an address like https://gnomon.example.com' };
+  }
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname);
+  if (u.protocol !== 'https:' && !(local && u.protocol === 'http:')) return { ok: false, code: 'not_https', message: 'The address has to start with https://' };
+  try {
+    const res = await fetch(new URL(`/.well-known/gnomon-check/${nonce}`, u), { signal: AbortSignal.timeout(10_000), redirect: 'manual', headers: { 'User-Agent': 'Gnomon server (address check)' } });
+    if (res.status === 200 && (await res.json().catch(() => null))?.gnomon === nonce) {
+      return local && u.protocol === 'http:'
+        ? { ok: true, code: 'ok_local', message: 'Reachable, but only on this machine and without HTTPS: fine for a test.' }
+        : { ok: true, code: 'ok', message: 'Reachable over HTTPS with a valid certificate, and it’s this server.' };
+    }
+    return { ok: false, code: 'other_server', detail: String(res.status), message: `The address answers (${res.status}), but not as this Gnomon server. Check that the proxy or tunnel forwards it here.` };
+  } catch (e) {
+    const err = e as Error & { cause?: { code?: string; message?: string } };
+    const code = err.cause?.code ?? '';
+    if (err.name === 'TimeoutError') return { ok: false, code: 'timeout', message: 'No answer within 10 seconds. A firewall, or the server can’t reach its own public address from inside (try it in a browser too).' };
+    if (/ENOTFOUND|EAI_AGAIN/.test(code)) return { ok: false, code: 'dns', host: u.hostname, message: `The name ${u.hostname} isn’t found in DNS (yet).` };
+    if (/ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ENETUNREACH/.test(code)) return { ok: false, code: 'refused', message: 'Nothing answers on that address. Is the proxy or tunnel running?' };
+    if (/CERT|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|TLS|SSL/i.test(code + (err.cause?.message ?? ''))) return { ok: false, code: 'certificate', host: u.hostname, detail: code || 'TLS', message: `The certificate isn’t valid for ${u.hostname} (${code || 'TLS error'}).` };
+    return { ok: false, code: 'refused', detail: err.cause?.message ?? err.message, message: `Couldn’t reach the address: ${err.cause?.message ?? err.message}` };
+  }
+}
+
+export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir, roadmapDir, mail, backups, macAppDir, https }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
@@ -327,6 +388,8 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   // Browser sessions (Admin page and account page): always a person's, kept in memory for two hours after the last
   // request; a restart signs everyone out of the browser (devices keep their keys).
   const sessions = new Map<string, { personId: string; until: number }>();
+  // Open address checks (checkAddress): /.well-known/gnomon-check/<nonce> answers only these.
+  const checkNonces = new Set<string>();
   const ADMIN_SESSION_MS = 2 * 3_600_000;
   let adminFailures = 0;
   let adminLockedUntil = 0;
@@ -398,14 +461,20 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   function adminState(meId: string) {
     const me = store.person(meId)!;
     const c = company!.get();
-    const release = readRelease(releasesDir);
+    // Where /latest gets the Mac app (releases.ts); GitHub's answer is the cached one, so this never waits for it.
+    const from = releasesDir ? 'folder' : c.macApp.source;
+    const release = from === 'github' ? peekGithubRelease() : readRelease(from === 'folder' ? releasesDir : macAppDir);
     return {
+      version: VERSION,
+      https: https ?? null,
       config: { ...c, audit: c.audit.slice(-20).reverse() },
       secrets: { float: company!.hasSecret('float'), personio: company!.hasSecret('personio'), email: company!.hasSecret('email') },
       // Whether email goes out (set up, and the server knows its address for links), for invitations and resets.
       email: { ready: canEmail(), publicUrl: Boolean(publicBase()) },
       keySource: company!.keySource,
-      release: release ? { version: release.version, size: release.size } : null,
+      release: release ? { version: release.version, size: release.size, date: release.date ?? null } : null,
+      macApp: { from, upload: macAppDir ? readRelease(macAppDir)?.version ?? null : null },
+      backups: backups ? backups.status() : null,
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
       passwordSet: store.hasPassword(me.id),
       feedbackUnread: store.listFeedback().filter((t) => t.unread).length,
@@ -599,8 +668,64 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       return [200, adminState(me.id)];
     }
 
+    if (method === 'POST' && p === '/admin/account') {
+      // The setup page's first step: the admin's own sign-in (name, email, password) in one go.
+      const b = isObj(body) ? body : {};
+      const email = validEmail(b.email);
+      const name = typeof b.name === 'string' ? b.name.trim().slice(0, 80) : '';
+      const password = typeof b.password === 'string' ? b.password : '';
+      if (!name) throw bad('Enter your name');
+      if (password.length < 10 || password.length > 200) throw bad('The password needs at least 10 characters');
+      if (store.listPeople().some((x) => x.email === email && x.id !== me.id)) throw bad('Another person already has this email');
+      store.updatePerson(me.id, { email, name });
+      store.setPassword(me.id, password);
+      company.save(company.get(), `${name} set up their admin account`);
+      return [200, adminState(me.id)];
+    }
+
     const c = company.get();
     if (method === 'GET' && p === '/admin/state') return [200, adminState(me.id)];
+    if (method === 'POST' && p === '/admin/check-address') {
+      const url = isObj(body) && typeof body.url === 'string' ? body.url.trim().replace(/\/+$/, '') : '';
+      const nonce = randomBytes(12).toString('base64url');
+      checkNonces.add(nonce);
+      try {
+        return [200, await checkAddress(url, nonce)];
+      } finally {
+        checkNonces.delete(nonce);
+      }
+    }
+    if (method === 'GET' && p === '/admin/mac-app') {
+      // What /latest hands out now, asking GitHub if that's the source (cached for an hour).
+      const r = await currentRelease({ releasesDir, uploadDir: macAppDir, source: c.macApp.source });
+      return [200, { from: r.from, release: r.release && { version: r.release.version, date: r.release.date ?? null, size: r.release.size, file: r.release.file } }];
+    }
+    // Backups (backups.ts): the nightly schedule, the password (only its public key is kept), and making one now.
+    if (p === '/admin/backups' || p.startsWith('/admin/backups/')) {
+      if (!backups) throw new HttpError(404, 'not_found', 'Backups aren’t available on this server');
+      const b = isObj(body) ? body : {};
+      try {
+        if (method === 'GET' && p === '/admin/backups') return [200, backups.status()];
+        if (method === 'PUT' && p === '/admin/backups') {
+          const s = backups.saveSettings(b);
+          company.save(c, `Backups: ${s.enabled ? `nightly at ${s.hour}:00, keeping ${s.keep}` : 'off'}`);
+          return [200, backups.status()];
+        }
+        if (method === 'POST' && p === '/admin/backups/password') {
+          backups.setPassword(typeof b.password === 'string' ? b.password : '', typeof b.current === 'string' ? b.current : undefined);
+          company.save(c, `${me.name} set the backup password`);
+          return [200, backups.status()];
+        }
+        if (method === 'POST' && p === '/admin/backups/run') {
+          await backups.run('manual');
+          company.save(c, `${me.name} made a backup`);
+          return [200, backups.status()];
+        }
+      } catch (e) {
+        if (e instanceof HttpError) throw e;
+        throw bad((e as Error).message);
+      }
+    }
     if (method === 'PUT' && p === '/admin/config') {
       if (!isObj(body)) throw bad('Send the settings as an object');
       try {
@@ -865,9 +990,66 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     throw new HttpError(404, 'not_found', 'Unknown admin route');
   }
 
+  /**
+   * The Admin page's files, which aren't JSON: downloading a backup (still encrypted), and uploading the Mac app
+   * (a .dmg of up to 1 GB, streamed to the data folder).
+   */
+  async function adminFiles(req: IncomingMessage, res: ServerResponse, method: string, p: string, url: URL): Promise<boolean> {
+    const name = p.match(/^\/admin\/backups\/files\/([\w.-]{1,80})$/)?.[1];
+    const upload = p === '/admin/mac-app' && method === 'PUT';
+    if (!(name && method === 'GET') && !upload) return false;
+    const me = sessionPerson(req);
+    if (!me) throw new HttpError(401, 'unauthorized', 'Sign in again');
+    if (me.role !== 'admin') throw new HttpError(403, 'not_admin', 'Only admins can use this page.');
+    if (name) {
+      const file = backups?.file(name);
+      if (!file) throw new HttpError(404, 'not_found', 'No such backup');
+      const size = fs.statSync(file).size;
+      res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': 'application/octet-stream', 'Content-Length': size, 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' });
+      fs.createReadStream(file).pipe(res);
+      return true;
+    }
+    if (!macAppDir || !company) throw new HttpError(404, 'not_found', 'Uploads aren’t available on this server');
+    const version = (url.searchParams.get('version') ?? '').trim();
+    if (!/^\d+\.\d+\.\d+([-+][\w.]+)?$/.test(version)) throw bad('Give the version, like 1.2.3');
+    const length = Number(req.headers['content-length'] ?? 0);
+    if (length > 1024 * MB) throw new HttpError(413, 'too_large', 'The file can be at most 1 GB');
+    fs.mkdirSync(macAppDir, { recursive: true, mode: 0o700 });
+    const tmp = path.join(macAppDir, '.upload.dmg');
+    await new Promise<void>((resolve, reject) => {
+      let size = 0;
+      const out = fs.createWriteStream(tmp, { mode: 0o600 });
+      req.on('data', (c: Buffer) => {
+        size += c.length;
+        if (size > 1024 * MB) {
+          req.destroy();
+          out.destroy();
+          reject(new HttpError(413, 'too_large', 'The file can be at most 1 GB'));
+        }
+      });
+      req.pipe(out);
+      out.on('finish', resolve);
+      out.on('error', reject);
+      req.on('error', reject);
+    });
+    if (!looksLikeDmg(tmp)) {
+      fs.rmSync(tmp, { force: true });
+      throw bad('That isn’t a .dmg disk image');
+    }
+    const file = `Gnomon-${version}.dmg`;
+    for (const f of fs.readdirSync(macAppDir)) if (/\.dmg$/i.test(f) && !f.startsWith('.')) fs.rmSync(path.join(macAppDir, f), { force: true });
+    fs.renameSync(tmp, path.join(macAppDir, file));
+    fs.writeFileSync(path.join(macAppDir, 'version.json'), JSON.stringify({ version, date: new Date().toISOString().slice(0, 10), notes: [], file }, null, 2));
+    const c = company.get();
+    company.save({ ...c, macApp: { source: 'upload' } }, `${me.name} uploaded the Mac app ${version}`);
+    send(res, 200, adminState(me.id));
+    return true;
+  }
+
   async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL) {
     const p = url.pathname.slice('/api/v1'.length) || '/';
     const method = req.method ?? 'GET';
+    if (company && p.startsWith('/admin/') && (await adminFiles(req, res, method, p, url))) return;
     let body: unknown;
     if (method !== 'GET' && method !== 'DELETE' && method !== 'HEAD') {
       const raw = await readBody(req, p === '/sync' ? 20 * MB : MB);
@@ -1043,9 +1225,9 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   }
 
   /** The Mac app download: /latest (page), /latest/version.json (update check), /latest/download (.dmg). Public. */
-  function serveRelease(req: IncomingMessage, res: ServerResponse, url: URL) {
+  async function serveRelease(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'method_not_allowed', message: 'GET only' });
-    const release = readRelease(releasesDir);
+    const { release, dir } = await currentRelease({ releasesDir, uploadDir: macAppDir, source: company?.get().macApp.source ?? 'github' });
     const p = url.pathname.replace(/\/$/, '');
     if (p === '/latest/version.json') {
       if (!release) return send(res, 404, { error: 'not_found', message: 'No release published' });
@@ -1054,6 +1236,11 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     }
     if (p === '/latest/download') {
       if (!release) return send(res, 404, { error: 'not_found', message: 'No release published' });
+      if (release.url) {
+        // The official release: straight from GitHub.
+        res.writeHead(302, { ...SECURITY_HEADERS, Location: release.url, 'Cache-Control': 'no-cache' });
+        return res.end();
+      }
       res.writeHead(200, {
         ...SECURITY_HEADERS,
         'Content-Type': 'application/x-apple-diskimage',
@@ -1062,7 +1249,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
         'Cache-Control': 'no-cache',
       });
       if (req.method === 'HEAD') return res.end();
-      return fs.createReadStream(path.join(releasesDir!, release.file)).pipe(res);
+      return fs.createReadStream(path.join(dir!, release.file)).pipe(res);
     }
     if (p !== '/latest') return send(res, 404, { error: 'not_found', message: 'Not found' });
     const html = releasePage(release, pickLang(req.headers['accept-language']));
@@ -1074,9 +1261,11 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
       if (url.pathname === '/healthz') return send(res, 200, { ok: true });
+      const check = url.pathname.match(/^\/\.well-known\/gnomon-check\/([\w-]{8,40})$/)?.[1];
+      if (check) return checkNonces.has(check) ? send(res, 200, { gnomon: check }) : send(res, 404, { error: 'not_found', message: 'Not found' });
       if (url.pathname === '/api/v1' || url.pathname.startsWith('/api/v1/')) return await handleApi(req, res, url);
       if (url.pathname.startsWith('/api/')) return send(res, 404, { error: 'not_found', message: 'Use /api/v1/…' });
-      if (url.pathname === '/latest' || url.pathname.startsWith('/latest/')) return serveRelease(req, res, url);
+      if (url.pathname === '/latest' || url.pathname.startsWith('/latest/')) return await serveRelease(req, res, url);
       if (url.pathname === '/example' || url.pathname.startsWith('/example/'))
         return serveFolder(req, res, url, '/example', demoDir, { 'X-Frame-Options': 'SAMEORIGIN', 'Content-Security-Policy': DEMO_CSP });
       if (url.pathname === '/about' || url.pathname.startsWith('/about/')) return serveFolder(req, res, url, '/about', siteDir, { 'Content-Security-Policy': SITE_CSP });

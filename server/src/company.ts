@@ -65,6 +65,8 @@ export type CompanyConfig = {
   /** How the server sends email (Settings → Email); the password or client secret is a secret of its own. */
   email?: EmailConfig & { tested?: string };
   rules: Rules;
+  /** Where /latest hands out the Mac app from: the official GitHub release, or an upload (see releases.ts). */
+  macApp: { source: 'github' | 'upload' };
   audit: { at: string; what: string }[];
 };
 
@@ -75,6 +77,7 @@ export const defaultConfig = (): CompanyConfig => ({
   float: {},
   personio: {},
   rules: { allowLocalApi: false, allowActivityTrail: true, managed: true, phoneApp: true },
+  macApp: { source: 'github' },
   audit: [],
 });
 
@@ -90,7 +93,7 @@ export class Company {
     const base = defaultConfig();
     if (!raw) return base;
     const c = JSON.parse(raw) as Partial<CompanyConfig>;
-    return { ...base, ...c, checklist: { ...base.checklist, ...c.checklist }, company: { ...base.company, ...c.company }, rules: { ...base.rules, ...c.rules } };
+    return { ...base, ...c, checklist: { ...base.checklist, ...c.checklist }, company: { ...base.company, ...c.company }, rules: { ...base.rules, ...c.rules }, macApp: { ...base.macApp, ...c.macApp } };
   }
 
   save(c: CompanyConfig, what?: string) {
@@ -178,6 +181,8 @@ export function applyConfigUpdate(c: CompanyConfig, u: Record<string, unknown>):
   if (co.language === 'system' || co.language === 'en' || co.language === 'de') next.company.language = co.language;
   const r = obj(u.rules);
   for (const k of Object.keys(next.rules) as (keyof Rules)[]) if (typeof r[k] === 'boolean') next.rules[k] = r[k] as boolean;
+  const m = obj(u.macApp);
+  if (m.source === 'github' || m.source === 'upload') next.macApp.source = m.source;
   const p = obj(u.personio);
   if (Array.isArray(p.dayOffTypes)) next.personio.dayOffTypes = p.dayOffTypes.filter((x): x is string => typeof x === 'string').slice(0, 100);
   return next;
