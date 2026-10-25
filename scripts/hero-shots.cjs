@@ -67,6 +67,25 @@ function phoneHtml() {
   </style></head><body><div class="scene">${phone(b, 'back')}${phone(a, 'front')}</div></body></html>`;
 }
 
+// The web app in a browser window: tilted a little, with the address bar showing a made-up server.
+function browserHtml() {
+  const src = `file://${path.join(shots, 'web-track.png')}`;
+  return `<!doctype html><html><head><style>
+    html, body { margin: 0; width: ${W}px; height: ${H}px; overflow: hidden; background: ${BG.light}; font: 15px -apple-system, sans-serif; }
+    .scene { position: absolute; inset: 0; perspective: 1800px; }
+    .browser { position: absolute; left: 230px; top: 110px; width: 1120px; border-radius: 14px; overflow: hidden; background: #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 50px 100px rgba(40,50,70,0.25);
+      transform: rotateX(12deg) rotateY(-14deg) rotateZ(2deg) scale(1.08); }
+    .bar { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #eceef2; border-bottom: 1px solid #dde0e5; }
+    .bar i { width: 12px; height: 12px; border-radius: 50%; background: #d5d8dd; }
+    .url { margin-left: 70px; flex: 0 1 460px; height: 28px; border-radius: 8px; background: #fff; color: #555; display: flex; align-items: center; justify-content: center; }
+    .browser img { display: block; width: 1120px; }
+    .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(255,255,255,0.5)); }
+  </style></head><body><div class="scene"><div class="browser">
+    <div class="bar"><i></i><i></i><i></i><span class="url">🔒 gnomon.example.com/app</span></div><img src="${src}">
+  </div></div><div class="vignette"></div></body></html>`;
+}
+
 async function render(win, html, file) {
   const tmp = path.join(os.tmpdir(), `gnomon-hero-${process.pid}.html`);
   fs.writeFileSync(tmp, html);
@@ -85,6 +104,7 @@ app.whenReady().then(async () => {
   try {
     for (const s of SHOTS) await render(win, macHtml(s), s.file);
     await render(win, phoneHtml(), 'hero-phone.jpg');
+    await render(win, browserHtml(), 'hero-web.jpg');
   } catch (err) {
     console.error(err);
     process.exitCode = 1;

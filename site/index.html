@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Gnomon · Time tracking that fits the way you work</title>
-    <meta name="description" content="Gnomon is a time tracker for your Mac and your phone: easy, fitting the way you work, set up once and then out of the way. Always know your hours, your projects and your overtime." />
+    <meta name="description" content="Gnomon is a free time tracker for your Mac, your phone and your browser: easy, fitting the way you work, set up once and then out of the way. Use it on your own, or run it for your company on your own server." />
     <meta name="theme-color" content="#0d0f12" />
     <meta property="og:title" content="Gnomon" />
     <meta property="og:description" content="Know where your day went. Time tracking that fits the way you work." />
@@ -19,6 +19,8 @@
         <a href="#why">Why Gnomon</a>
         <a href="#devices">Devices</a>
         <a href="#private">Privacy</a>
+        <a href="#company">For companies</a>
+        <a href="/roadmap">Roadmap</a>
         <a class="btn ghost small" href="/example/">Try it in your browser</a>
         <a class="btn small" href="/latest">Download</a>
       </nav>
@@ -28,17 +30,17 @@
       <!-- Hero: one promise, two ways in, the app itself. -->
       <section class="hero">
         <div class="hero-text reveal">
-          <p class="eyebrow">Time tracking for Mac and phone</p>
+          <p class="eyebrow">Time tracking for Mac, phone and browser</p>
           <h1>Know where your <span class="hl">day</span> went.</h1>
           <p class="lead">
-            Your work hours, your projects and your overtime, in one calm app that fits the way you work. Set it up once, and it stays
-            out of your way.
+            Your work hours, your projects and your overtime, in one calm app that fits the way you work. Use it on your own, or for
+            your whole company on your own server. Set it up once, and it stays out of your way.
           </p>
           <div class="ctas">
             <a class="btn big" href="/latest">Download for Mac</a>
             <a class="btn ghost big" href="/example/">Try it in your browser</a>
           </div>
-          <p class="fine">No account needed · your data stays with you</p>
+          <p class="fine">Free · no account needed · your data stays with you</p>
         </div>
         <figure class="hero-shot reveal">
           <img src="img/timer.jpg" alt="Gnomon with a running timer on a project" width="1600" height="900" />
@@ -75,7 +77,7 @@
             <svg viewBox="0 0 24 24"><rect x="3" y="5" width="13" height="10" rx="1.5" /><rect x="17" y="8" width="5" height="11" rx="1.2" /><path d="M7 19h6" /></svg>
           </span>
           <strong>Every device</strong>
-          <span>Mac and phone, in sync. In the browser soon, too.</span>
+          <span>Mac, phone and browser, in sync.</span>
         </div>
       </section>
 
@@ -122,8 +124,9 @@
           <p class="eyebrow">Peace of mind</p>
           <h2>Always know where you stand.</h2>
           <p>
-            Every workday counts against your own schedule: part time, a free Friday, vacation and sick days included. The overtime
-            balance is simply right, month by month, so "how many hours am I up?" takes one glance.
+            Every workday counts against your own schedule: part time, a free Friday, vacation and sick days from Personio included.
+            Your hours at work and your project bookings stay apart, so the overtime balance is simply right, month by month, and
+            "how many hours am I up?" takes one glance.
           </p>
         </div>
         <figure class="moment-shot reveal"><img src="img/balance.jpg" alt="The overtime balance, month by month" loading="lazy" width="1600" height="900" /></figure>
@@ -132,18 +135,30 @@
       <section id="devices" class="moment">
         <div class="moment-text reveal">
           <p class="eyebrow">Every device</p>
-          <h2>On your Mac, on your phone.</h2>
+          <h2>On your Mac, your phone, your browser.</h2>
           <p>
-            Clock in on the way to work, correct a time on the train, start a timer from the couch. The phone app stays in sync with
-            your Mac.
+            Clock in on the way to work, correct a time on the train, start a timer from the couch. Sign in with your email and
+            password, and your Mac, your phone and the browser show the same day.
           </p>
           <ul class="devices">
             <li><span class="ok" aria-hidden="true"></span>Mac</li>
             <li><span class="ok" aria-hidden="true"></span>Phone</li>
-            <li class="soon"><span aria-hidden="true"></span>Web <em>coming soon</em></li>
+            <li><span class="ok" aria-hidden="true"></span>Web</li>
           </ul>
         </div>
         <figure class="moment-shot reveal"><img src="img/phone.jpg" alt="The phone app: the time clock and the week" loading="lazy" width="1600" height="900" /></figure>
+      </section>
+
+      <section class="moment flip">
+        <div class="moment-text reveal">
+          <p class="eyebrow">In the browser</p>
+          <h2>Any laptop will do.</h2>
+          <p>
+            Track, Week, Reports and Projects, right in the browser, on Windows and Linux too. Your daily target, schedule and balance
+            follow your account, so every device counts the same way.
+          </p>
+        </div>
+        <figure class="moment-shot reveal"><img src="img/web.jpg" alt="Gnomon in the browser: today's entries and a running timer" loading="lazy" width="1600" height="900" /></figure>
       </section>
 
       <!-- A small extra, not the headline. -->
@@ -160,9 +175,28 @@
       <section id="private" class="private">
         <h2 class="reveal">Private by default.</h2>
         <div class="cards">
-          <div class="card reveal"><strong>Your data stays with you.</strong><span>No account, no cloud, no analytics. The phone app runs on your own server.</span></div>
-          <div class="card reveal"><strong>Secrets in the keychain.</strong><span>Tokens for Float or Personio are encrypted by macOS.</span></div>
-          <div class="card reveal"><strong>Works with what you use.</strong><span>Float, Personio, CSV export and a local API, all optional.</span></div>
+          <div class="card reveal"><strong>Your data stays with you.</strong><span>On your Mac, or on your company's own server. There is no Gnomon cloud, and no analytics.</span></div>
+          <div class="card reveal"><strong>Only your own times.</strong><span>Admins invite people and manage accounts, but never see anyone's times. No screenshots, no activity scores.</span></div>
+          <div class="card reveal"><strong>Works with what you use.</strong><span>Float, Personio, CSV export and a local API, all optional. Tokens are kept encrypted.</span></div>
+        </div>
+      </section>
+
+      <!-- For the admin: short, and the admin guide has the rest. -->
+      <section id="company" class="company">
+        <div class="company-text reveal">
+          <p class="eyebrow">For your company</p>
+          <h2>Run it for everyone, on your own server.</h2>
+          <p>
+            One command installs a Gnomon server on any Linux machine with Docker. A setup page in the browser does the rest, and
+            everyone signs in with their email on the Mac, the phone and the web.
+          </p>
+          <p class="links"><a href="https://github.com/DennHa/gnomon/blob/main/docs/admin-guide.md">Read the admin guide →</a></p>
+        </div>
+        <div class="cards two">
+          <div class="card reveal"><strong>One command.</strong><span>HTTPS your way: an automatic certificate, your own, your reverse proxy or a Cloudflare Tunnel.</span></div>
+          <div class="card reveal"><strong>A setup page.</strong><span>Your admin account, email through SMTP or Microsoft 365, who may register, and where the Mac app comes from.</span></div>
+          <div class="card reveal"><strong>Invite everyone.</strong><span>One person or a whole list, by email or as links. Forgotten passwords reset themselves by email.</span></div>
+          <div class="card reveal"><strong>Backups every night.</strong><span>Encrypted, on by default, and one command to update, restore or check the server.</span></div>
         </div>
       </section>
 
@@ -174,6 +208,7 @@
           <a class="btn big" href="/latest">Download for Mac</a>
           <a class="btn ghost big" href="/example/">Try it in your browser</a>
         </div>
+        <p class="roadmap">What's coming next: <a href="/roadmap">the roadmap</a>.</p>
         <p class="sundial">A <em>gnomon</em> is the pointer on a sundial: the oldest time tracker there is.</p>
       </section>
     </main>

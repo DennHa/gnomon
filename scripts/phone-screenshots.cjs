@@ -1,6 +1,6 @@
-// Takes the phone screenshots for the README: starts the server (server/dist) on a throwaway database with the clock
-// set to a regular Wednesday, pairs a device, loads two weeks of demo data through the API and captures the web app
-// at iPhone size into docs/screenshots/.
+// Takes the phone and web app screenshots for the README: starts the server (server/dist) on a throwaway database with
+// the clock set to a regular Wednesday, signs up a made-up person, loads two weeks of demo data through the API and
+// captures the phone app at iPhone size and the web app (/app) at laptop size into docs/screenshots/.
 // Usage: (cd server && npm run build) && node node_modules/electron/cli.js scripts/phone-screenshots.cjs
 const { app, BrowserWindow } = require('electron');
 const { spawn, execFileSync } = require('child_process');
@@ -36,6 +36,11 @@ const at = Date.parse(NOW);
 fs.writeFileSync(path.join(tmp, 'clock.cjs'), clockJs(at));
 // For the page: a preload in the page's own world (screenshot window only), so the clock is set before the app runs.
 fs.writeFileSync(path.join(tmp, 'page-clock.cjs'), clockJs(at).replace('globalThis.Date', 'window.Date'));
+
+// A made-up person; a fresh server only takes invited people, so the database starts with registration open.
+const PERSON = { name: 'Alex Morgan', email: 'alex@example.com', password: 'demo-password-123' };
+fs.mkdirSync(path.join(tmp, 'db'));
+execFileSync('sqlite3', [path.join(tmp, 'db', 'gnomon.db'), "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL); INSERT INTO meta VALUES ('registration', 'open');"]);
 
 const env = { ...process.env, GNOMON_DATA_DIR: path.join(tmp, 'db'), PORT: String(PORT), HOST: '127.0.0.1', NODE_OPTIONS: `--require ${path.join(tmp, 'clock.cjs')}` };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -78,7 +83,11 @@ async function openPhone() {
   await win.loadURL(`${base}/`).catch(() => {}); // the page may replace its own URL while loading
   dbg.attach('1.3');
   await dbg.sendCommand('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
-  await win.webContents.executeJavaScript(`localStorage.setItem('gnomon.deviceKey', ${JSON.stringify(global.deviceKey)})`);
+  // Retried: the page may still be navigating, which makes a script fail.
+  for (let i = 0; i < 20; i++) {
+    if (await win.webContents.executeJavaScript(`localStorage.setItem('gnomon.deviceKey', ${JSON.stringify(global.deviceKey)})`).then(() => true, () => false)) break;
+    await sleep(200);
+  }
   const loaded = new Promise((r) => win.webContents.once('did-finish-load', r));
   win.webContents.reload();
   await loaded;
@@ -87,6 +96,27 @@ async function openPhone() {
   for (let i = 0; i < 50 && !(await win.webContents.executeJavaScript("!!document.querySelector('.tabs button')").catch(() => false)); i++) await sleep(200);
   await sleep(800);
   return win;
+}
+
+/** The web app at laptop size in the same window, signed in with the made-up person's email and password. */
+async function shootWeb(win, file, scheme) {
+  const dbg = win.webContents.debugger;
+  await dbg.sendCommand('Emulation.setDeviceMetricsOverride', { width: 1120, height: 780, deviceScaleFactor: 2, mobile: false });
+  await dbg.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
+  // The session cookie is HTTPS-only, which browsers waive for localhost (not for 127.0.0.1).
+  const web = base.replace('127.0.0.1', 'localhost');
+  await win.loadURL(`${web}/app/`).catch(() => {});
+  await sleep(500);
+  // Sign in through the page's own form, as a person would.
+  for (const [i, text] of [PERSON.email, PERSON.password].entries()) {
+    await win.webContents.executeJavaScript(`document.querySelectorAll('input')[${i}].focus()`);
+    await dbg.sendCommand('Input.insertText', { text });
+  }
+  await win.webContents.executeJavaScript("document.querySelector('form button[type=submit], form button').click()");
+  await sleep(3000);
+  const img = await win.webContents.capturePage();
+  fs.writeFileSync(path.join(out, file), img.toPNG());
+  console.log(`✓ docs/screenshots/${file}`);
 }
 
 async function shoot(win, file, scheme, tab) {
@@ -105,9 +135,7 @@ app.whenReady().then(async () => {
       if (await fetch(`${base}/healthz`).then((r) => r.ok, () => false)) break;
       await sleep(200);
     }
-    const said = execFileSync('node', [path.join(root, 'server', 'dist', 'admin.mjs'), 'pair', 'iPhone'], { env }).toString();
-    const code = said.match(/([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
-    global.deviceKey = (await api(null, 'POST', '/pair', { code })).key;
+    global.deviceKey = (await api(null, 'POST', '/account/register', { ...PERSON, device: true })).key;
     await seed(global.deviceKey);
     fs.mkdirSync(out, { recursive: true });
     const win = await openPhone();
@@ -117,6 +145,7 @@ app.whenReady().then(async () => {
     await shoot(win, 'phone-today-dark.png', 'dark', 1);
     await shoot(win, 'phone-clock.png', 'light', 0);
     await shoot(win, 'phone-clock-dark.png', 'dark', 0);
+    await shootWeb(win, 'web-track.png', 'light');
     win.destroy();
   } catch (err) {
     console.error(err);
