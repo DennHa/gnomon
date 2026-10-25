@@ -11,6 +11,9 @@ Gnomon server shows the newest entry.
   opens to show their devices and actions. Invitations and approvals have their own page, where expired invitations
   can be sent again all at once. The settings are grouped into Company and Server, and your own account is in the
   menu under your name. Admins still never see anyone's times.
+- **A new README and About page** that describe Gnomon as it is now: for your Mac, phone and browser on your own, and
+  for a company on its own server, with a short install section for admins, links to the admin guide and the
+  roadmap, and a picture of the web app.
 
 ## 0.1.20 · 2026-10-25
 

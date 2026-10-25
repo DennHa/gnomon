@@ -122,9 +122,19 @@ kbd { font: 600 0.9em/1 -apple-system, system-ui, sans-serif; padding: 3px 7px; 
 .card { padding: 26px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
 .card span { color: var(--muted); font-size: 16px; }
 
+/* For companies: the words on the left, four cards on the right. */
+.company { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: clamp(32px, 6vw, 90px); align-items: center; padding: clamp(40px, 6vw, 80px) 0 clamp(64px, 8vw, 110px); }
+.company-text p:not(.eyebrow) { margin-top: 20px; color: #c9c6be; font-size: 18px; max-width: 30em; }
+.company-text .links a { color: var(--sun); font-weight: 600; text-decoration: none; }
+.company-text .links a:hover { text-decoration: underline; }
+.cards.two { grid-template-columns: repeat(2, 1fr); margin-top: 0; }
+.cards .card:nth-child(4) { transition-delay: 0.3s; }
+
 /* Final call: a sun rising behind the headline. */
 .final { position: relative; text-align: center; padding: clamp(80px, 10vw, 140px) 0 clamp(90px, 10vw, 140px); overflow: hidden; }
 .final p { margin: 20px auto 0; color: #c9c6be; max-width: 34em; font-size: 18px; }
+.final .roadmap { margin-top: 28px; font-size: 16px; color: var(--muted); }
+.final .roadmap a { color: var(--sun); }
 .final .sundial { margin-top: 56px; color: #6b7078; font-size: 14px; }
 .final .sundial em { color: #8d929a; }
 .final h2, .final p, .final .ctas { position: relative; }
@@ -154,7 +164,7 @@ footer img { border-radius: 4px; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(76, 195, 138, 0.55); } 70% { box-shadow: 0 0 0 10px rgba(76, 195, 138, 0); } 100% { box-shadow: 0 0 0 0 rgba(76, 195, 138, 0); } }
 
 @media (max-width: 880px) {
-  .hero, .moment { grid-template-columns: 1fr; }
+  .hero, .moment, .company { grid-template-columns: 1fr; }
   .moment.flip .moment-text { order: 0; }
   .cards, .extra { grid-template-columns: 1fr; }
   .pillars { grid-template-columns: 1fr 1fr; }
@@ -163,7 +173,7 @@ footer img { border-radius: 4px; }
   .live-clock { left: 50%; transform: translateX(-50%); white-space: nowrap; }
 }
 @media (max-width: 520px) {
-  .pillars { grid-template-columns: 1fr; }
+  .pillars, .cards.two { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
