@@ -3,6 +3,11 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## 0.1.20 · 2026-10-25
+
+- **The ready-made server image is published** with this release (`ghcr.io/dennha/gnomon-server`), so the one-command
+  install and `gnomon-admin update` download it instead of building. Nothing changes in the Mac app or the server.
+
 ## 0.1.19 · 2026-10-25
 
 - **Installing a Gnomon server is one command** on any Linux machine with Docker (`server/deploy/install.sh`). It
