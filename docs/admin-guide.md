@@ -11,7 +11,7 @@ holds the Float and Personio tokens so people get their own plans and absences. 
 server runs on your machine and the data stays there.
 
 Contents: [What you need](#what-you-need) · [Install](#install) · [HTTPS](#https-the-four-ways) ·
-[The setup page](#the-setup-page) · [Email](#email) · [Inviting people](#inviting-people) ·
+[The setup page](#the-setup-page) · [The Admin page](#the-admin-page) · [Email](#email) · [Inviting people](#inviting-people) ·
 [The Mac app](#handing-out-the-mac-app) · [Phone and web](#phone-and-web-app) · [Backups](#backups-and-restore) ·
 [Encryption at rest](#encryption-at-rest) · [Updates](#updates) · [Security and privacy](#security-and-privacy) · [Troubleshooting](#troubleshooting) ·
 [Moving or removing](#moving-or-removing-a-server) · [Example: a Raspberry Pi](#example-a-raspberry-pi-with-a-cloudflare-tunnel)
@@ -133,13 +133,13 @@ To switch later, the simplest is a [move](#moving-or-removing-a-server) to a fre
 
 ## The setup page
 
-The link from the install opens the setup page. Each step can be skipped and changed later in **Admin → Settings**,
+The link from the install opens the setup page. Each step can be skipped and changed later on the [Admin page](#the-admin-page),
 except the first one.
 
 | Step | What you do |
 |---|---|
 | **Welcome** | Shows what the install did: version, HTTPS, where the secret key is kept, backups. And a checklist of what's needed for a roll-out. |
-| **Your admin account** | Your name, work email and a password (at least 10 characters). That's how you sign in at `https://gnomon.example.com/admin` from now on, and it's your own Gnomon account for tracking. More admins: invite them later and make them admin on the People page. |
+| **Your admin account** | Your name, work email and a password (at least 10 characters). That's how you sign in at `https://gnomon.example.com/admin` from now on, and it's your own Gnomon account for tracking. More admins: invite them later and make them admin under Admin → People. |
 | **Your company** | The company name, the **server's address** with an **HTTPS check** (the server opens its own address and must find itself there with a valid certificate), the time zone, the default daily target and language. |
 | **Email** | SMTP or Microsoft 365, then *Send a test email*. See [Email](#email). |
 | **Who may register** | *Invited only* (right for a company), *With approval*, or *Anyone*; and how long invitations are valid (default 14 days). |
@@ -152,11 +152,28 @@ except the first one.
 | **Done** | A summary. *Finish setup* makes the setup link stop working. |
 
 Later, sign in at `/admin` with your email and password. Forgot it? `gnomon-admin admin-link` prints a one-time link
-to the Admin page (60 minutes), where you set a new one under *Admin password*.
+to the Admin page (60 minutes), where you set a new one under *Admin password* (the menu under your name).
+
+## The Admin page
+
+`https://gnomon.example.com/admin`, for admins only. It opens on the **Overview**: how many people are active,
+invited, waiting for approval or disabled; a *Needs attention* list (people waiting for approval, expired
+invitations, email not set up, no backup password or a failed backup, a full disk, a new Gnomon version), each with a
+button that goes where it's fixed; and the server's health at a glance. The menu on the left is grouped:
+
+| Group | Pages |
+|---|---|
+| **People** | *People*: everyone, searchable and sortable, filtered by status; a click on a person shows their devices and what you can do (send the invitation again, send a password reset, make admin, disable, remove). *Invitations and approvals*: invite one person or a list, approve or decline people who signed up themselves, and send expired invitations again (all at once, too). *Who may sign up*. |
+| **Inbox** | *Feedback* people send from the app. |
+| **Company** | *Company details*, *Mac app and roll-out* (where the app comes from, the rules, the settings profile for Iru), *Float and Personio*. |
+| **Server** | *Health and updates* (version and how to update, backups, disk, email, HTTPS, recent changes, running the setup again), *Email*, *Backups*. |
+
+Your own admin password, your own account and *Sign out* are in the menu under your name at the top right. Admins
+manage accounts here, but **never see anyone's times**: the Admin page has no way to show them.
 
 ## Email
 
-Email is for invitations and password resets. Set it up on the setup page or under Admin → Settings → Email, then
+Email is for invitations and password resets. Set it up on the setup page or under Admin → Server → Email, then
 *Send a test email*: it says plainly what went wrong. The password or client secret is stored encrypted and never
 shown again.
 
@@ -195,7 +212,7 @@ SMTP sign-in with a password:
 
 ## Inviting people
 
-On the setup page's last step, or any time under **Admin → People → Invite people**:
+On the setup page's last step, or any time under **Admin → Invitations and approvals**:
 
 - **One person:** email, name, member or admin. With email set up they get an email with their link; without, you
   get the link to pass on.
@@ -241,7 +258,7 @@ data volume, **encrypted**, and keeps the **last 14**. A backup is made before e
 **The backup password** was shown once at install. The server keeps only a key that can *encrypt*, not decrypt
 (public-key encryption), so someone who gets the backup files can't read them, and **nobody can recover a lost backup
 password**, not even the Gnomon project. A backup without its password is lost. Keep it in your password manager, and
-somewhere a colleague can find it if you're away. Change it on the setup page or under Admin → Settings → Backups (with
+somewhere a colleague can find it if you're away. Change it on the setup page or under Admin → Server → Backups (with
 the current one) or on the machine with `gnomon-admin backup-password` (without, since that's the machine's owner).
 After a change, older backups still need the password they were made with.
 
@@ -252,7 +269,7 @@ for example every night with cron:
 gnomon-admin backup --out /srv/backup/gnomon-$(date +%F).gnomonbak
 ```
 
-Or download one under Admin → Settings → Backups. The files stay encrypted, so any storage will do.
+Or download one under Admin → Server → Backups. The files stay encrypted, so any storage will do.
 
 | Command | |
 |---|---|

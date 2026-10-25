@@ -188,7 +188,7 @@ const EN = {
   settingsGroup: 'Settings',
   overviewTitle: 'Overview',
   rerunSetup: 'Run the setup again',
-  backToSettings: 'Back to settings',
+  backToSettings: 'Back to the Admin page',
   ownerTitle: 'Your account',
   ownerIntro: 'Everything on this server so far is yours: your times, projects and devices. Which email belongs to your account? It finds you in Float and Personio later, and for the company login.',
   ownerEmail: 'Your email',
@@ -387,6 +387,88 @@ const EN = {
   sBackups: 'Backups',
   sAdmin: 'Admin',
   doneIntroNew: 'The server is set up. After finishing, the setup link stops working; sign in at {url}/admin with your account for changes.',
+  loading: 'Loading…',
+  invitationsTitle: 'Invitations and approvals',
+  signupTitle: 'Who may sign up',
+  inboxGroup: 'Inbox',
+  companyGroup: 'Company',
+  companyDetails: 'Company details',
+  macRollout: 'Mac app and roll-out',
+  integrationsTitle: 'Float and Personio',
+  serverGroup: 'Server',
+  healthTitle: 'Health and updates',
+  ownAccount: 'Your own account',
+  pSelf: 'That’s you. Change your own account under “Your own account” in the menu at the top.',
+  pDecline: 'Decline',
+  pAsked: 'asked {date}',
+  pDeclineConfirm: 'Decline {name}? Their request is deleted; they can ask again.',
+  pExpiredOn: 'expired {date}',
+  pUntil: 'until {date}',
+  pSearch: 'Search name or email',
+  pStatus: 'Status',
+  pSeen: 'Last seen',
+  pActions: 'Actions',
+  pResendShort: 'Resend',
+  pDetails: 'Devices and actions',
+  pNoDevices: 'No devices connected.',
+  pNoDevicesYet: 'No devices yet: they connect after signing up.',
+  pNoMatch: 'Nobody matches.',
+  pResending: 'Sending… {done} of {total}',
+  pPendingHint: 'They signed up themselves. Their account works once you approve it.',
+  pExpiredTitle: 'Expired invitations',
+  pResendAll: 'Send all {n} again',
+  pReinviteAll: 'New links for all {n}',
+  pOpenTitle: 'Open invitations',
+  pNothingOpen: 'No open invitations and nobody waiting.',
+  oAttention: 'Needs attention',
+  oAllGood: 'Nothing needs your attention.',
+  oServer: 'Server',
+  oDetails: 'Details',
+  oExpired: '{n} expired',
+  atPending: '{n} waiting for your approval',
+  atReview: 'Review',
+  atExpired: '{n} invitations expired before they were used',
+  atResend: 'Resend',
+  atEmail: 'Email isn’t set up: invitations are links you pass on, and nobody can reset a forgotten password',
+  atSetUp: 'Set up',
+  atAddress: 'Email is set up, but the server’s address is missing, so emails can’t link to it',
+  atBackupKey: 'No backup password, so no backups are made',
+  atBackupFailed: 'The last backup failed ({when}): {error}',
+  atBackupsOff: 'Nightly backups are off',
+  atBackupOld: 'No backup in the last two days',
+  atDisk: 'The server’s disk is almost full',
+  atUpdate: 'Gnomon {v} is available (this server runs {current})',
+  atHowUpdate: 'How to update',
+  atPassword: 'You have no password: set one to sign in here without a link',
+  atFeedback: '{n} unread feedback conversations',
+  atRead: 'Read',
+  atUnknown: 'Something needs a look',
+  atOpen: 'Open',
+  hVersion: 'Version',
+  hCurrent: 'Gnomon {v}, up to date',
+  hUpdate: 'Gnomon {v}; {new} is available',
+  hNoKey: 'No backup password yet',
+  hBackupFailed: 'The last one failed ({when})',
+  hBackupLast: 'Last one {when}, every night at {hour}:00',
+  hBackupNone: 'None yet; the first tonight at {hour}:00',
+  hDisk: 'Disk',
+  hDiskFree: '{free} free of {total}',
+  hTested: 'tested {when}',
+  hUntested: 'not tested yet',
+  hEmailOff: 'Not set up',
+  hEncryption: 'Database encryption',
+  hEncOn: 'On',
+  hEncOff: 'Off',
+  hEncSoon: 'Comes in a later version',
+  keyFileShort: 'Key file in the data folder',
+  hUpdateTitle: 'Gnomon {v} is available',
+  hUpdateHow: 'On the server, this makes a backup first, then downloads and starts the new version. People keep working; their apps reconnect by themselves.',
+  hWhatsNew: 'What’s new',
+  hRunning: 'Running',
+  hSince: 'since {when}',
+  hDevices: '{n} connected',
+  hCleanup: 'Remove unused devices',
+  rerunHint: 'Walks through every setup step again. Nothing is lost; each step shows what’s set now.',
 };
 type Key = keyof typeof EN;
 const DE: Record<Key, string> = {
@@ -559,7 +641,7 @@ const DE: Record<Key, string> = {
   settingsGroup: 'Einstellungen',
   overviewTitle: 'Übersicht',
   rerunSetup: 'Einrichtung erneut durchlaufen',
-  backToSettings: 'Zurück zu den Einstellungen',
+  backToSettings: 'Zurück zur Verwaltung',
   ownerTitle: 'Dein Konto',
   ownerIntro: 'Alles auf diesem Server gehört bisher dir: deine Zeiten, Projekte und Geräte. Welche E-Mail gehört zu deinem Konto? Darüber findet der Server dich später in Float und Personio und beim Firmen-Login.',
   ownerEmail: 'Deine E-Mail',
@@ -757,6 +839,88 @@ const DE: Record<Key, string> = {
   sBackups: 'Backups',
   sAdmin: 'Admin',
   doneIntroNew: 'Der Server ist eingerichtet. Nach dem Abschließen funktioniert der Einrichtungslink nicht mehr; für Änderungen meldest du dich unter {url}/admin mit deinem Konto an.',
+  loading: 'Lädt…',
+  invitationsTitle: 'Einladungen und Freigaben',
+  signupTitle: 'Wer sich anmelden darf',
+  inboxGroup: 'Posteingang',
+  companyGroup: 'Firma',
+  companyDetails: 'Firmendaten',
+  macRollout: 'Mac-App und Verteilung',
+  integrationsTitle: 'Float und Personio',
+  serverGroup: 'Server',
+  healthTitle: 'Zustand und Updates',
+  ownAccount: 'Dein eigenes Konto',
+  pSelf: 'Das bist du. Dein eigenes Konto änderst du unter „Dein eigenes Konto“ im Menü oben.',
+  pDecline: 'Ablehnen',
+  pAsked: 'angefragt am {date}',
+  pDeclineConfirm: '{name} ablehnen? Die Anfrage wird gelöscht; sie können es erneut versuchen.',
+  pExpiredOn: 'abgelaufen am {date}',
+  pUntil: 'bis {date}',
+  pSearch: 'Name oder E-Mail suchen',
+  pStatus: 'Status',
+  pSeen: 'Zuletzt aktiv',
+  pActions: 'Aktionen',
+  pResendShort: 'Erneut senden',
+  pDetails: 'Geräte und Aktionen',
+  pNoDevices: 'Keine Geräte verbunden.',
+  pNoDevicesYet: 'Noch keine Geräte: die kommen nach der Anmeldung.',
+  pNoMatch: 'Niemand passt.',
+  pResending: 'Sendet… {done} von {total}',
+  pPendingHint: 'Sie haben sich selbst angemeldet. Das Konto funktioniert, sobald du es freigibst.',
+  pExpiredTitle: 'Abgelaufene Einladungen',
+  pResendAll: 'Alle {n} erneut senden',
+  pReinviteAll: 'Neue Links für alle {n}',
+  pOpenTitle: 'Offene Einladungen',
+  pNothingOpen: 'Keine offenen Einladungen, niemand wartet.',
+  oAttention: 'Braucht Aufmerksamkeit',
+  oAllGood: 'Nichts braucht gerade deine Aufmerksamkeit.',
+  oServer: 'Server',
+  oDetails: 'Details',
+  oExpired: '{n} abgelaufen',
+  atPending: '{n} warten auf deine Freigabe',
+  atReview: 'Ansehen',
+  atExpired: '{n} Einladungen sind abgelaufen, ohne benutzt zu werden',
+  atResend: 'Erneut senden',
+  atEmail: 'E-Mail ist nicht eingerichtet: Einladungen sind Links zum Weitergeben, und niemand kann ein vergessenes Passwort zurücksetzen',
+  atSetUp: 'Einrichten',
+  atAddress: 'E-Mail ist eingerichtet, aber die Adresse des Servers fehlt, also können E-Mails nicht darauf verlinken',
+  atBackupKey: 'Kein Backup-Passwort, also werden keine Backups gemacht',
+  atBackupFailed: 'Das letzte Backup ist fehlgeschlagen ({when}): {error}',
+  atBackupsOff: 'Die nächtlichen Backups sind aus',
+  atBackupOld: 'Seit zwei Tagen kein Backup',
+  atDisk: 'Die Festplatte des Servers ist fast voll',
+  atUpdate: 'Gnomon {v} ist da (dieser Server hat {current})',
+  atHowUpdate: 'So geht’s',
+  atPassword: 'Du hast kein Passwort: setz eins, um dich hier ohne Link anzumelden',
+  atFeedback: '{n} ungelesene Feedback-Gespräche',
+  atRead: 'Lesen',
+  atUnknown: 'Etwas braucht einen Blick',
+  atOpen: 'Öffnen',
+  hVersion: 'Version',
+  hCurrent: 'Gnomon {v}, aktuell',
+  hUpdate: 'Gnomon {v}; {new} ist da',
+  hNoKey: 'Noch kein Backup-Passwort',
+  hBackupFailed: 'Das letzte ist fehlgeschlagen ({when})',
+  hBackupLast: 'Letztes {when}, jede Nacht um {hour}:00',
+  hBackupNone: 'Noch keins; das erste heute Nacht um {hour}:00',
+  hDisk: 'Festplatte',
+  hDiskFree: '{free} frei von {total}',
+  hTested: 'getestet {when}',
+  hUntested: 'noch nicht getestet',
+  hEmailOff: 'Nicht eingerichtet',
+  hEncryption: 'Datenbank-Verschlüsselung',
+  hEncOn: 'An',
+  hEncOff: 'Aus',
+  hEncSoon: 'Kommt in einer späteren Version',
+  keyFileShort: 'Schlüsseldatei im Datenordner',
+  hUpdateTitle: 'Gnomon {v} ist da',
+  hUpdateHow: 'Auf dem Server: das macht zuerst ein Backup, lädt dann die neue Version und startet sie. Alle arbeiten weiter; ihre Apps verbinden sich von selbst neu.',
+  hWhatsNew: 'Was ist neu',
+  hRunning: 'Läuft',
+  hSince: 'seit {when}',
+  hDevices: '{n} verbunden',
+  hCleanup: 'Unbenutzte Geräte entfernen',
+  rerunHint: 'Geht alle Einrichtungsschritte noch einmal durch. Nichts geht verloren; jeder Schritt zeigt, was jetzt eingestellt ist.',
 };
 const L = /^de\b/i.test(navigator.language) ? DE : EN;
 const t = (k: Key, vars: Record<string, string | number> = {}) => L[k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
@@ -1650,11 +1814,13 @@ const KIND: Record<string, [IconName, Key]> = { mac: ['laptop_mac', 'devMac'], p
 /** Not seen for 30 days, or never used and older than a day (the server removes the same ones). */
 const unused = (d: Device) => !d.admin && (d.lastSeenAt ? Date.now() - Date.parse(d.lastSeenAt) > 30 * 86_400_000 : Date.now() - Date.parse(d.createdAt) > 86_400_000);
 
-function ago(iso: string | null): string {
-  if (!iso) return t('devNever');
+/** How long ago, like "3 h ago". */
+function since(iso: string): string {
   const min = Math.round((Date.now() - Date.parse(iso)) / 60_000);
-  const when = min < 2 ? t('devJustNow') : min < 60 ? t('devMinutes', { n: min }) : min < 48 * 60 ? t('devHours', { n: Math.round(min / 60) }) : t('devDays', { n: Math.round(min / 1440) });
-  return t('devLastSeen', { when });
+  return min < 2 ? t('devJustNow') : min < 60 ? t('devMinutes', { n: min }) : min < 48 * 60 ? t('devHours', { n: Math.round(min / 60) }) : t('devDays', { n: Math.round(min / 1440) });
+}
+function ago(iso: string | null): string {
+  return iso ? t('devLastSeen', { when: since(iso) }) : t('devNever');
 }
 
 function DeviceRow({ d, reload, setErr }: { d: Device; reload: () => void; setErr: (e: string | null) => void }) {
@@ -1706,7 +1872,7 @@ function DeviceRow({ d, reload, setErr }: { d: Device; reload: () => void; setEr
 
 // ---- People: everyone with an account, their devices, invitations, who may register ------------------
 
-type PersonRow = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'pending' | 'active' | 'disabled'; owner: boolean; lastSeenAt: string | null; inviteExpiresAt: string | null; devices: Device[] };
+type PersonRow = { id: string; email: string | null; name: string; role: 'admin' | 'member'; status: 'invited' | 'pending' | 'active' | 'disabled'; owner: boolean; createdAt: string; lastSeenAt: string | null; inviteExpiresAt: string | null; devices: Device[] };
 /** An invitation just made: emailed (`sent`), or a link to pass on by hand (with `error` when the email failed). */
 type Invite = { personId?: string; email: string; sent: boolean; link?: string; error?: string; expiresAt?: string };
 type PeopleResponse = { people: PersonRow[]; registration: 'invite' | 'approval' | 'open'; inviteDays: number; email: boolean };
@@ -1970,19 +2136,12 @@ function ImportList({ reload, setErr }: { reload: () => void; setErr: (e: string
 }
 
 /** `part`: only the invitation card or only who may register (for the setup page's steps). */
-function People({ part, ...ctx }: Ctx & { part?: 'invite' | 'registration' }) {
-  const [people, setPeople] = useState<PersonRow[] | null>(null);
-  const [registration, setRegistration] = useState<'invite' | 'approval' | 'open'>('invite');
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<'member' | 'admin'>('member');
+/** Everyone with an account, loaded once per page; every change answers with the new list. */
+function usePeople(ctx: Ctx) {
+  const [r, setR] = useState<PeopleResponse | null>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
-  const [inviteDays, setInviteDays] = useState(14);
-  const [emailOn, setEmailOn] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [how, setHow] = useState<'one' | 'list'>('one');
-  const take = (r: PeopleResponse) => (setPeople(r.people), setRegistration(r.registration), setInviteDays(r.inviteDays), setEmailOn(r.email));
-  const load = () => call<PeopleResponse>('GET', '/people').then(take, (e) => ctx.setErr((e as Error).message));
+  const load = () => call<PeopleResponse>('GET', '/people').then(setR, (e) => ctx.setErr((e as Error).message));
   useEffect(() => {
     void load();
   }, []);
@@ -1990,154 +2149,404 @@ function People({ part, ...ctx }: Ctx & { part?: 'invite' | 'registration' }) {
     try {
       ctx.setErr(null);
       setNotice(null);
-      const r = await call<PeopleResponse & { invite?: Invite; resetSentTo?: string }>(method, path, body);
-      take(r);
-      if (r.invite) setInvite(r.invite);
-      if (r.resetSentTo) setNotice(t('pResetSent', { email: r.resetSentTo }));
-      call<State>('GET', '/state').then(ctx.setS);
+      const res = await call<PeopleResponse & { invite?: Invite; resetSentTo?: string }>(method, path, body);
+      setR(res);
+      if (res.invite) setInvite(res.invite);
+      if (res.resetSentTo) setNotice(t('pResetSent', { email: res.resetSentTo }));
+      call<State>('GET', '/state').then(ctx.setS, () => {});
+      return res;
     } catch (e) {
       ctx.setErr((e as Error).message);
+      return null;
     }
   };
+  return { r, load, run, invite, notice };
+}
+type PeopleData = ReturnType<typeof usePeople>;
+
+const expiredInvite = (x: PersonRow) => x.status === 'invited' && Boolean(x.inviteExpiresAt) && Date.parse(x.inviteExpiresAt!) < Date.now();
+/** What the People list shows and filters by: an expired invitation counts on its own. */
+type Shown = PersonRow['status'] | 'expired';
+const shownStatus = (x: PersonRow): Shown => (expiredInvite(x) ? 'expired' : x.status);
+const SHOWN_KEY: Record<Shown, Key> = { ...STATUS_KEY, expired: 'pExpired' };
+const SHOWN_ORDER: Shown[] = ['pending', 'expired', 'invited', 'active', 'disabled'];
+
+function InviteCard({ p, ctx }: { p: PeopleData; ctx: Ctx }) {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'member' | 'admin'>('member');
+  const [how, setHow] = useState<'one' | 'list'>('one');
+  return (
+    <div className="a-card">
+      <div className="a-card-head">
+        <strong>
+          <Icon name="person_add" size={18} /> {t('pInviteTitle')}
+        </strong>
+        <div className="a-seg">
+          <button className={how === 'one' ? 'on' : ''} onClick={() => setHow('one')}>
+            {t('pOne')}
+          </button>
+          <button className={how === 'list' ? 'on' : ''} onClick={() => setHow('list')}>
+            {t('pList')}
+          </button>
+        </div>
+      </div>
+      <form
+        className="a-import"
+        hidden={how !== 'one'}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void p.run('POST', '/people', { email, name: name || undefined, role }).then((r) => r && (setEmail(''), setName('')));
+        }}
+      >
+        <span className="a-hint">{t(p.r?.email ? 'pInviteIntroEmail' : 'pInviteIntro')}</span>
+        <div className="a-row">
+          <input type="email" required placeholder={t('pEmail')} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder={t('pName')} value={name} onChange={(e) => setName(e.target.value)} />
+          <select value={role} onChange={(e) => setRole(e.target.value as 'member' | 'admin')}>
+            <option value="member">{t('pMember')}</option>
+            <option value="admin">{t('pAdmin')}</option>
+          </select>
+          <button className="primary">{t('pInvite')}</button>
+        </div>
+        {p.invite && <InviteBox invite={p.invite} />}
+      </form>
+      {/* Stays mounted while hidden, so a running import goes on when switching to one person. */}
+      <div hidden={how !== 'list'}>
+        <ImportList reload={p.load} setErr={ctx.setErr} />
+      </div>
+    </div>
+  );
+}
+
+function RegistrationCard({ p }: { p: PeopleData }) {
+  const registration = p.r?.registration ?? 'invite';
+  const [inviteDays, setInviteDays] = useState(14);
+  useEffect(() => {
+    if (p.r) setInviteDays(p.r.inviteDays);
+  }, [p.r?.inviteDays]);
+  return (
+    <div className="a-card">
+      <strong>{t('pRegTitle')}</strong>
+      <div className="a-seg">
+        {(['invite', 'approval', 'open'] as const).map((m) => (
+          <button key={m} className={registration === m ? 'on' : ''} onClick={() => p.run('PUT', '/registration', { mode: m })}>
+            {t(m === 'invite' ? 'pRegInvite' : m === 'approval' ? 'pRegApproval' : 'pRegOpen')}
+          </button>
+        ))}
+      </div>
+      <span className="a-hint">{t(registration === 'invite' ? 'pRegInviteHint' : registration === 'approval' ? 'pRegApprovalHint' : 'pRegOpenHint')}</span>
+      <label className="a-inline a-days">
+        <span>{t('pInviteDays')}</span>
+        <input
+          type="number"
+          min={1}
+          max={90}
+          value={inviteDays}
+          onChange={(e) => setInviteDays(Number(e.target.value))}
+          onBlur={() => inviteDays >= 1 && inviteDays <= 90 && p.run('PUT', '/registration', { inviteDays: Math.round(inviteDays) })}
+        />
+        <span>{t('pDays')}</span>
+      </label>
+    </div>
+  );
+}
+
+/** The setup wizard's steps "Who may register" and "Invite people". */
+function People({ part, ...ctx }: Ctx & { part: 'invite' | 'registration' }) {
+  const p = usePeople(ctx);
+  return part === 'invite' ? <InviteCard p={p} ctx={ctx} /> : <RegistrationCard p={p} />;
+}
+
+/** One person's actions: the ones that fit their status. */
+function PersonActions({ x, p, ctx }: { x: PersonRow; p: PeopleData; ctx: Ctx }) {
+  const emailOn = Boolean(p.r?.email);
+  if (x.id === ctx.s.me.id) return <span className="a-hint">{t('pSelf')}</span>;
+  return (
+    <div className="a-inline a-person-actions">
+      {x.status === 'pending' && (
+        <button className="primary" onClick={() => p.run('PATCH', `/people/${x.id}`, { status: 'active' })}>
+          {t('pApprove')}
+        </button>
+      )}
+      {x.status === 'invited' && (
+        <button className={expiredInvite(x) ? 'primary' : 'soft'} onClick={() => p.run('POST', `/people/${x.id}/invite`)}>
+          {t(emailOn ? 'pResend' : 'pReinvite')}
+        </button>
+      )}
+      {x.status === 'active' && x.email && emailOn && (
+        <button className="soft" onClick={() => confirm(t('pResetConfirm', { name: x.name })) && p.run('POST', `/people/${x.id}/reset`)}>
+          {t('pReset')}
+        </button>
+      )}
+      <button className="soft" onClick={() => p.run('PATCH', `/people/${x.id}`, { role: x.role === 'admin' ? 'member' : 'admin' })}>
+        {t(x.role === 'admin' ? 'pMakeMember' : 'pMakeAdmin')}
+      </button>
+      {x.status === 'active' && (
+        <button className="soft" onClick={() => confirm(t('pDisableConfirm', { name: x.name })) && p.run('PATCH', `/people/${x.id}`, { status: 'disabled' })}>
+          {t('pDisable')}
+        </button>
+      )}
+      {x.status === 'disabled' && (
+        <button className="soft" onClick={() => p.run('PATCH', `/people/${x.id}`, { status: 'active' })}>
+          {t('pEnable')}
+        </button>
+      )}
+      {!x.owner && (
+        <button className="soft danger" onClick={() => confirm(t('pRemoveConfirm', { name: x.name })) && p.run('DELETE', `/people/${x.id}`)}>
+          {t(x.status === 'pending' ? 'pDecline' : 'pRemove')}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Last seen for people with an account, the invitation's end for invited ones. */
+function seenText(x: PersonRow) {
+  if (x.status === 'pending') return t('pAsked', { date: day(x.createdAt) });
+  if (x.status === 'invited') return x.inviteExpiresAt ? t(expiredInvite(x) ? 'pExpiredOn' : 'pUntil', { date: day(x.inviteExpiresAt) }) : '—';
+  return x.lastSeenAt ? since(x.lastSeenAt) : '—';
+}
+
+type Sort = 'name' | 'status' | 'seen';
+
+/** Everyone, searchable and sortable, one line each; a click opens their devices and actions. */
+function PeopleList({ ctx, filter: initial }: { ctx: Ctx; filter?: string }) {
+  const p = usePeople(ctx);
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState<Shown | 'all'>(SHOWN_ORDER.includes(initial as Shown) ? (initial as Shown) : 'all');
+  const [sort, setSort] = useState<{ by: Sort; up: boolean }>({ by: 'name', up: true });
+  const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => setFilter(SHOWN_ORDER.includes(initial as Shown) ? (initial as Shown) : 'all'), [initial]);
+  const people = p.r?.people ?? [];
+  const counts = Object.fromEntries(SHOWN_ORDER.map((k) => [k, people.filter((x) => shownStatus(x) === k).length])) as Record<Shown, number>;
+  const needle = q.trim().toLowerCase();
+  const seen = (x: PersonRow) => Date.parse((x.status === 'invited' ? x.inviteExpiresAt : x.lastSeenAt) ?? '') || 0;
+  const rows = people
+    .filter((x) => (filter === 'all' || shownStatus(x) === filter) && (!needle || `${x.name} ${x.email ?? ''}`.toLowerCase().includes(needle)))
+    .sort((a, b) => {
+      const d =
+        sort.by === 'status'
+          ? SHOWN_ORDER.indexOf(shownStatus(a)) - SHOWN_ORDER.indexOf(shownStatus(b))
+          : sort.by === 'seen'
+            ? seen(b) - seen(a)
+            : 0;
+      return (sort.up ? 1 : -1) * (d || a.name.localeCompare(b.name));
+    });
+  const head = (by: Sort, label: Key, className?: string) => (
+    <th className={className}>
+      <button className={`a-sort ${sort.by === by ? 'on' : ''}`} onClick={() => setSort({ by, up: sort.by === by ? !sort.up : true })}>
+        {t(label)}
+        {sort.by === by && <Icon name={sort.up ? 'arrow_upward' : 'arrow_downward'} size={14} />}
+      </button>
+    </th>
+  );
   return (
     <>
-      {!part && <p className="a-intro">{t('pIntro')}</p>}
-      <div className="a-card" hidden={part === 'registration'}>
-        <div className="a-card-head">
-          <strong>
-            <Icon name="person" size={18} /> {t('pInviteTitle')}
-          </strong>
-          <div className="a-seg">
-            <button className={how === 'one' ? 'on' : ''} onClick={() => setHow('one')}>
-              {t('pOne')}
-            </button>
-            <button className={how === 'list' ? 'on' : ''} onClick={() => setHow('list')}>
-              {t('pList')}
-            </button>
-          </div>
-        </div>
-        <form
-          className="a-import"
-          hidden={how !== 'one'}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run('POST', '/people', { email, name: name || undefined, role }).then(() => (setEmail(''), setName('')));
-          }}
-        >
-          <span className="a-hint">{t(emailOn ? 'pInviteIntroEmail' : 'pInviteIntro')}</span>
-          <div className="a-row">
-            <input type="email" required placeholder={t('pEmail')} value={email} onChange={(e) => setEmail(e.target.value)} />
-            <input placeholder={t('pName')} value={name} onChange={(e) => setName(e.target.value)} />
-            <select value={role} onChange={(e) => setRole(e.target.value as 'member' | 'admin')}>
-              <option value="member">{t('pMember')}</option>
-              <option value="admin">{t('pAdmin')}</option>
-            </select>
-            <button className="primary">{t('pInvite')}</button>
-          </div>
-          {invite && <InviteBox invite={invite} />}
-        </form>
-        {/* Stays mounted while hidden, so a running import goes on when switching to one person. */}
-        <div hidden={how !== 'list'}>
-          <ImportList reload={load} setErr={ctx.setErr} />
-        </div>
-      </div>
-      <div className="a-card" hidden={part === 'invite'}>
-        <strong>{t('pRegTitle')}</strong>
-        <div className="a-seg">
-          {(['invite', 'approval', 'open'] as const).map((m) => (
-            <button key={m} className={registration === m ? 'on' : ''} onClick={() => run('PUT', '/registration', { mode: m })}>
-              {t(m === 'invite' ? 'pRegInvite' : m === 'approval' ? 'pRegApproval' : 'pRegOpen')}
-            </button>
-          ))}
-        </div>
-        <span className="a-hint">{t(registration === 'invite' ? 'pRegInviteHint' : registration === 'approval' ? 'pRegApprovalHint' : 'pRegOpenHint')}</span>
-        <label className="a-inline a-days">
-          <span>{t('pInviteDays')}</span>
-          <input
-            type="number"
-            min={1}
-            max={90}
-            value={inviteDays}
-            onChange={(e) => setInviteDays(Number(e.target.value))}
-            onBlur={() => inviteDays >= 1 && inviteDays <= 90 && run('PUT', '/registration', { inviteDays: Math.round(inviteDays) })}
-          />
-          <span>{t('pDays')}</span>
+      <div className="a-toolbar">
+        <label className="a-search">
+          <Icon name="search" size={18} />
+          <input type="search" placeholder={t('pSearch')} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
+        <a className="primary a-button" href="#invitations">
+          <Icon name="person_add" size={18} /> {t('pInviteTitle')}
+        </a>
       </div>
-      {notice && (
+      <div className="a-chips">
+        <button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>
+          {t('imAll')} {people.length}
+        </button>
+        {SHOWN_ORDER.filter((k) => counts[k] || filter === k).map((k) => (
+          <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>
+            {t(SHOWN_KEY[k])} {counts[k]}
+          </button>
+        ))}
+      </div>
+      {p.notice && (
         <div className="a-ok">
-          <Icon name="mail" /> {notice}
+          <Icon name="mail" /> {p.notice}
         </div>
       )}
-      <ul className="a-people" hidden={Boolean(part)}>
-        {people?.map((x) => {
-          const expired = x.status === 'invited' && Boolean(x.inviteExpiresAt) && Date.parse(x.inviteExpiresAt!) < Date.now();
-          return (
-          <li key={x.id} className={`a-person ${x.status}`}>
-            <div className="a-person-head">
-              <span className="a-device-icon">
-                <Icon name="person" size={20} />
-              </span>
-              <div className="a-device-main">
-                <strong>
-                  {x.name} {x.id === ctx.s.me.id && <span className="a-tag">{t('pYou')}</span>}
-                </strong>
-                <span className="a-hint">
-                  {x.email ?? '—'}
-                  {x.status === 'invited' && x.inviteExpiresAt && !expired && ` · ${t('pInvitedUntil', { date: day(x.inviteExpiresAt) })}`}
-                </span>
-              </div>
-              <span className={`a-status ${x.status === 'pending' || expired ? 'new' : ''}`}>{t(expired ? 'pExpired' : STATUS_KEY[x.status])}</span>
-              <span className="a-status">{t(x.role === 'admin' ? 'pAdmin' : 'pMember')}</span>
-            </div>
-            {x.devices.length > 0 && (
-              <ul className="a-devices">
-                {x.devices.map((d) => (
-                  <DeviceRow key={d.id} d={d} reload={load} setErr={ctx.setErr} />
-                ))}
-              </ul>
-            )}
-            {x.id !== ctx.s.me.id && (
-              <div className="a-inline a-person-actions">
-                {x.status === 'pending' && (
-                  <button className="primary" onClick={() => run('PATCH', `/people/${x.id}`, { status: 'active' })}>
+      {p.invite && <InviteBox invite={p.invite} />}
+      <table className="a-table">
+        <thead>
+          <tr>
+            {head('name', 'imName')}
+            {head('status', 'pStatus')}
+            {head('seen', 'pSeen', 'a-wide')}
+            <th aria-label={t('pActions')} />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((x) => {
+            const st = shownStatus(x);
+            const isOpen = open === x.id;
+            return (
+              <Fragment key={x.id}>
+                <tr className={`a-prow ${st} ${isOpen ? 'open' : ''}`} onClick={() => setOpen(isOpen ? null : x.id)}>
+                  <td>
+                    <strong>{x.name}</strong>
+                    {x.role === 'admin' && <span className="a-tag">{t('pAdmin')}</span>}
+                    {x.id === ctx.s.me.id && <span className="a-tag">{t('pYou')}</span>}
+                    <span className="a-hint a-email">{x.email ?? '—'}</span>
+                  </td>
+                  <td>
+                    <span className={`a-chip ${st}`}>{t(SHOWN_KEY[st])}</span>
+                  </td>
+                  <td className="a-wide a-hint">{seenText(x)}</td>
+                  <td className="a-row-end" onClick={(e) => e.stopPropagation()}>
+                    {x.status === 'pending' && (
+                      <button className="primary a-small" onClick={() => p.run('PATCH', `/people/${x.id}`, { status: 'active' })}>
+                        {t('pApprove')}
+                      </button>
+                    )}
+                    {st === 'expired' && (
+                      <button className="soft a-small" onClick={() => p.run('POST', `/people/${x.id}/invite`)}>
+                        {t('pResendShort')}
+                      </button>
+                    )}
+                    <button className={`a-more ${isOpen ? 'open' : ''}`} aria-label={t('pDetails')} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : x.id)}>
+                      <Icon name="chevron_right" size={20} />
+                    </button>
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr className="a-pdetail">
+                    <td colSpan={4}>
+                      <span className="a-label">{t('devicesTitle')}</span>
+                      {x.devices.length ? (
+                        <ul className="a-devices">
+                          {x.devices.map((d) => (
+                            <DeviceRow key={d.id} d={d} reload={p.load} setErr={ctx.setErr} />
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="a-hint">{t(x.status === 'active' ? 'pNoDevices' : 'pNoDevicesYet')}</span>
+                      )}
+                      <PersonActions x={x} p={p} ctx={ctx} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+      {p.r && !rows.length && <p className="a-hint">{t('pNoMatch')}</p>}
+    </>
+  );
+}
+
+/** People → Invitations and approvals: the invite card, then everyone still waiting for something. */
+function Invitations(ctx: Ctx) {
+  const p = usePeople(ctx);
+  const [busy, setBusy] = useState<string | null>(null);
+  // Links made by "Resend all" without email: every one of them, for the CSV (the invite box shows only the last).
+  const [links, setLinks] = useState<Imported[]>([]);
+  const people = p.r?.people ?? [];
+  const pending = people.filter((x) => x.status === 'pending');
+  const expired = people.filter(expiredInvite);
+  const open = people.filter((x) => x.status === 'invited' && !expiredInvite(x)).sort((a, b) => (a.inviteExpiresAt ?? '').localeCompare(b.inviteExpiresAt ?? ''));
+  const resendAll = async () => {
+    // One after another, like the list import, so a slow mail server never times out a big request.
+    const made: Imported[] = [];
+    for (const [i, x] of expired.entries()) {
+      setBusy(t('pResending', { done: i, total: expired.length }));
+      const r = await p.run('POST', `/people/${x.id}/invite`);
+      if (!r) break;
+      if (r.invite?.link && !r.invite.sent) made.push({ ...r.invite, name: x.name });
+    }
+    setLinks(made);
+    setBusy(null);
+  };
+  const line = (x: PersonRow, action: ReactNode) => (
+    <li key={x.id} className="a-qline">
+      <span className="a-qname">
+        <strong>{x.name}</strong>
+        <span className="a-hint">{x.email}</span>
+      </span>
+      <span className="a-hint">{seenText(x)}</span>
+      {action}
+    </li>
+  );
+  return (
+    <>
+      <InviteCard p={p} ctx={ctx} />
+      {p.notice && <div className="a-ok">{p.notice}</div>}
+      {links.length > 1 && (
+        <div className="a-card a-update">
+          <strong>{t('imMade', { n: links.length })}</strong>
+          <span className="a-hint">{t('imCsvHint')}</span>
+          <button className="primary a-save" onClick={() => linksCsv(links)}>
+            <Icon name="download" size={18} /> {t('imCsv')}
+          </button>
+        </div>
+      )}
+      {pending.length > 0 && (
+        <section className="a-sub">
+          <h3>
+            {t('pPending')} <span className="a-count">{pending.length}</span>
+          </h3>
+          <span className="a-hint">{t('pPendingHint')}</span>
+          <ul className="a-queue">
+            {pending.map((x) =>
+              line(
+                x,
+                <span className="a-inline">
+                  <button className="primary a-small" onClick={() => p.run('PATCH', `/people/${x.id}`, { status: 'active' })}>
                     {t('pApprove')}
                   </button>
-                )}
-                {x.status === 'invited' && (
-                  <button className={expired ? 'primary' : 'soft'} onClick={() => run('POST', `/people/${x.id}/invite`)}>
-                    {t(emailOn ? 'pResend' : 'pReinvite')}
+                  <button className="soft a-small danger" onClick={() => confirm(t('pDeclineConfirm', { name: x.name })) && p.run('DELETE', `/people/${x.id}`)}>
+                    {t('pDecline')}
                   </button>
-                )}
-                {x.status === 'active' && x.email && emailOn && (
-                  <button className="soft" onClick={() => confirm(t('pResetConfirm', { name: x.name })) && run('POST', `/people/${x.id}/reset`)}>
-                    {t('pReset')}
-                  </button>
-                )}
-                <button className="soft" onClick={() => run('PATCH', `/people/${x.id}`, { role: x.role === 'admin' ? 'member' : 'admin' })}>
-                  {t(x.role === 'admin' ? 'pMakeMember' : 'pMakeAdmin')}
-                </button>
-                {x.status === 'active' && (
-                  <button className="soft" onClick={() => confirm(t('pDisableConfirm', { name: x.name })) && run('PATCH', `/people/${x.id}`, { status: 'disabled' })}>
-                    {t('pDisable')}
-                  </button>
-                )}
-                {x.status === 'disabled' && (
-                  <button className="soft" onClick={() => run('PATCH', `/people/${x.id}`, { status: 'active' })}>
-                    {t('pEnable')}
-                  </button>
-                )}
-                {!x.owner && (
-                  <button className="soft danger" onClick={() => confirm(t('pRemoveConfirm', { name: x.name })) && run('DELETE', `/people/${x.id}`)}>
-                    {t('pRemove')}
-                  </button>
-                )}
-              </div>
+                </span>,
+              ),
             )}
-          </li>
-          );
-        })}
-      </ul>
+          </ul>
+        </section>
+      )}
+      {expired.length > 0 && (
+        <section className="a-sub">
+          <div className="a-card-head">
+            <h3>
+              {t('pExpiredTitle')} <span className="a-count">{expired.length}</span>
+            </h3>
+            {expired.length > 1 && (
+              <button className="soft" disabled={Boolean(busy)} onClick={resendAll}>
+                {busy ?? t(p.r?.email ? 'pResendAll' : 'pReinviteAll', { n: expired.length })}
+              </button>
+            )}
+          </div>
+          <ul className="a-queue">
+            {expired.map((x) =>
+              line(
+                x,
+                <button className="soft a-small" onClick={() => p.run('POST', `/people/${x.id}/invite`)}>
+                  {t('pResendShort')}
+                </button>,
+              ),
+            )}
+          </ul>
+        </section>
+      )}
+      {open.length > 0 && (
+        <section className="a-sub">
+          <h3>
+            {t('pOpenTitle')} <span className="a-count">{open.length}</span>
+          </h3>
+          <ul className="a-queue">
+            {open.map((x) =>
+              line(
+                x,
+                <button className="soft a-small" onClick={() => p.run('POST', `/people/${x.id}/invite`)}>
+                  {t('pResendShort')}
+                </button>,
+              ),
+            )}
+          </ul>
+        </section>
+      )}
+      {p.r && !pending.length && !expired.length && !open.length && <p className="a-hint">{t('pNothingOpen')}</p>}
     </>
   );
 }
@@ -2413,10 +2822,357 @@ function Account({ s, setS, setErr }: Ctx) {
   );
 }
 
+// ---- The Admin page after the setup: an overview, then pages grouped by People, Inbox, Company and Server ----------
+
+type Attention = { code: string; n?: number; at?: string; error?: string; version?: string };
+type Overview = {
+  counts: { active: number; invited: number; expired: number; pending: number; disabled: number; admins: number; devices: number };
+  attention: Attention[];
+  health: {
+    version: string;
+    update: { version: string; date: string | null } | null;
+    https: string | null;
+    keySource: 'env' | 'file';
+    email: { ready: boolean; provider: 'smtp' | 'graph' | null; tested: string | null };
+    backups: { enabled: boolean; hour: number; keySet: boolean; last: { at: string; ok: boolean; error?: string } | null; newest: string | null; count: number } | null;
+    disk: { free: number; total: number } | null;
+    encryption: null | { on: boolean };
+    startedAt: string;
+  };
+};
+
+const gb = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e11 ? 0 : 1)} GB` : `${Math.round(n / 1e6)} MB`);
+const RELEASES = 'https://github.com/DennHa/gnomon/releases';
+
+/** What each attention item says, where its button goes, and what the button says. */
+const ATTENTION: Record<string, [IconName, Key, Key, string]> = {
+  pending: ['how_to_reg', 'atPending', 'atReview', 'invitations'],
+  invitesExpired: ['schedule', 'atExpired', 'atResend', 'invitations'],
+  emailMissing: ['mail', 'atEmail', 'atSetUp', 'email'],
+  addressMissing: ['language', 'atAddress', 'atSetUp', 'company'],
+  backupNoPassword: ['backup', 'atBackupKey', 'atSetUp', 'backups'],
+  backupFailed: ['warning', 'atBackupFailed', 'atOpen', 'backups'],
+  backupsOff: ['backup', 'atBackupsOff', 'atOpen', 'backups'],
+  backupOld: ['backup', 'atBackupOld', 'atOpen', 'backups'],
+  diskLow: ['hard_drive', 'atDisk', 'atOpen', 'health'],
+  update: ['update', 'atUpdate', 'atHowUpdate', 'health'],
+  adminPassword: ['lock', 'atPassword', 'atSetUp', 'account'],
+  feedback: ['forum', 'atFeedback', 'atRead', 'feedback'],
+};
+
+function useOverview(ctx: Ctx) {
+  const [o, setO] = useState<Overview | null>(null);
+  useEffect(() => {
+    call<Overview>('GET', '/overview').then(setO, (e) => ctx.setErr((e as Error).message));
+  }, []);
+  return o;
+}
+
+/** One line of the server's health: a dot (fine, needs a look, or nothing to say), a label and what's true. */
+function HealthRow({ label, value, state }: { label: Key; value: ReactNode; state: 'ok' | 'warn' | 'off' }) {
+  return (
+    <div className="a-health-row">
+      <span className={`a-dot ${state}`} />
+      <dt>{t(label)}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function healthRows(o: Overview, s: State): ReactNode[] {
+  const h = o.health;
+  const b = h.backups;
+  const diskLow = h.disk && (h.disk.free < 1e9 || h.disk.free / h.disk.total < 0.05);
+  return [
+    <HealthRow key="v" label="hVersion" state={h.update ? 'warn' : 'ok'} value={h.update ? t('hUpdate', { v: h.version, new: h.update.version }) : t('hCurrent', { v: h.version })} />,
+    <HealthRow
+      key="b"
+      label="sBackups"
+      state={!b || !b.keySet || !b.enabled || (b.last && !b.last.ok) ? 'warn' : 'ok'}
+      value={!b ? '—' : !b.keySet ? t('hNoKey') : b.last && !b.last.ok ? t('hBackupFailed', { when: since(b.last.at) }) : !b.enabled ? t('wBackupsOff') : b.newest ? t('hBackupLast', { when: since(b.newest), hour: String(b.hour).padStart(2, '0') }) : t('hBackupNone', { hour: String(b.hour).padStart(2, '0') })}
+    />,
+    <HealthRow key="d" label="hDisk" state={!h.disk ? 'off' : diskLow ? 'warn' : 'ok'} value={h.disk ? t('hDiskFree', { free: gb(h.disk.free), total: gb(h.disk.total) }) : '—'} />,
+    <HealthRow
+      key="e"
+      label="sEmail"
+      state={h.email.ready ? 'ok' : 'warn'}
+      value={h.email.ready ? `${h.email.provider === 'graph' ? t('emailGraph') : t('emailSmtp')} · ${h.email.tested ? t('hTested', { when: since(h.email.tested) }) : t('hUntested')}` : t('hEmailOff')}
+    />,
+    <HealthRow key="h" label="wHttps" state={h.https === 'local' ? 'warn' : 'ok'} value={t((h.https && HTTPS_TEXT[h.https]) || 'httpsManual')} />,
+    // Encryption at rest is still to come: shown so admins know where it will be, filled in once the server reports it.
+    <HealthRow key="x" label="hEncryption" state={h.encryption ? (h.encryption.on ? 'ok' : 'warn') : 'off'} value={h.encryption ? t(h.encryption.on ? 'hEncOn' : 'hEncOff') : t('hEncSoon')} />,
+    <HealthRow key="k" label="sKey" state={s.keySource === 'env' ? 'ok' : 'off'} value={t(s.keySource === 'env' ? 'keyEnv' : 'keyFileShort')} />,
+  ];
+}
+
+function OverviewPage(ctx: Ctx) {
+  const o = useOverview(ctx);
+  if (!o) return <p className="a-hint">{t('loading')}</p>;
+  const c = o.counts;
+  const tiles: [Key, number, string, string?][] = [
+    ['pActive', c.active, 'people/active'],
+    ['pInvited', c.invited + c.expired, 'people/invited', c.expired ? t('oExpired', { n: c.expired }) : undefined],
+    ['pPending', c.pending, 'people/pending'],
+    ['pDisabled', c.disabled, 'people/disabled'],
+  ];
+  return (
+    <>
+      <div className="a-tiles">
+        {tiles.map(([label, n, href, sub]) => (
+          <a key={label} className={`a-tile ${label === 'pPending' && n ? 'hot' : ''}`} href={`#${href}`}>
+            <span className="a-hint">{t(label)}</span>
+            <strong>{n}</strong>
+            {sub && <span className="a-tile-sub">{sub}</span>}
+          </a>
+        ))}
+      </div>
+      <section className="a-card">
+        <strong>{t('oAttention')}</strong>
+        {o.attention.length ? (
+          <ul className="a-attention">
+            {o.attention.map((a) => {
+              const [icon, text, button, href] = ATTENTION[a.code] ?? ['warning', 'atUnknown', 'atOpen', 'health'];
+              return (
+                <li key={a.code}>
+                  <Icon name={icon} size={20} />
+                  <span>{t(text, { n: a.n ?? '', v: a.version ?? '', current: o.health.version, when: a.at ? since(a.at) : '', error: a.error ?? '' })}</span>
+                  <a className="soft a-button a-small" href={`#${href}`}>
+                    {t(button)}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="a-ok">
+            <Icon name="check_circle" /> {t('oAllGood')}
+          </div>
+        )}
+      </section>
+      <section className="a-card">
+        <div className="a-card-head">
+          <strong>{t('oServer')}</strong>
+          <a href="#health">{t('oDetails')}</a>
+        </div>
+        <dl className="a-health">{healthRows(o, ctx.s)}</dl>
+      </section>
+    </>
+  );
+}
+
+function HealthPage(ctx: Ctx & { rerun: () => void }) {
+  const o = useOverview(ctx);
+  const [cleaned, setCleaned] = useState<string | null>(null);
+  if (!o) return <p className="a-hint">{t('loading')}</p>;
+  const h = o.health;
+  return (
+    <>
+      {h.update && (
+        <div className="a-card a-update">
+          <strong>
+            <Icon name="update" size={18} /> {t('hUpdateTitle', { v: h.update.version })}
+          </strong>
+          <span className="a-hint">{t('hUpdateHow')}</span>
+          <code className="a-cmd">sudo gnomon-admin update</code>
+          <a href={`${RELEASES}/tag/v${h.update.version}`} target="_blank" rel="noreferrer">
+            {t('hWhatsNew')} <Icon name="open_in_new" size={14} />
+          </a>
+        </div>
+      )}
+      <section className="a-card">
+        <dl className="a-health">
+          {healthRows(o, ctx.s)}
+          <HealthRow label="hRunning" state="off" value={t('hSince', { when: new Date(h.startedAt).toLocaleString() })} />
+          <HealthRow label="devicesTitle" state="off" value={t('hDevices', { n: o.counts.devices })} />
+        </dl>
+        <div className="a-inline a-cleanup-row">
+          <button
+            className="soft a-small"
+            onClick={async () => {
+              try {
+                const r = await call<{ removed: number }>('POST', '/devices/cleanup');
+                setCleaned(t('devCleaned', { n: r.removed }));
+              } catch (e) {
+                ctx.setErr((e as Error).message);
+              }
+            }}
+          >
+            {t('hCleanup')}
+          </button>
+          <span className="a-hint">{cleaned ?? t('devCleanupHint')}</span>
+        </div>
+      </section>
+      {ctx.s.config.audit.length > 0 && (
+        <section className="a-card">
+          <strong>{t('history')}</strong>
+          <ul className="a-audit">
+            {ctx.s.config.audit.map((a) => (
+              <li key={a.at + a.what}>
+                <span className="a-hint">{new Date(a.at).toLocaleString()}</span> {a.what}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section className="a-card">
+        <strong>{t('rerunSetup')}</strong>
+        <span className="a-hint">{t('rerunHint')}</span>
+        <button className="soft a-save" onClick={ctx.rerun}>
+          <Icon name="rocket_launch" size={18} /> {t('rerunSetup')}
+        </button>
+      </section>
+    </>
+  );
+}
+
+/** A page made of several setup steps, each under its own heading. */
+const parts = (ctx: Ctx, list: [Key, (c: Ctx) => ReactNode][]) => (
+  <>
+    {list.map(([title, view]) => (
+      <section key={title} className="a-sub">
+        <h3>{t(title)}</h3>
+        {view(ctx)}
+      </section>
+    ))}
+  </>
+);
+
+type Page = { key: string; title: Key; icon: IconName; view: (c: Ctx & { sub: string; rerun: () => void }) => ReactNode; badge?: (s: State) => number };
+const ADMIN_NAV: { group?: Key; pages: Page[] }[] = [
+  { pages: [{ key: 'overview', title: 'overviewTitle', icon: 'home', view: (c) => <OverviewPage {...c} /> }] },
+  {
+    group: 'peopleTitle',
+    pages: [
+      { key: 'people', title: 'peopleTitle', icon: 'group', view: (c) => <PeopleList ctx={c} filter={c.sub} /> },
+      { key: 'invitations', title: 'invitationsTitle', icon: 'person_add', view: (c) => <Invitations {...c} />, badge: (s) => s.pending },
+      { key: 'signup', title: 'signupTitle', icon: 'how_to_reg', view: (c) => <><p className="a-intro">{t('regStepIntro')}</p><People {...c} part="registration" /></> },
+    ],
+  },
+  { group: 'inboxGroup', pages: [{ key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} />, badge: (s) => s.feedbackUnread }] },
+  {
+    group: 'companyGroup',
+    pages: [
+      { key: 'company', title: 'companyDetails', icon: 'apartment', view: (c) => <CompanyStep {...c} /> },
+      { key: 'macapp', title: 'macRollout', icon: 'laptop_mac', view: (c) => parts(c, [['macTitle', (x) => <MacAppStep {...x} />], ['rulesTitle', (x) => <RulesStep {...x} />], ['rolloutTitle', (x) => <Rollout {...x} />]]) },
+      { key: 'integrations', title: 'integrationsTitle', icon: 'extension', view: (c) => parts(c, [['floatTitle', (x) => <FloatStep {...x} />], ['personioTitle', (x) => <PersonioStep {...x} />]]) },
+    ],
+  },
+  {
+    group: 'serverGroup',
+    pages: [
+      { key: 'health', title: 'healthTitle', icon: 'monitor_heart', view: (c) => <HealthPage {...c} /> },
+      { key: 'email', title: 'emailTitle', icon: 'mail', view: (c) => <EmailStep {...c} /> },
+      { key: 'backups', title: 'backupsTitle', icon: 'backup', view: (c) => <BackupsStep {...c} /> },
+    ],
+  },
+];
+// Your own admin password: from the menu under your name, not the side menu.
+const ACCOUNT_PAGE: Page = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
+const ADMIN_PAGES = [...ADMIN_NAV.flatMap((g) => g.pages), ACCOUNT_PAGE];
+
+/** The page in the address (#people/pending → people, pending), so reloading and links keep the place. */
+const route = () => {
+  const [key, sub = ''] = location.hash.slice(1).split('/');
+  return { key: ADMIN_PAGES.some((x) => x.key === key) ? key : 'overview', sub };
+};
+
+function AdminShell({ ctx, rerun }: { ctx: Ctx; rerun: () => void }) {
+  const { s, err, setErr } = ctx;
+  const [at, setAt] = useState(route);
+  const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    const on = () => (setAt(route()), setErr(null), setMenu(false), window.scrollTo(0, 0));
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: MouseEvent) => !(e.target as Element).closest('.a-me') && setMenu(false);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [menu]);
+  // Badges and the overview stay current when coming back to a page.
+  useEffect(() => {
+    call<State>('GET', '/state').then(ctx.setS, () => {});
+  }, [at.key]);
+  const cur = ADMIN_PAGES.find((x) => x.key === at.key)!;
+  return (
+    <main className="a-page">
+      <header className="a-head">
+        <img src="/icon-192.png" alt="" width={44} height={44} />
+        <div>
+          <h1>{t('adminTitle')}</h1>
+          <span className="a-hint">{s.config.company.name || s.config.company.publicUrl || location.host}</span>
+        </div>
+        <div className="a-me">
+          <button className="soft" aria-expanded={menu} onClick={() => setMenu(!menu)}>
+            <Icon name="account_circle" size={20} /> <span className="a-me-name">{s.me.name}</span>
+          </button>
+          {menu && (
+            <div className="a-menu" role="menu">
+              <span className="a-hint">{s.me.email}</span>
+              <a role="menuitem" href="#account">
+                <Icon name="lock" size={18} /> {t('accountTitle')}
+              </a>
+              <a role="menuitem" href="/account">
+                <Icon name="person" size={18} /> {t('ownAccount')}
+              </a>
+              <button
+                role="menuitem"
+                onClick={async () => {
+                  await call('DELETE', '/session').catch(() => {});
+                  keepToken('');
+                  location.replace('/admin');
+                }}
+              >
+                <Icon name="logout" size={18} /> {t('signOut')}
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+      {!s.me.email && <OwnerPrompt s={s} setS={ctx.setS} />}
+      <div className="a-body">
+        <nav className="a-steps">
+          {ADMIN_NAV.map((g, i) => (
+            <Fragment key={i}>
+              {g.group && <span className="a-group">{t(g.group)}</span>}
+              {g.pages.map((pg) => {
+                const n = pg.badge?.(s) ?? 0;
+                return (
+                  <a key={pg.key} className={`a-step ${pg.key === at.key ? 'on' : ''}`} href={`#${pg.key}`} aria-current={pg.key === at.key ? 'page' : undefined}>
+                    <span className="a-num">
+                      <Icon name={pg.icon} size={14} />
+                    </span>
+                    {t(pg.title)}
+                    {n > 0 && <span className="a-badge">{n}</span>}
+                  </a>
+                );
+              })}
+            </Fragment>
+          ))}
+        </nav>
+        <section className="a-panel">
+          <h2>
+            <Icon name={cur.icon} size={24} /> {t(cur.title)}
+          </h2>
+          {err && (
+            <p className="a-error">
+              <Icon name="warning" size={18} /> {err}
+            </p>
+          )}
+          {/* Keyed by page, so each page loads fresh when opened. */}
+          <Fragment key={at.key}>{cur.view({ ...ctx, sub: at.sub, rerun })}</Fragment>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 // ---- App ------------------------------------------------------------------------------------------
 
 type Section = { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => ReactNode };
-const PEOPLE: Section = { key: 'people', title: 'peopleTitle', icon: 'group', view: (c) => <People {...c} /> };
+const PEOPLE: Section = { key: 'people', title: 'peopleTitle', icon: 'group', view: (c) => <PeopleList ctx={c} /> };
 const FEEDBACK: Section = { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} /> };
 const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
 /** After the setup, these steps are Settings pages of their own (the others only make sense in the wizard). */
@@ -2498,7 +3254,10 @@ function App() {
       </main>
     );
 
-  // The Admin page: Manage (everyday: devices, feedback, account), then either the setup wizard (numbered steps, until
+  // After the setup, the Admin page has its own layout (AdminShell); the wizard can be run again from Health.
+  if (admin && s.config.setupDone && !wizard) return <AdminShell ctx={{ s, setS, err, setErr }} rerun={() => (setWizard(true), setStep(3), setErr(null), history.replaceState(null, '', location.pathname))} />;
+
+  // The setup wizard on the Admin page: Manage (everyday: devices, feedback, account), then either the setup wizard (numbered steps, until
   // it's finished or when run again) or Settings (the same pages, each on its own, without steps). /setup is the wizard.
   const setupMode = !admin || !s.config.setupDone || wizard;
   const MANAGE = admin ? [PEOPLE, FEEDBACK, ACCOUNT] : [];

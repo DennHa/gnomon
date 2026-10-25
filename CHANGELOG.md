@@ -15,6 +15,12 @@ Gnomon server shows the newest entry.
   after `gnomon-admin update`, with a backup first. A wrong or missing key stops the server with the reason, never
   with an empty database. New: `gnomon-admin rotate-data-key`, and `gnomon-admin status` says whether the data is
   encrypted.
+- **A clearer Admin page for companies:** it opens on an overview with how many people are active, invited, waiting
+  for approval or disabled, what needs your attention (approvals, expired invitations, email, backups, disk space, a
+  new version), and the server's health. People is a searchable, sortable list with filters by status; each person
+  opens to show their devices and actions. Invitations and approvals have their own page, where expired invitations
+  can be sent again all at once. The settings are grouped into Company and Server, and your own account is in the
+  menu under your name. Admins still never see anyone's times.
 
 ## 0.1.20 · 2026-10-25
 

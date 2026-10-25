@@ -43,8 +43,19 @@ import upload from '@material-symbols/svg-400/rounded/upload.svg';
 import dns from '@material-symbols/svg-400/rounded/dns.svg';
 import how_to_reg from '@material-symbols/svg-400/rounded/how_to_reg.svg';
 import admin_panel_settings from '@material-symbols/svg-400/rounded/admin_panel_settings.svg';
+import home from '@material-symbols/svg-400/rounded/home.svg';
+import monitor_heart from '@material-symbols/svg-400/rounded/monitor_heart.svg';
+import person_add from '@material-symbols/svg-400/rounded/person_add.svg';
+import search from '@material-symbols/svg-400/rounded/search.svg';
+import extension from '@material-symbols/svg-400/rounded/extension.svg';
+import hard_drive from '@material-symbols/svg-400/rounded/hard_drive.svg';
+import account_circle from '@material-symbols/svg-400/rounded/account_circle.svg';
+import open_in_new from '@material-symbols/svg-400/rounded/open_in_new.svg';
+import update from '@material-symbols/svg-400/rounded/update.svg';
+import arrow_upward from '@material-symbols/svg-400/rounded/arrow_upward.svg';
+import arrow_downward from '@material-symbols/svg-400/rounded/arrow_downward.svg';
 
-const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail, backup, upload, dns, how_to_reg, admin_panel_settings };
+const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail, backup, upload, dns, how_to_reg, admin_panel_settings, home, monitor_heart, person_add, search, extension, hard_drive, account_circle, open_in_new, update, arrow_upward, arrow_downward };
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
