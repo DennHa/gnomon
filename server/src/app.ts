@@ -8,7 +8,7 @@ import { phoneApi } from '../../src/phone';
 import type { Data, Entry, Settings } from '../../src/types';
 import { ACCOUNT_SETTINGS, type AccountSettings, type RemoteAccount } from '../../src/sync';
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
-import { currentRelease, looksLikeDmg, peekGithubRelease, pickLang, readRelease, releasePage } from './releases';
+import { currentRelease, githubRelease, looksLikeDmg, peekGithubRelease, pickLang, readRelease, releasePage } from './releases';
 import type { Backups } from './backups';
 import { VERSION } from './version';
 import { applyConfigUpdate, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
@@ -485,6 +485,65 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
   }
 
   /**
+   * The Admin page's home: how many people are in, what needs attention and whether the server is healthy. Counts and
+   * statuses only: admins never see anyone's times.
+   */
+  async function adminOverview(meId: string) {
+    const c = company!.get();
+    const people = store.listPeople();
+    const now = Date.now();
+    const expired = people.filter((x) => x.status === 'invited' && Date.parse(store.inviteExpiresAt(x.id) ?? '') < now).length;
+    const count = (status: string) => people.filter((x) => x.status === status).length;
+    const counts = { active: count('active'), invited: count('invited') - expired, expired, pending: count('pending'), disabled: count('disabled'), admins: people.filter((x) => x.role === 'admin' && x.status === 'active').length, devices: store.listDevices().filter((d) => !d.revokedAt).length };
+    // A newer official release than this server: GitHub's answer is cached for an hour, so this waits at most once.
+    const latest = peekGithubRelease() ?? (await Promise.race([githubRelease(), new Promise<null>((r) => setTimeout(() => r(null), 2500).unref())]));
+    const newer = (a: string, b: string) => {
+      const [x, y] = [a, b].map((v) => v.split(/[-+]/)[0].split('.').map(Number));
+      const i = x.findIndex((n, k) => n !== y[k]);
+      return /^\d+\.\d+\.\d+/.test(a) && /^\d+\.\d+\.\d+/.test(b) && i >= 0 && x[i] > y[i];
+    };
+    const update = latest && newer(latest.version, VERSION) ? { version: latest.version, date: latest.date ?? null } : null;
+    const b = backups?.status();
+    const lastOk = b?.files[0]?.at ?? null;
+    let disk: { free: number; total: number } | null = null;
+    try {
+      const st = backups && fs.statfsSync(path.dirname(backups.dir));
+      if (st) disk = { free: st.bavail * st.bsize, total: st.blocks * st.bsize };
+    } catch {
+      disk = null;
+    }
+    const attention: { code: string; n?: number; at?: string; error?: string; version?: string }[] = [];
+    if (counts.pending) attention.push({ code: 'pending', n: counts.pending });
+    if (expired) attention.push({ code: 'invitesExpired', n: expired });
+    if (!canEmail()) attention.push({ code: transport() ? 'addressMissing' : 'emailMissing' });
+    if (b && !b.keySet) attention.push({ code: 'backupNoPassword' });
+    else if (b?.last && !b.last.ok) attention.push({ code: 'backupFailed', at: b.last.at, error: b.last.error });
+    else if (b && !b.enabled) attention.push({ code: 'backupsOff' });
+    else if (b && (!lastOk || now - Date.parse(lastOk) > 2 * 86_400_000) && now - Date.parse(b.keySetAt ?? '') > 2 * 86_400_000) attention.push({ code: 'backupOld', at: lastOk ?? undefined });
+    if (disk && (disk.free < 1024 * MB || disk.free / disk.total < 0.05)) attention.push({ code: 'diskLow' });
+    if (update) attention.push({ code: 'update', version: update.version });
+    if (!store.hasPassword(meId)) attention.push({ code: 'adminPassword' });
+    const unread = store.listFeedback().filter((t) => t.unread).length;
+    if (unread) attention.push({ code: 'feedback', n: unread });
+    return {
+      counts,
+      attention,
+      health: {
+        version: VERSION,
+        update,
+        https: https ?? null,
+        keySource: company!.keySource,
+        email: { ready: canEmail(), provider: c.email?.provider ?? null, tested: c.email?.tested ?? null },
+        backups: b ? { enabled: b.enabled, hour: b.hour, keySet: b.keySet, last: b.last ?? null, newest: lastOk, count: b.files.length } : null,
+        disk,
+        // Encryption of the database at rest isn't there yet: null until the server can say whether it's on.
+        encryption: null,
+        startedAt: new Date(now - process.uptime() * 1000).toISOString(),
+      },
+    };
+  }
+
+  /**
    * Everyone's own account (docs/accounts-design.md, section 3): registering (with an invitation, or as this server
    * allows), signing in, signing in a device with email and password, and the account page's own routes.
    */
@@ -685,6 +744,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
 
     const c = company.get();
     if (method === 'GET' && p === '/admin/state') return [200, adminState(me.id)];
+    if (method === 'GET' && p === '/admin/overview') return [200, await adminOverview(me.id)];
     if (method === 'POST' && p === '/admin/check-address') {
       const url = isObj(body) && typeof body.url === 'string' ? body.url.trim().replace(/\/+$/, '') : '';
       const nonce = randomBytes(12).toString('base64url');
