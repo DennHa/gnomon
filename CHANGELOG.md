@@ -8,6 +8,13 @@ Gnomon server shows the newest entry.
 - **A new README and About page** that describe Gnomon as it is now: for your Mac, phone and browser on your own, and
   for a company on its own server, with a short install section for admins, links to the admin guide and the
   roadmap, and a picture of the web app.
+- **The server's data is encrypted at rest:** times, entries, workdays, projects and people's details, with SQLCipher
+  (AES-256) and a data key kept outside the database (`GNOMON_DATA_KEY` in `.env`, or a file such as a Docker secret).
+  A copied database file, disk image or backup can't be read. The install makes the key and shows it once: keep it in
+  your password manager, because without it the data can't be read. Existing servers are encrypted on the first start
+  after `gnomon-admin update`, with a backup first. A wrong or missing key stops the server with the reason, never
+  with an empty database. New: `gnomon-admin rotate-data-key`, and `gnomon-admin status` says whether the data is
+  encrypted.
 
 ## 0.1.20 · 2026-10-25
 

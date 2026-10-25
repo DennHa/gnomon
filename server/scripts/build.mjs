@@ -18,7 +18,7 @@ const node = {
   format: 'esm',
   target: 'node20',
   nodePaths,
-  external: ['better-sqlite3'],
+  external: ['better-sqlite3-multiple-ciphers'],
   logLevel: 'warning',
   banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
 };

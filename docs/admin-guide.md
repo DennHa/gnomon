@@ -13,7 +13,7 @@ server runs on your machine and the data stays there.
 Contents: [What you need](#what-you-need) · [Install](#install) · [HTTPS](#https-the-four-ways) ·
 [The setup page](#the-setup-page) · [Email](#email) · [Inviting people](#inviting-people) ·
 [The Mac app](#handing-out-the-mac-app) · [Phone and web](#phone-and-web-app) · [Backups](#backups-and-restore) ·
-[Updates](#updates) · [Security and privacy](#security-and-privacy) · [Troubleshooting](#troubleshooting) ·
+[Encryption at rest](#encryption-at-rest) · [Updates](#updates) · [Security and privacy](#security-and-privacy) · [Troubleshooting](#troubleshooting) ·
 [Moving or removing](#moving-or-removing-a-server) · [Example: a Raspberry Pi](#example-a-raspberry-pi-with-a-cloudflare-tunnel)
 
 ## What you need
@@ -23,7 +23,7 @@ Contents: [What you need](#what-you-need) · [Install](#install) · [HTTPS](#htt
 | **A Linux machine** | Any distribution with **Docker Engine and the Docker Compose plugin** (`docker compose`), on x86-64 or arm64 (a VM, a small cloud server, a Raspberry Pi 4/5). 1 CPU, 1 GB of RAM and a few GB of disk are plenty for 150 people. |
 | **A host name** | For example `gnomon.example.com`, pointing at the machine (or at your proxy, or a Cloudflare Tunnel). Phones and Macs only talk to the server over HTTPS. |
 | **An email account to send from** (recommended) | SMTP (any provider) or Microsoft 365. Without it, invitations are links you pass on yourself, and nobody can reset a forgotten password themselves. |
-| **A password manager** | For the backup password (shown once at install) and your admin password. |
+| **A password manager** | For the data key and the backup password (both shown once at install) and your admin password. |
 | Optional | Admin access to Float and Personio (for plans and absences), and a Mac management tool such as Iru (to roll out the app). |
 
 Install Docker from [docs.docker.com/engine/install](https://docs.docker.com/engine/install/) if it isn't there.
@@ -41,12 +41,12 @@ sudo sh install.sh
 It checks Docker, asks a few questions (install folder, [how HTTPS is done](#https-the-four-ways), the host name, the
 time zone), and then:
 
-1. writes the folder (default `/opt/gnomon`): `compose.yml`, `.env` with a **newly generated secret key**, and a
-   `Caddyfile` if Caddy does HTTPS,
+1. writes the folder (default `/opt/gnomon`): `compose.yml`, `.env` with a **newly generated secret key and data
+   key**, and a `Caddyfile` if Caddy does HTTPS,
 2. puts the `gnomon-admin` command on the machine (`/usr/local/bin/gnomon-admin`),
 3. downloads the published server image (`ghcr.io/dennha/gnomon-server`), starts it, and checks HTTPS,
-4. sets a **backup password and shows it once**: put it in your password manager now
-   ([why it matters](#backups-and-restore)),
+4. shows the **data key**, which encrypts all data on disk, and sets a **backup password**, showing it once: put both
+   in your password manager now ([data key](#encryption-at-rest), [backup password](#backups-and-restore)),
 5. prints the **one-time link to the setup page** (and a QR code), valid for 60 minutes.
 
 Open the link and follow the [setup page](#the-setup-page). If the link expired: `gnomon-admin setup-link`.
@@ -263,10 +263,54 @@ Or download one under Admin → Settings → Backups. The files stay encrypted, 
 | `gnomon-admin restore FILE` | Restore a `.gnomonbak` file from the machine |
 
 **Restoring** asks for the backup password, stops the server, replaces its data, and starts it again. The data from
-before is kept in the volume as `gnomon.db.before-restore-<time>` (unencrypted; delete it once all is well). On a
+before is kept in the volume as `gnomon.db.before-restore-<time>` (encrypted like the database; delete it once all
+is well). The restored data is encrypted with the server's own data key: a backup doesn't need the data key, only
+its backup password. On a
 **new machine**: install as usual, then `gnomon-admin restore FILE`. What's not in a backup: the `.env` file. Without
 the old `GNOMON_SECRET_KEY`, the Float and Personio tokens and the email password have to be entered again; everything
 else works. So keep a copy of `.env` safe too.
+
+## Encryption at rest
+
+All data in the database (times, entries, workdays, projects, people's names and emails, invitations, feedback) is
+encrypted on disk with **SQLCipher (AES-256)**, including the database's write-ahead log and every copy the server
+makes. The key is **`GNOMON_DATA_KEY`** in `.env`, outside the database. Someone who gets a copy of the database
+file, the Docker volume or a backup can't read it. The server itself still reads the data, so it can show times,
+produce working-time records and send password resets: this isn't end-to-end encryption.
+
+**Keep the data key in your password manager.** If it's lost, the data on the server can't be read any more, by
+anyone, and the server won't start. The only way back is a backup and its backup password (backups don't depend on
+the data key). The install shows the key once; it's also in `.env`.
+
+**Updating a server installed before encryption at rest:** `gnomon-admin update` adds a data key to `.env` and
+`compose.yml`, shows it once, and the new version encrypts the data on its first start. Before it does, it makes an
+encrypted backup (`backups/gnomon-<time>-pre-encryption.gnomonbak`), or, without a backup password, keeps the
+unencrypted database as `gnomon.db.before-encryption-<time>`; `gnomon-admin status` lists such unencrypted copies
+until you delete them. If encrypting fails, the data stays as it was and unencrypted, and the log says why. With a
+compose file of your own (like the Raspberry Pi example below), add the key yourself:
+
+```bash
+echo "GNOMON_DATA_KEY=$(head -c 64 /dev/urandom | base64 | tr -d '\n/+=' | head -c 48)" >> .env
+# in compose.yml, under the gnomon service's environment:  GNOMON_DATA_KEY: ${GNOMON_DATA_KEY}
+docker compose up -d
+```
+
+| | |
+|---|---|
+| `gnomon-admin status` | `Data: encrypted at rest`, or a warning when it isn't, and any unencrypted copies left |
+| `gnomon-admin rotate-data-key` | Back up, stop, re-encrypt all data with a new key (written to `.env` and shown once), start |
+| `GNOMON_DATA_KEY_FILE` | Instead of `GNOMON_DATA_KEY`: read the key from a file, such as a Docker secret |
+
+A wrong or missing key stops the server with the reason in `gnomon-admin logs`; it never starts with an empty
+database. The Admin page reads the same status from `GET /api/v1/admin/encryption`.
+
+**What it protects, and what not.** It protects a copied database file, a leaked backup, a copied volume or VM image,
+and a disk thrown away without `.env`. It doesn't protect against someone with root on the running machine, and a
+stolen disk that also holds `.env` holds the key too. So keep **disk encryption** on as well (below), or keep the key
+off the disk with `GNOMON_DATA_KEY_FILE` on a separate secret mount. Encryption at rest is what Article 34(3)(a) of the
+GDPR asks for so that a breach of unreadable data needn't be told to every person, as long as the key wasn't part of
+it; your data protection officer makes that call. Data written before encryption can remain in the disk's free space,
+and so can copies made before (for example plain `.db` backups you made by hand): delete those.
 
 ## Updates
 
@@ -278,7 +322,8 @@ gnomon-admin update 0.1.19     # a specific one
 It makes a backup, downloads the new image, restarts, and checks that the server is healthy. Your data and settings
 stay. What's new is in [CHANGELOG.md](../CHANGELOG.md). With `--build` installs, it gets that version's code and
 builds it. To go back: `gnomon-admin update <older version>`, and if the data changed in a way the older version
-doesn't understand, `gnomon-admin restore` the backup made before the update.
+doesn't understand, `gnomon-admin restore` the backup made before the update. Versions from before
+[encryption at rest](#encryption-at-rest) can't open encrypted data: going back to one needs that restore too.
 
 Caddy and cloudflared are updated with `docker compose pull && docker compose up -d` in the install folder. Keep the
 machine itself updated as usual.
@@ -299,13 +344,13 @@ release).
 | Device keys and session tokens | Only as SHA-256 hashes. |
 | Float and Personio tokens, the email password | AES-256-GCM, with `GNOMON_SECRET_KEY` from `.env`. |
 | Backups | Encrypted for the backup password (X25519 and AES-256-GCM). |
-| Times and entries in the database | **Not yet** encrypted inside the database. Use disk encryption (below). |
+| Times, entries, people and everything else in the database | SQLCipher (AES-256), with `GNOMON_DATA_KEY` from `.env`, including the write-ahead log. See [Encryption at rest](#encryption-at-rest). |
 
 **Recommended on the machine:**
 
 - **Disk encryption** (LUKS on Linux, or your cloud provider's encrypted volumes), so a stolen disk or a discarded VM
-  image doesn't give away the database.
-- Keep **`.env`** (the secret key) readable only by root: the install sets it to `600`. Keep a copy in your password
+  image doesn't give away the data key in `.env` along with the database.
+- Keep **`.env`** (the secret key and the data key) readable only by root: the install sets it to `600`. Keep a copy in your password
   manager or vault. Anyone with root on the machine can read everything, as with any server: give root access to few.
 - Keep the **backup password** away from the server (a password manager, a vault).
 - Only expose what's needed: with Caddy ports 80 and 443; with your own proxy, the port only to the proxy; with a
@@ -332,6 +377,9 @@ Start with `gnomon-admin status` (containers, version, HTTPS, backups, disk) and
 | A backup failed | `gnomon-admin status` shows the error. Usually the disk is full (`df -h`). |
 | Forgot the admin password | `gnomon-admin admin-link`, then set a new one under *Admin password*. |
 | Lost the backup password | Existing backups can't be restored. Set a new one now (`gnomon-admin backup-password`) so new backups can be, and make one: `gnomon-admin backup`. |
+| *Gnomon can't start: The database is encrypted, but GNOMON_DATA_KEY isn't set* | `.env` or `compose.yml` lost the key (see [Encryption at rest](#encryption-at-rest)). Put it back from your password manager, then `gnomon-admin restart`. |
+| *GNOMON_DATA_KEY doesn't open this database* | It's not the key the data was encrypted with. Use the one from your password manager. Without it, install anew and `gnomon-admin restore` a backup. |
+| `status` lists *unencrypted copies to delete* | Copies from before encryption or a plain backup, in the data volume. Once all is well: `docker compose exec gnomon rm /data/<name>`. |
 | The server won't start after an update | `gnomon-admin logs`; go back with `gnomon-admin update <previous version>`. |
 
 ## Moving or removing a server
@@ -340,7 +388,7 @@ Start with `gnomon-admin status` (containers, version, HTTPS, backups, disk) and
 
 1. On the new machine, install with the same host name (`--no-start` lets you prepare it before switching DNS).
 2. On the old one: `gnomon-admin backup --out gnomon.gnomonbak`, and copy that file and the old `.env`'s
-   `GNOMON_SECRET_KEY` line to the new machine.
+   `GNOMON_SECRET_KEY` line to the new machine. The data key isn't needed: the new machine encrypts with its own.
 3. On the new one: put the old `GNOMON_SECRET_KEY` into its `.env` (so the stored tokens keep working),
    `gnomon-admin restart`, then `gnomon-admin restore gnomon.gnomonbak` with the backup password.
 4. Point the host name at the new machine. Macs and phones keep working, since the address stays the same.

@@ -534,7 +534,7 @@ describe('people: each person only ever sees their own data', () => {
 
   test('a database from before people: everything becomes the owner\'s, once, and keeps working', async () => {
     const file = path.join(dir, 'old-layout.db');
-    const Database = (await import('better-sqlite3')).default;
+    const Database = (await import('better-sqlite3-multiple-ciphers')).default;
     const old = new Database(file);
     old.exec(`
       CREATE TABLE records (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT, seq INTEGER NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (kind, id));

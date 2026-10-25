@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { backupKeyFor, decryptFile, encryptFile, passwordMatches, readHeader, type PublicBackupKey } from './backup-crypto';
+import { rekeyFile } from './data-key';
 import type { Store } from './store';
 
 export type BackupSettings = { enabled: boolean; hour: number; keep: number };
@@ -117,20 +118,8 @@ export class Backups {
     const key = this.key();
     try {
       if (!key) throw new Error('No backup password is set yet');
-      fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 });
       const now = new Date();
-      const base = `gnomon-${stamp(now)}-${label.replace(/[^a-z-]/g, '').slice(0, 20) || 'manual'}`;
-      let name = `${base}${EXT}`;
-      for (let i = 2; fs.existsSync(path.join(this.dir, name)); i++) name = `${base}-${i}${EXT}`; // two in the same second
-      const tmp = path.join(this.dir, `.${name}.db`);
-      try {
-        await this.store.backup(tmp);
-        const sealed = encryptFile(gzipSync(fs.readFileSync(tmp)), key);
-        fs.writeFileSync(path.join(this.dir, `.${name}`), sealed, { mode: 0o600 });
-        fs.renameSync(path.join(this.dir, `.${name}`), path.join(this.dir, name));
-      } finally {
-        fs.rmSync(tmp, { force: true });
-      }
+      const name = writeBackup(this.dir, label, this.store.snapshot(), key, now);
       this.prune();
       this.store.setMeta('backupLast', JSON.stringify({ at: now.toISOString(), ok: true, file: name }));
       const st = fs.statSync(path.join(this.dir, name));
@@ -171,6 +160,17 @@ export class Backups {
   }
 }
 
+/** Write a database image as an encrypted backup into `dir`; returns its name. */
+export function writeBackup(dir: string, label: string, image: Buffer, key: PublicBackupKey, now = new Date()): string {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const base = `gnomon-${stamp(now)}-${label.replace(/[^a-z-]/g, '').slice(0, 20) || 'manual'}`;
+  let name = `${base}${EXT}`;
+  for (let i = 2; fs.existsSync(path.join(dir, name)); i++) name = `${base}-${i}${EXT}`; // two in the same second
+  fs.writeFileSync(path.join(dir, `.${name}`), encryptFile(gzipSync(image), key), { mode: 0o600 });
+  fs.renameSync(path.join(dir, `.${name}`), path.join(dir, name));
+  return name;
+}
+
 /** Decrypt a backup into a database file's bytes (checked to be SQLite). */
 export function openBackup(file: Buffer, password: string): { db: Buffer; created: string } {
   const { payload, created } = decryptFile(file, password);
@@ -181,9 +181,10 @@ export function openBackup(file: Buffer, password: string): { db: Buffer; create
 
 /**
  * Replace the database with a backup. Only while the server is stopped (gnomon-admin restore does that). The current
- * database is kept next to it as gnomon.db.before-restore-<time>, in case the wrong backup was picked.
+ * database is kept next to it as gnomon.db.before-restore-<time>, in case the wrong backup was picked. With a data key
+ * the restored database is encrypted with it (and so is the kept one, when it was).
  */
-export function restoreBackup(dbFile: string, backup: Buffer, password: string): { created: string; kept?: string } {
+export function restoreBackup(dbFile: string, backup: Buffer, password: string, dataKey?: Buffer): { created: string; kept?: string } {
   const { db, created } = openBackup(backup, password);
   let kept: string | undefined;
   if (fs.existsSync(dbFile)) {
@@ -195,6 +196,15 @@ export function restoreBackup(dbFile: string, backup: Buffer, password: string):
   }
   const tmp = `${dbFile}.restoring`;
   fs.writeFileSync(tmp, db, { mode: 0o600 });
+  // Backups hold the data unencrypted inside their own encryption; on disk it's encrypted again with the data key.
+  if (dataKey) {
+    try {
+      rekeyFile(tmp, undefined, dataKey);
+    } catch (e) {
+      fs.rmSync(tmp, { force: true });
+      throw e;
+    }
+  }
   for (const ext of ['-wal', '-shm']) fs.rmSync(dbFile + ext, { force: true });
   fs.renameSync(tmp, dbFile);
   return { created, kept };
