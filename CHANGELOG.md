@@ -21,6 +21,7 @@ Gnomon server shows the newest entry.
   opens to show their devices and actions. Invitations and approvals have their own page, where expired invitations
   can be sent again all at once. The settings are grouped into Company and Server, and your own account is in the
   menu under your name. Admins still never see anyone's times.
+- **Copy day**: one click copies a day's entries as bullet points (with hours, or without) for Weblog or a status message, from the day view, the Week view (*Copy week*) and the menu bar (*Copy today as text*).
 
 ## 0.1.20 · 2026-10-25
 

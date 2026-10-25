@@ -637,6 +637,10 @@ export default function Settings() {
           <input type="checkbox" checked={s.reviewOnLeave} onChange={(e) => set({ reviewOnLeave: e.target.checked })} />
           {t('set.reviewOnLeave')}
         </label>
+        <label className="check-row">
+          <input type="checkbox" checked={s.copyHours !== false} onChange={(e) => set({ copyHours: e.target.checked })} />
+          {t('set.copyHours')}
+        </label>
         {isWeb() ? null : profile?.allowActivityTrail === false ? (
           <p className="muted small">{t('managed.trailOff')}</p>
         ) : (

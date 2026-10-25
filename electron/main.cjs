@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, safeStorage, globalShortcut, powerMonitor, dialog, Notification, screen, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, safeStorage, globalShortcut, powerMonitor, dialog, Notification, screen, shell, nativeTheme, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -572,6 +572,8 @@ function buildTrayMenu(state) {
   } else {
     items.push({ label: tr(state.dayEnded ? 'resumeDay' : 'startDay'), icon: menuIcon('login'), click: () => sendAction({ type: 'start-day' }) });
   }
+  // Also after leaving: that's when you write the day up.
+  items.push({ label: tr('copyToday'), icon: menuIcon('content_copy'), click: () => sendAction({ type: 'copy-today' }) });
 
   items.push({ type: 'separator' }, { label: tr('openGnomon'), icon: menuIcon('open_in_full'), click: showWindow }, { label: tr('quitGnomon'), role: 'quit' });
   return Menu.buildFromTemplate(items);
@@ -983,6 +985,11 @@ function notify(title, body, onClick) {
   if (onClick) n.on('click', onClick);
   n.show();
 }
+
+// Copy day: through main, so it works from the menu bar while the window is hidden.
+ipcMain.handle('clipboard:write', (_e, text) => {
+  if (typeof text === 'string') clipboard.writeText(text.slice(0, 100_000));
+});
 
 // Reminders worked out in the window (src/reminders.ts): plain text only; a click opens the window.
 ipcMain.on('notify', (_e, msg) => {

@@ -14,6 +14,7 @@ import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
 import type { Data } from '../src/types';
 import * as Sync from '../src/sync';
 import { setLanguage, t, trayStrings } from '../src/i18n';
+import { dayText, daysText } from '../src/copytext';
 
 let passed = 0;
 const test = (name: string, fn: () => void) => { try { fn(); passed++; console.log('✓', name); } catch (e) { console.log('✗', name, '\n  ', (e as Error).message); process.exitCode = 1; } };
@@ -566,6 +567,58 @@ test('account settings: the first sync takes the server’s, later the newer cha
   const web = { json: Sync.accountJson(mine), at: '' };
   assert.equal(Sync.planAccount(mine, web, null, { now: NOW }).push, undefined);
   assert.equal(Sync.planAccount(edited, web, null, { now: NOW }).push?.values.dailyTargetHours, 5);
+});
+
+// Copy day: Friday 2026-10-23, entries in the order of the day.
+const copyDay = '2026-10-23';
+const copyData = (): Data => {
+  const d = base();
+  d.projects = [{ id: 'c1', name: 'Client XYZ', color: '#111' }, { id: 'c2', name: 'Internal', color: '#222' }];
+  const at = (hhmm: string, min: number, x: Partial<Data['entries'][0]>) =>
+    d.entries.push({ id: `e${d.entries.length}`, description: '', ...x, start: atTime(copyDay, hhmm), end: new Date(Date.parse(atTime(copyDay, hhmm)) + min * M).toISOString() });
+  at('09:00', 90, { projectId: 'c1', taskName: 'Landing page', description: 'Design review' });
+  at('10:30', 45, { projectId: 'c2', description: 'Weekly sync' });
+  at('11:15', 60, { projectId: 'c1', taskName: 'Landing page', description: 'Design review ' });
+  at('13:00', 30, { projectId: 'c1', activityId: 'a1' });
+  at('13:30', 15, { projectId: 'c1', taskName: 'Hero' });
+  at('14:00', 10, {});
+  d.workdays = [{ date: copyDay, start: atTime(copyDay, '08:30'), end: atTime(copyDay, '17:00'), breaks: [{ start: atTime(copyDay, '12:00'), end: atTime(copyDay, '12:30') }] }];
+  return d;
+};
+test('dayText: merges repeats, falls back to activity or task, adds breaks', () => {
+  setLanguage('en');
+  const r = dayText(copyData(), copyDay, { hours: true });
+  assert.equal(r.lines, 5);
+  assert.equal(r.text, [
+    'Friday, 23 Oct · 4:10 h', '',
+    '- Client XYZ · Landing page: Design review (2:30)',
+    '- Internal: Weekly sync (0:45)',
+    '- Client XYZ: Call (0:30)',
+    '- Client XYZ: Hero (0:15)',
+    '- Untitled (0:10)',
+    '- Breaks: 0:30', '',
+  ].join('\n'));
+});
+test('dayText: hours off, no breaks line without breaks, empty day copies nothing', () => {
+  setLanguage('en');
+  const d = copyData();
+  d.workdays[0].breaks = [];
+  const r = dayText(d, copyDay, { hours: false });
+  assert.match(r.text, /^Friday, 23 Oct · 4:10 h\n\n- Client XYZ · Landing page: Design review\n- Internal: Weekly sync\n/);
+  assert.ok(!r.text.includes('Breaks') && !r.text.includes('(0:'));
+  assert.deepEqual(dayText(d, '2026-10-22', { hours: true }), { text: '', lines: 0 });
+});
+test('dayText and daysText in German; a week has one block per day with entries', () => {
+  setLanguage('de');
+  const d = copyData();
+  d.entries.push({ id: 'x', description: 'Workshop', projectId: 'c2', start: atTime('2026-10-20', '09:00'), end: atTime('2026-10-20', '10:00') });
+  const day = dayText(d, copyDay, { hours: true });
+  assert.ok(day.text.startsWith('Freitag, 23. Okt. · 4:10 h\n'), day.text);
+  assert.ok(day.text.includes('- Pausen: 0:30') && day.text.includes('- Ohne Titel (0:10)'), day.text);
+  const week = daysText(d, ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', copyDay], { hours: true });
+  assert.equal(week.lines, 6);
+  assert.ok(week.text.startsWith('Dienstag, 20. Okt. · 1:00 h\n\n- Internal: Workshop (1:00)\n\nFreitag, 23. Okt.'), week.text);
+  setLanguage('en');
 });
 
 console.log(`\n${passed} passed`);

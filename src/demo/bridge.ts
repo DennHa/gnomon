@@ -13,6 +13,7 @@ window.api = {
   profile: async () => null,
   setTheme: () => {},
   notify: () => {},
+  copyText: (text) => navigator.clipboard.writeText(text),
   appInfo: async () => ({ version, electron: '–', chrome: navigator.userAgent.match(/Chrome\/([\d.]+)/)?.[1] ?? '–', node: '–', updateSource: null, roadmap: null }),
   checkUpdate: async () => ({ ok: true, newer: false, latest: { version, notes: [] } }),
   openLink: (url) => void window.open(url, '_blank', 'noopener'),

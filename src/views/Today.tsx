@@ -6,7 +6,7 @@ import { ActivityChips, BillableToggle, ProjectSelect, TrailSummary } from '../c
 import { EntryFeed, TaskPicker } from '../feed';
 import { Icon } from '../icons';
 import { dayKey, entryMs, fmtClock, fmtDayLong, useNow } from '../time';
-import { DayReview, ProjectGoals, StaleBanner } from './day';
+import { CopyButton, DayReview, ProjectGoals, StaleBanner } from './day';
 import { t } from '../i18n';
 import { prettyAccel } from '../shortcuts';
 import { isWeb } from '../platform';
@@ -155,7 +155,10 @@ export default function Today({ onOpenDay, onOpenProjects }: { onOpenDay: (d: st
       <section className="card">
         <div className="card-head">
           <h3>{t('entries')}</h3>
-          <span className="muted">{t('today.totalTime', { time: fmtClock(tracked) })}</span>
+          <span className="card-head-end">
+            {entries.length > 0 && <CopyButton days={[today]} />}
+            <span className="muted">{t('today.totalTime', { time: fmtClock(tracked) })}</span>
+          </span>
         </div>
         {entries.length === 0 && <p className="muted empty-state">{isWeb() ? t('today.emptyWeb') : t('today.empty', { key: prettyAccel(data.settings.shortcuts.quick) || '—' })}</p>}
         <EntryFeed day={today} entries={entries} mode="times" />

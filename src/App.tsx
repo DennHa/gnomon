@@ -23,6 +23,7 @@ import PhoneTile from './views/PhoneTile';
 import Tour from './views/Tour';
 import About from './views/About';
 import { isWeb } from './platform';
+import { copyDays } from './views/day';
 import { locale, t, trayStrings, type MsgKey } from './i18n';
 
 const VIEWS = [
@@ -85,7 +86,7 @@ function dayStatus(data: Data, now: number): string {
 function useTrayBridge(onShowReview: () => void) {
   const showReviewRef = useRef(onShowReview);
   showReviewRef.current = onShowReview;
-  const { data, update } = useStore();
+  const { data, update, getData } = useStore();
   const now = useNow();
   const running = runningEntry(data);
   const wd = todayWorkday(data);
@@ -173,10 +174,12 @@ function useTrayBridge(onShowReview: () => void) {
         if (action.type === 'resume') update(resumeLast);
         if (action.type === 'idle') update((d) => resolveIdle(d, action.since, action.choice));
         if (action.type === 'show-review') showReviewRef.current();
+        if (action.type === 'copy-today')
+          void copyDays(getData(), [dayKey(Date.now())]).then((r) => window.api.notify(r.lines ? t('copy.done', { n: r.lines }) : t('copy.nothing'), r.text.split('\n')[0]));
         if (action.type === 'show-feedback') window.dispatchEvent(new Event('gnomon:show-feedback'));
         if (action.type === 'switch-activity') update((d) => switchActivity(d, action.activityId));
       }),
-    [update],
+    [update, getData],
   );
 }
 
@@ -374,7 +377,7 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
 }
 
 /** Rasterise a few Material Symbols to PNG for the native menu bar menu (Electron menus can't draw SVG). */
-const MENU_ICONS: IconName[] = ['play_arrow', 'pause', 'stop', 'login', 'logout', 'coffee', 'search', 'open_in_full', 'today'];
+const MENU_ICONS: IconName[] = ['play_arrow', 'pause', 'stop', 'login', 'logout', 'coffee', 'search', 'open_in_full', 'today', 'content_copy'];
 function useMenuIcons() {
   useEffect(() => {
     const size = 32; // 16pt @2x
