@@ -1,14 +1,18 @@
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-24 (0.1.18).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-25 (0.1.19).
 
 ## Now
 
-- **Server that runs anywhere.** A server guide for any Linux machine with Docker, so a company server can run
-  wherever IT likes.
+Nothing in progress right now; the next step is chosen from the list below.
 
 ## Next
 
+- **Refresh the README and About page.** Describe accounts, the web app, inviting people and the admin install.
+- **A clearer admin page.** See at a glance who's in, who's invited, what needs attention and whether the server is
+  healthy.
+- **Data encrypted at rest.** Times and entries encrypted in the database and backups, with the key kept outside the
+  database file.
 - **A drafted day.** Suggest the day from the calendar plus the activity trail Gnomon already keeps, on the Mac only so
   it stays private.
 - **Calendar as a memory aid.** Show meetings next to the day; one click turns one into an entry. macOS Calendar first
@@ -46,6 +50,8 @@ What's coming to Gnomon, and what it already does well. Updated 2026-10-24 (0.1.
 - **Password reset by email.** A link that works once, for 30 minutes, from every sign-in page.
 - **Web app with sign-in.** Track, Week, Reports and Projects in the browser at `/app`; your settings follow your
   account.
+- **Easy install for admins.** One command on any Linux machine with Docker, with HTTPS your way, a setup page in
+  the browser, nightly encrypted backups and an admin guide.
 - **Public roadmap.** This page, at `/roadmap` on your Gnomon server and linked from Info & feedback.
 
 ## Left out on purpose

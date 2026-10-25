@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.19 · 2026-10-25
 
 - **Installing a Gnomon server is one command** on any Linux machine with Docker (`server/deploy/install.sh`). It
   asks how HTTPS is done (Caddy with an automatic or your own certificate, your own reverse proxy, a Cloudflare
