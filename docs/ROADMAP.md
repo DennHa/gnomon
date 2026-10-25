@@ -1,6 +1,6 @@
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-25 (0.1.20).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-25 (0.1.21).
 
 ## Now
 
@@ -8,11 +8,6 @@ Nothing in progress right now; the next step is chosen from the list below.
 
 ## Next
 
-- **Refresh the README and About page.** Describe accounts, the web app, inviting people and the admin install.
-- **A clearer admin page.** See at a glance who's in, who's invited, what needs attention and whether the server is
-  healthy.
-- **Data encrypted at rest.** Times and entries encrypted in the database and backups, with the key kept outside the
-  database file.
 - **A drafted day.** Suggest the day from the calendar plus the activity trail Gnomon already keeps, on the Mac only so
   it stays private.
 - **Calendar as a memory aid.** Show meetings next to the day; one click turns one into an entry. macOS Calendar first
@@ -52,6 +47,9 @@ Nothing in progress right now; the next step is chosen from the list below.
   account.
 - **Easy install for admins.** One command on any Linux machine with Docker, with HTTPS your way, a setup page in
   the browser, nightly encrypted backups and an admin guide.
+- **A clear admin page.** An overview of who's in, who's invited, what needs attention and the server's health.
+- **Data encrypted at rest.** The server's database and backups are encrypted, with the key kept outside the data.
+- **Copy the day as text.** One click turns a day or a week into bullet points for Weblog or a status message.
 - **Public roadmap.** This page, at `/roadmap` on your Gnomon server and linked from Info & feedback.
 
 ## Left out on purpose

@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.21 · 2026-10-25
 
 - **A new README and About page** that describe Gnomon as it is now: for your Mac, phone and browser on your own, and
   for a company on its own server, with a short install section for admins, links to the admin guide and the
