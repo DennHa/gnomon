@@ -10,6 +10,7 @@ import { ACCOUNT_SETTINGS, type AccountSettings, type RemoteAccount } from '../.
 import { KINDS, keyOf, type Device, type Kind, type Store } from './store';
 import { currentRelease, looksLikeDmg, peekGithubRelease, pickLang, readRelease, releasePage } from './releases';
 import type { Backups } from './backups';
+import type { Encryption } from './open-store';
 import { VERSION } from './version';
 import { applyConfigUpdate, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
 import { randomBytes } from 'node:crypto';
@@ -31,6 +32,7 @@ const PAIR_LOCK_MS = 15 * 60_000;
 /** mail: how to send email instead of the one set up in Settings → Email (tests use a fake one). */
 /** backups: the nightly encrypted backups (backups.ts), shown and set on the setup page. */
 /** macAppDir: where an uploaded Mac app is kept (the data folder's releases/). */
+/** encryption: whether the data is encrypted at rest (open-store.ts), for the setup and Admin pages. */
 /** https: how the install script set up HTTPS (GNOMON_HTTPS: caddy, proxy, tunnel or local), shown on the setup page. */
 export type AppOptions = {
   store: Store;
@@ -44,6 +46,7 @@ export type AppOptions = {
   backups?: Backups;
   macAppDir?: string;
   https?: string;
+  encryption?: () => Encryption;
 };
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -186,7 +189,7 @@ async function checkAddress(url: string, nonce: string): Promise<AddressCheck> {
   }
 }
 
-export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir, roadmapDir, mail, backups, macAppDir, https }: AppOptions) {
+export function createApp({ store, webDir, releasesDir, company, demoDir, siteDir, roadmapDir, mail, backups, macAppDir, https, encryption }: AppOptions) {
   let pairFailures = 0;
   let pairLockedUntil = 0;
 
@@ -475,6 +478,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       release: release ? { version: release.version, size: release.size, date: release.date ?? null } : null,
       macApp: { from, upload: macAppDir ? readRelease(macAppDir)?.version ?? null : null },
       backups: backups ? backups.status() : null,
+      encryption: encryption ? encryption() : null,
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
       passwordSet: store.hasPassword(me.id),
       feedbackUnread: store.listFeedback().filter((t) => t.unread).length,
@@ -700,6 +704,8 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       const r = await currentRelease({ releasesDir, uploadDir: macAppDir, source: c.macApp.source });
       return [200, { from: r.from, release: r.release && { version: r.release.version, date: r.release.date ?? null, size: r.release.size, file: r.release.file } }];
     }
+    // Encryption at rest (data-key.ts): whether the data is encrypted, where the key comes from, unencrypted copies left.
+    if (method === 'GET' && p === '/admin/encryption') return [200, encryption ? encryption() : { encrypted: false, keySource: null, plainCopies: [] }];
     // Backups (backups.ts): the nightly schedule, the password (only its public key is kept), and making one now.
     if (p === '/admin/backups' || p.startsWith('/admin/backups/')) {
       if (!backups) throw new HttpError(404, 'not_found', 'Backups aren’t available on this server');

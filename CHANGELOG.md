@@ -3,6 +3,16 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **The server's data is encrypted at rest:** times, entries, workdays, projects and people's details, with SQLCipher
+  (AES-256) and a data key kept outside the database (`GNOMON_DATA_KEY` in `.env`, or a file such as a Docker secret).
+  A copied database file, disk image or backup can't be read. The install makes the key and shows it once: keep it in
+  your password manager, because without it the data can't be read. Existing servers are encrypted on the first start
+  after `gnomon-admin update`, with a backup first. A wrong or missing key stops the server with the reason, never
+  with an empty database. New: `gnomon-admin rotate-data-key`, and `gnomon-admin status` says whether the data is
+  encrypted.
+
 ## 0.1.20 · 2026-10-25
 
 - **The ready-made server image is published** with this release (`ghcr.io/dennha/gnomon-server`), so the one-command

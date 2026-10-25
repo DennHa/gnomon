@@ -6,11 +6,12 @@
 // after seq N" is how a client (the Mac app) syncs, without trusting clocks. Deletions leave a tombstone row.
 // Every device belongs to a person, and every read and write goes through that person: nobody sees anyone else's
 // records. A server set up before people existed gets one person, the owner, who keeps all its data.
-import Database from 'better-sqlite3';
+import Database from 'better-sqlite3-multiple-ciphers';
 import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Activity, Data, Entry, Project, Settings, Workday } from '../../src/types';
+import { applyKey, DataKeyError, isEncryptedFile } from './data-key';
 
 /**
  * Where the database lives in a data folder. Servers set up before the rename to Gnomon used punch.db; it is
@@ -79,10 +80,29 @@ export class Store {
   private slots = new Map<string, Slot>();
   /** The person a server had before there were people, and who a single-person server's devices belong to. */
   readonly ownerId: string;
+  /** Whether the database is encrypted at rest (data-key.ts). */
+  readonly encrypted: boolean;
 
-  constructor(file: string) {
+  /**
+   * `key`: the data key (data-key.ts). An encrypted database never opens without it, and a wrong one is an error, never
+   * an empty start. An unencrypted database with a key is encrypted first (openStore in data-key.ts does that).
+   */
+  constructor(file: string, key?: Buffer) {
     if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    const state = file === ':memory:' ? undefined : isEncryptedFile(file);
+    if (state && !key) throw new DataKeyError('missing_key', 'The database is encrypted, but GNOMON_DATA_KEY isn’t set. Set it to the data key from the install (in .env or your password manager).');
+    if (state === false && key) throw new DataKeyError('not_encrypted', 'The database isn’t encrypted yet; it has to be encrypted before it opens with GNOMON_DATA_KEY.');
     this.db = new Database(file);
+    this.encrypted = Boolean(key);
+    if (key) {
+      try {
+        applyKey(this.db, key);
+      } catch (e) {
+        this.db.close();
+        throw e;
+      }
+      this.db.pragma('temp_store = MEMORY'); // temporary tables and sorts never touch the disk unencrypted
+    }
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.db.exec(`
@@ -217,9 +237,15 @@ export class Store {
     this.db.close();
   }
 
-  /** A consistent copy of the database while the server keeps running. */
-  backup(file: string): Promise<unknown> {
-    return this.db.backup(file);
+  /** The whole database, decrypted, as one consistent SQLite image (for backups, which encrypt it themselves). */
+  snapshot(): Buffer {
+    return this.db.serialize();
+  }
+
+  /** A consistent copy of the database file while the server keeps running, encrypted with the same key when it is. */
+  copyTo(file: string) {
+    fs.rmSync(file, { force: true });
+    this.db.prepare('VACUUM INTO ?').run(file);
   }
 
   // ---- Data -------------------------------------------------------------------------------

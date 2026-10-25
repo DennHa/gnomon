@@ -6,6 +6,8 @@ import { newBackupPassword } from './backup-crypto';
 import { Backups, MIN_PASSWORD, restoreBackup } from './backups';
 import { Company, defaultConfig, loadSecretKey } from './company';
 import { printPairing, terminalQr } from './qr-terminal';
+import { isEncryptedFile, loadDataKey, newDataKey, rawKey, rekeyFile } from './data-key';
+import { encryptionStatus, openStore } from './open-store';
 import { databaseFile, Store } from './store';
 import { VERSION } from './version';
 
@@ -19,10 +21,12 @@ const usage = `Gnomon ${VERSION}. Usage: gnomon-admin <command>
   setup-link              One-time link to the setup page (valid 60 minutes), with a QR code
   admin-link              One-time link to the Admin page, valid 60 minutes
   backup                  Make an encrypted backup now (in the data folder's backups/)
-  backup --plain <file>   Unencrypted copy of the database to a file (safe while the server runs)
+  backup --copy <file>    Copy of the database file, encrypted with the data key like the original (safe while the server runs)
+  backup --plain <file>   Unencrypted copy of the database to a file (safe while the server runs; delete it after use)
   backups                 List the backups
   backup-password         Set the backup password (asks for it; --new makes and shows one; --stdin reads it)
   restore <file>          Replace the database with a backup (only while the server is stopped)
+  rotate-data-key         Re-encrypt the data with a new key (only while the server is stopped; --new makes one, else stdin)
   pair <device name>      One-time code (valid 10 minutes) to sign in a phone or browser
   add-key <device name>   Create a device key directly (for scripts and the Mac app); shown once
   devices                 List devices
@@ -65,20 +69,37 @@ const when = (iso?: string) => (iso ? new Date(iso).toLocaleString('sv-SE').slic
 async function main() {
   const dbFile = databaseFile(dataDir);
 
+  const serverRunning = () => fetch(`http://127.0.0.1:${process.env.PORT ?? 8080}/healthz`, { signal: AbortSignal.timeout(1000) }).then(() => true, () => false);
+
   // Restoring replaces the database file, so it never opens the store.
   if (cmd === 'restore') {
     const file = rest()[0];
     if (!file) throw new Error('Usage: gnomon-admin restore <backup file>');
-    const running = await fetch(`http://127.0.0.1:${process.env.PORT ?? 8080}/healthz`, { signal: AbortSignal.timeout(1000) }).then(() => true, () => false);
-    if (running) throw new Error('The server is running. Stop it first (in a Docker install, the host’s `gnomon-admin restore` does that for you).');
+    if (await serverRunning()) throw new Error('The server is running. Stop it first (in a Docker install, the host’s `gnomon-admin restore` does that for you).');
     const password = await secretLine('Backup password: ');
-    const r = restoreBackup(dbFile, fs.readFileSync(path.resolve(file)), password);
-    console.log(`Restored the backup from ${when(r.created)}.`);
-    if (r.kept) console.log(`The database from before is kept as ${r.kept} (unencrypted; delete it once all is well).`);
+    const r = restoreBackup(dbFile, fs.readFileSync(path.resolve(file)), password, loadDataKey()?.raw);
+    console.log(`Restored the backup from ${when(r.created)}${isEncryptedFile(dbFile) ? ', encrypted with the data key' : ''}.`);
+    if (r.kept) console.log(`The database from before is kept as ${r.kept} (${isEncryptedFile(r.kept) ? 'encrypted' : 'unencrypted'}; delete it once all is well).`);
     return;
   }
 
-  const store = new Store(dbFile);
+  // A new data key: the whole database is re-encrypted in place. The old key no longer opens it; backups don't need it.
+  if (cmd === 'rotate-data-key') {
+    if (await serverRunning()) throw new Error('The server is running. Stop it first (in a Docker install, the host’s `gnomon-admin rotate-data-key` does that for you).');
+    const current = loadDataKey();
+    if (!isEncryptedFile(dbFile)) throw new Error('The data isn’t encrypted yet. Set GNOMON_DATA_KEY and start the server: it encrypts the data on the first start.');
+    if (!current) throw new Error('GNOMON_DATA_KEY (the current key) isn’t set.');
+    new Store(dbFile, current.raw).close(); // the current key must open it
+    const value = flag('--new') ? newDataKey() : (await secretLine('New data key: ')).trim();
+    const next = rawKey(value);
+    rekeyFile(dbFile, current.raw, next);
+    new Store(dbFile, next).close();
+    if (flag('--new')) console.log(`New data key (shown only now):\n\n    ${value}\n`);
+    console.log('Re-encrypted with the new key. Put it in GNOMON_DATA_KEY (.env) and your password manager before starting the server: the old key no longer opens the data.');
+    return;
+  }
+
+  const { store, key: dataKey } = openStore(dataDir);
   const backups = new Backups(store, dataDir);
   try {
     const company = () => {
@@ -102,6 +123,9 @@ async function main() {
       console.log(`People:    ${people.filter((x) => x.status === 'active').length} active, ${people.filter((x) => x.status === 'invited').length} invited`);
       console.log(`Devices:   ${devices.length}`);
       console.log(`Secret key: ${process.env.GNOMON_SECRET_KEY ? 'from GNOMON_SECRET_KEY' : 'key file in the data folder'}`);
+      const enc = encryptionStatus(store, dataDir, dbFile, dataKey);
+      console.log(`Data:      ${enc.encrypted ? `encrypted at rest (key from ${enc.keySource === 'file' ? 'GNOMON_DATA_KEY_FILE' : 'GNOMON_DATA_KEY'})` : 'NOT encrypted at rest: set GNOMON_DATA_KEY (docs/admin-guide.md#encryption-at-rest)'}`);
+      if (enc.plainCopies.length) console.log(`           unencrypted copies to delete: ${enc.plainCopies.join(', ')}`);
       console.log(`Backups:   ${!b.keySet ? 'no backup password set (gnomon-admin backup-password)' : b.enabled ? `every night at ${String(b.hour).padStart(2, '0')}:00, keeping ${b.keep}` : 'nightly backups are off'}`);
       console.log(`           ${b.files.length} on the server${b.files[0] ? `, newest ${b.files[0].name} (${kb(b.files[0].size)})` : ''}`);
       if (b.last && !b.last.ok) console.log(`           last attempt ${when(b.last.at)} failed: ${b.last.error}`);
@@ -122,13 +146,15 @@ async function main() {
       const list = store.listDevices();
       if (!list.length) console.log('No devices.');
       for (const d of list) console.log(`${d.id.slice(0, 8)}  ${d.name.padEnd(24)}  created ${d.createdAt.slice(0, 10)}  last seen ${d.lastSeenAt?.slice(0, 16).replace('T', ' ') ?? 'never'}${d.revokedAt ? '  REVOKED' : ''}`);
-    } else if (cmd === 'backup' && flag('--plain')) {
+    } else if (cmd === 'backup' && (flag('--plain') || flag('--copy'))) {
       const file = rest()[0];
-      if (!file) throw new Error('Usage: gnomon-admin backup --plain <file>');
+      if (!file) throw new Error(`Usage: gnomon-admin backup ${flag('--copy') ? '--copy' : '--plain'} <file>`);
       fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true, mode: 0o700 });
-      await store.backup(path.resolve(file));
+      if (flag('--copy')) store.copyTo(path.resolve(file));
+      else fs.writeFileSync(path.resolve(file), store.snapshot());
       fs.chmodSync(path.resolve(file), 0o600); // it holds everyone's times and the password hashes
-      console.log(`Backed up (unencrypted) to ${path.resolve(file)}`);
+      const encrypted = flag('--copy') && store.encrypted;
+      console.log(`Backed up (${encrypted ? 'encrypted with the data key' : 'unencrypted'}) to ${path.resolve(file)}`);
     } else if (cmd === 'backup') {
       const label = args.find((a) => a.startsWith('--label='))?.slice(8) ?? 'manual';
       const f = await backups.run(label);

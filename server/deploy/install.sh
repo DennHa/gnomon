@@ -5,7 +5,7 @@
 #   sudo sh install.sh
 #
 # It asks a few questions (or takes them as options, for scripted installs), then writes a folder (default /opt/gnomon)
-# with compose.yml and .env (with a newly generated secret key), puts gnomon-admin on this machine, starts the server,
+# with compose.yml and .env (with a newly generated secret key and data key), puts gnomon-admin on this machine, starts the server,
 # sets a backup password and shows it once, and prints the one-time link to the setup page.
 #
 # Options:
@@ -162,6 +162,7 @@ cd "$DIR"
 
 random() { head -c "$1" /dev/urandom | base64 | tr -d '\n/+=' | head -c "$2"; }
 SECRET_KEY="$(random 48 48)"
+DATA_KEY="$(random 64 48)"
 case "$MODE" in tunnel) TRUST=cloudflare ;; caddy|caddy-own|proxy) TRUST=proxy ;; *) TRUST=none ;; esac
 
 if [ "$BUILD" -eq 1 ]; then
@@ -180,10 +181,13 @@ fi
 cat >.env <<EOF
 # Gnomon server settings. Keep this file safe: GNOMON_SECRET_KEY encrypts the integration tokens and the email password
 # stored on the server. If it's lost, they have to be entered again (nothing else is lost). See docs/admin-guide.md.
+# GNOMON_DATA_KEY encrypts all data (times, people, projects) on disk. If it's lost, THE DATA IS LOST: only a backup
+# and its backup password bring it back. Keep a copy in your password manager.
 GNOMON_IMAGE=$IMAGE
 GNOMON_PUBLIC_URL=${PUBLIC_URL}
 GNOMON_TZ=$TZONE
 GNOMON_SECRET_KEY=$SECRET_KEY
+GNOMON_DATA_KEY=$DATA_KEY
 GNOMON_HTTPS=$MODE
 GNOMON_TRUST_PROXY=$TRUST
 GNOMON_DOMAIN=$DOMAIN
@@ -215,6 +219,7 @@ EOF
       TZ: ${GNOMON_TZ}
       GNOMON_PUBLIC_URL: ${GNOMON_PUBLIC_URL}
       GNOMON_SECRET_KEY: ${GNOMON_SECRET_KEY}
+      GNOMON_DATA_KEY: ${GNOMON_DATA_KEY}
       GNOMON_HTTPS: ${GNOMON_HTTPS}
       GNOMON_TRUST_PROXY: ${GNOMON_TRUST_PROXY}
       # Optional: a folder with the Mac app instead of GitHub or an upload (see docs/admin-guide.md).
@@ -331,7 +336,7 @@ EOF
 esac
 [ -f Caddyfile ] && chmod 644 Caddyfile
 docker compose config --quiet || die "The generated compose.yml isn't valid (see above)"
-ok "Wrote $DIR: compose.yml, .env (secret key generated)$( [ -f Caddyfile ] && printf ', Caddyfile')"
+ok "Wrote $DIR: compose.yml, .env (secret key and data key generated)$( [ -f Caddyfile ] && printf ', Caddyfile')"
 
 # ---- 4. gnomon-admin on this machine ---------------------------------------------------------------
 
@@ -357,6 +362,7 @@ fi
 
 if [ "$START" -eq 0 ]; then
   say "Not started (--no-start). Start it with: cd $DIR && docker compose up -d, then $ADMIN backup-password --new and $ADMIN setup-link"
+  say "The data key (GNOMON_DATA_KEY in $DIR/.env) encrypts all data: put it in your password manager, or the data is lost with it."
   exit 0
 fi
 if [ "$BUILD" -eq 1 ]; then
@@ -396,8 +402,15 @@ if [ "$MODE" = caddy ] || [ "$MODE" = caddy-own ] || [ "$MODE" = tunnel ]; then
   [ $i -le 12 ] && ok "HTTPS works: $PUBLIC_URL"
 fi
 
-# ---- 6. Backup password and the setup link --------------------------------------------------------
+# ---- 6. Data key, backup password and the setup link ----------------------------------------------
 
+say ""
+say "Data key (encrypts all data on disk; it's in $DIR/.env):"
+say ""
+say "    $DATA_KEY"
+say ""
+say "Put it in your password manager now. If it's lost, the data can't be read any more: only a backup and"
+say "its backup password bring it back. Nobody can recover it, not even the Gnomon project."
 say ""
 docker compose exec -T gnomon gnomon-admin backup-password --new | sed -n '1,4p'
 say "Nightly encrypted backups are on (the last 14 are kept in the data volume). A backup can only be"

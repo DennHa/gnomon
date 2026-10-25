@@ -14,6 +14,9 @@ services:
       TZ: ${GNOMON_TZ:-Europe/Berlin}
       # The public address, so the server log and gnomon-admin can show pairing QR codes.
       GNOMON_PUBLIC_URL: ${GNOMON_PUBLIC_URL:-}
+      # Encrypts all data on disk (docs/admin-guide.md#encryption-at-rest). Put it in .env next to this file and in
+      # your password manager: without it the data can't be read. Unset, the data stays unencrypted.
+      GNOMON_DATA_KEY: ${GNOMON_DATA_KEY:-}
       # Optional download page for the Mac app (/latest); see README "Download page". Uncomment with the volume below.
       # GNOMON_RELEASES_DIR: /releases
     volumes:

@@ -188,6 +188,8 @@ offline shell (plain `http://localhost` is fine for testing).
 | `GNOMON_DATA_DIR` | `./data` (`/data` in Docker) | Where `gnomon.db` lives |
 | `TZ` | system | Set by `GNOMON_TZ` in compose |
 | `GNOMON_SECRET_KEY` | key file in the data folder | Encrypts integration tokens and the email password |
+| `GNOMON_DATA_KEY` | none: data unencrypted | Encrypts the whole database at rest (SQLCipher); at least 32 characters. Without it the data can't be read ([admin guide](../docs/admin-guide.md#encryption-at-rest)) |
+| `GNOMON_DATA_KEY_FILE` | | The data key from a file instead (a Docker secret) |
 | `GNOMON_PUBLIC_URL` | | The public address, for links in the log and gnomon-admin |
 | `GNOMON_HTTPS` | | How the install did HTTPS (`caddy`, `caddy-own`, `proxy`, `tunnel`, `local`), shown on the setup page |
 | `GNOMON_TRUST_PROXY` | either header | Which header has the client's address for rate limits: `cloudflare` (CF-Connecting-IP), `proxy` (last X-Forwarded-For), `none` |

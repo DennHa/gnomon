@@ -19,6 +19,37 @@ env_get() { sed -n "s/^$1=//p" .env | tail -1; }
 env_set() { # env_set NAME value: replace or add a line in .env
   if grep -q "^$1=" .env; then sed -i.bak "s|^$1=.*|$1=$2|" .env && rm -f .env.bak; else printf '%s=%s\n' "$1" "$2" >>.env; fi
 }
+new_key() { head -c 64 /dev/urandom | base64 | tr -d '\n/+=' | head -c 48; }
+show_data_key() {
+  say ""
+  say "Data key (encrypts all data on disk; it's in $GNOMON_DIR/.env as GNOMON_DATA_KEY):"
+  say ""
+  say "    $1"
+  say ""
+  say "Put it in your password manager now. If it's lost, the data can't be read any more: only a backup and"
+  say "its backup password bring it back."
+  say ""
+}
+# Servers installed before encryption at rest have no data key: make one, and pass it to the container.
+ensure_data_key() {
+  [ -n "$(env_get GNOMON_DATA_KEY)" ] && grep -q 'GNOMON_DATA_KEY' compose.yml && return 0
+  if ! grep -q 'GNOMON_DATA_KEY' compose.yml; then
+    grep -q 'GNOMON_SECRET_KEY: \${GNOMON_SECRET_KEY}' compose.yml || {
+      say "  (compose.yml was changed by hand, so the data key isn't added: see docs/admin-guide.md#encryption-at-rest)"
+      return 0
+    }
+    awk '{ print } /GNOMON_SECRET_KEY: \$\{GNOMON_SECRET_KEY\}/ { sub(/GNOMON_SECRET_KEY.*/, ""); print $0 "GNOMON_DATA_KEY: ${GNOMON_DATA_KEY}" }' compose.yml >compose.yml.new
+    mv compose.yml.new compose.yml
+    chmod 644 compose.yml
+  fi
+  key="$(env_get GNOMON_DATA_KEY)"
+  if [ -z "$key" ]; then
+    key="$(new_key)"
+    env_set GNOMON_DATA_KEY "$key"
+    say "Encryption at rest: a new data key is in .env; the server encrypts its data on this start."
+    show_data_key "$key"
+  fi
+}
 running() { [ -n "$(dc ps -q gnomon 2>/dev/null)" ] && [ "$(docker inspect -f '{{.State.Running}}' gnomon 2>/dev/null)" = true ]; }
 wait_healthy() {
   i=0
@@ -37,6 +68,7 @@ On this machine:
   update [VERSION]       Back up, get the new version (default: the newest), restart, check
   backup [--out FILE]    Make an encrypted backup now; --out also copies it to FILE on this machine
   restore FILE|NAME      Stop the server, replace its data with a backup (asks for the backup password), start
+  rotate-data-key        Back up, stop the server, re-encrypt the data with a new key (into .env), start
   logs                   Follow the server's log
   restart                Restart the containers (after changing .env or the certificate)
 In the server (passed on):
@@ -68,11 +100,14 @@ case "$cmd" in
     running || die "The server isn't running; start it first (gnomon-admin restart)"
     say "Backing up first…"
     if ! inner backup --label=pre-update; then
-      # Without a backup password: a plain copy in the data volume, so the update never runs without one.
+      # Without a backup password: a copy in the data volume (encrypted like the database; older servers
+      # only make plain ones), so the update never runs without one.
       stamp="$(date +%Y%m%d-%H%M%S)"
-      inner backup --plain "/data/backups/gnomon-$stamp-pre-update.db" || die "The backup failed, so nothing was updated"
-      say "  (no backup password set: an unencrypted copy is in the data volume; set one with gnomon-admin backup-password)"
+      copy="/data/backups/gnomon-$stamp-pre-update.db"
+      inner backup --copy "$copy" 2>/dev/null || inner backup --plain "$copy" || die "The backup failed, so nothing was updated"
+      say "  (no backup password set: a copy is in the data volume; set one with gnomon-admin backup-password)"
     fi
+    ensure_data_key
     before="$(dc images -q gnomon 2>/dev/null | head -1)"
     if [ -d source ]; then
       # Built from the code (install.sh --build): get that version's code and build it.
@@ -143,6 +178,31 @@ case "$cmd" in
       [ -n "$tmpdir" ] && rm -rf "$tmpdir"
       dc up -d
       die "Restoring didn't work (see above); the server runs on with its data as before."
+    fi
+    ;;
+
+  rotate-data-key)
+    [ -n "$(env_get GNOMON_DATA_KEY)" ] || die "There's no data key yet; gnomon-admin update adds one"
+    running || die "The server isn't running; start it first (gnomon-admin restart)"
+    say "This makes a new data key, re-encrypts all data with it and puts it in .env. The old key stops working."
+    if [ -t 0 ]; then
+      printf 'Type "rotate" to go on: '
+      read -r answer
+      [ "$answer" = rotate ] || die "Nothing changed"
+    fi
+    inner backup --label=pre-rekey || say "  (no backup made: set a backup password with gnomon-admin backup-password)"
+    key="$(new_key)"
+    dc stop gnomon
+    if printf '%s\n' "$key" | dc run --rm --no-deps -T gnomon gnomon-admin rotate-data-key; then
+      show_data_key "$key" # first, so it's never lost
+      env_set GNOMON_DATA_KEY "$key"
+      dc up -d
+      wait_healthy
+      say "Re-encrypted with the new key, and the server is running again."
+    else
+      dc up -d
+      say "If the output above says it re-encrypted after all, the new key is: $key"
+      die "Rotating the key didn't work (see above); the server runs on with the old key."
     fi
     ;;
 
