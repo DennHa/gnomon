@@ -516,10 +516,13 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     } catch {
       disk = null;
     }
-    const attention: { code: string; n?: number; at?: string; error?: string; version?: string }[] = [];
+    const attention: { code: string; n?: number; at?: string; error?: string; version?: string; files?: string[] }[] = [];
+    const enc = encryption ? encryption() : null;
     if (counts.pending) attention.push({ code: 'pending', n: counts.pending });
     if (expired) attention.push({ code: 'invitesExpired', n: expired });
     if (!canEmail()) attention.push({ code: transport() ? 'addressMissing' : 'emailMissing' });
+    if (enc && !enc.encrypted) attention.push({ code: 'notEncrypted' });
+    if (enc?.plainCopies.length) attention.push({ code: 'plainCopies', n: enc.plainCopies.length, files: enc.plainCopies });
     if (b && !b.keySet) attention.push({ code: 'backupNoPassword' });
     else if (b?.last && !b.last.ok) attention.push({ code: 'backupFailed', at: b.last.at, error: b.last.error });
     else if (b && !b.enabled) attention.push({ code: 'backupsOff' });
@@ -540,8 +543,8 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
         email: { ready: canEmail(), provider: c.email?.provider ?? null, tested: c.email?.tested ?? null },
         backups: b ? { enabled: b.enabled, hour: b.hour, keySet: b.keySet, last: b.last ?? null, newest: lastOk, count: b.files.length } : null,
         disk,
-        // Encryption of the database at rest isn't there yet: null until the server can say whether it's on.
-        encryption: null,
+        // Whether the database is encrypted at rest (open-store.ts); null when this server wasn't told.
+        encryption: enc,
         startedAt: new Date(now - process.uptime() * 1000).toISOString(),
       },
     };

@@ -250,3 +250,5 @@ a.soft.a-button { background: var(--surface); color: var(--text); font-weight: 6
 }
 .a-pdetail .soft, .a-card .soft { background: var(--surface); }
 .a-cleanup-row { align-items: center; gap: 12px; padding-top: 4px; }
+.a-files { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+.a-files code { padding: 1px 6px; border-radius: 6px; background: var(--surface); font-size: 12px; overflow-wrap: anywhere; }

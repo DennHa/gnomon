@@ -6,6 +6,9 @@ Gnomon server shows the newest entry.
 ## Unreleased
 
 - **Copy as text is clearer**: one *Copy as text* button with a ▾ for options (hours per line, with a preview of the exact text), under the timesheet for the week and in the day's header; *Copy last week* is now *Fill from last week*, so the two no longer look alike.
+- **The Admin page shows whether the data is encrypted at rest:** the server's health says so, with where the key
+  comes from, and *Needs attention* warns when it isn't, or when unencrypted copies of the database are still in the
+  data folder (with their names, to delete once all is well).
 
 ## 0.1.21 · 2026-10-25
 
