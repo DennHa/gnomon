@@ -37,6 +37,8 @@ import i_wb_sunny from '@material-symbols/svg-400/rounded/wb_sunny.svg?raw';
 import i_schedule from '@material-symbols/svg-400/rounded/schedule.svg?raw';
 import i_open_in_full from '@material-symbols/svg-400/rounded/open_in_full.svg?raw';
 import i_content_copy from '@material-symbols/svg-400/rounded/content_copy.svg?raw';
+import i_notes from '@material-symbols/svg-400/rounded/notes.svg?raw';
+import i_arrow_drop_down from '@material-symbols/svg-400/rounded/arrow_drop_down.svg?raw';
 import i_history from '@material-symbols/svg-400/rounded/history.svg?raw';
 import i_feedback from '@material-symbols/svg-400/rounded/feedback.svg?raw';
 import i_mail from '@material-symbols/svg-400/rounded/mail.svg?raw';
@@ -99,6 +101,8 @@ const ICONS = {
   schedule: i_schedule,
   open_in_full: i_open_in_full,
   content_copy: i_content_copy,
+  notes: i_notes,
+  arrow_drop_down: i_arrow_drop_down,
   history: i_history,
   feedback: i_feedback,
   mail: i_mail,

@@ -3,6 +3,7 @@
 // does nothing; connecting Float, Personio or a server answers that this is a demo. Nothing leaves the browser.
 import './clock';
 import { readDemo, writeDemo } from './storage';
+import { browserCopy } from '../platform';
 import { version } from '../../package.json';
 
 const DEMO_ERROR = 'This is the web demo with made-up data. Connections work in the Mac app.';
@@ -13,7 +14,7 @@ window.api = {
   profile: async () => null,
   setTheme: () => {},
   notify: () => {},
-  copyText: (text) => navigator.clipboard.writeText(text),
+  copyText: browserCopy,
   appInfo: async () => ({ version, electron: '–', chrome: navigator.userAgent.match(/Chrome\/([\d.]+)/)?.[1] ?? '–', node: '–', updateSource: null, roadmap: null }),
   checkUpdate: async () => ({ ok: true, newer: false, latest: { version, notes: [] } }),
   openLink: (url) => void window.open(url, '_blank', 'noopener'),

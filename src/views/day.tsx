@@ -1,5 +1,6 @@
 // Day-level pieces shared by the Today page and the Timesheet's day modal.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import {
   addBreak,
@@ -36,34 +37,123 @@ export async function copyDays(data: Data, days: string[]): Promise<CopyText> {
   return r;
 }
 
-/** "Copy day" / "Copy week", with a small switch for the hours per line; says what it copied for a moment. */
-export function CopyButton({ days, week }: { days: string[]; week?: boolean }) {
+/**
+ * "Copy as text": a click copies right away; the arrow opens the options (hours per line) with a preview of the exact
+ * text and its own Copy button. Says what it copied for a moment.
+ */
+export function CopyAsText({ days }: { days: string[] }) {
   const { data, update } = useStore();
   const [done, setDone] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number; maxHeight: number } | null>(null);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const now = useNow(30_000);
   useEffect(() => {
     if (!done) return;
     const timer = setTimeout(() => setDone(null), 2500);
     return () => clearTimeout(timer);
   }, [done]);
   const hours = copyHoursOn(data);
+  const multi = days.length > 1;
   const copy = () =>
     copyDays(data, days).then(
       (r) => setDone(r.lines ? t('copy.done', { n: r.lines }) : t('copy.nothing')),
-      () => setDone(t('copy.nothing')),
+      () => setDone(t('copy.failed')),
     );
+  const close = (refocus = true) => {
+    setOpen(false);
+    if (refocus) moreRef.current?.focus();
+  };
+
+  // Fixed and in <body>, so the week card's scroll area and the day panel don't clip it: below the button, or above
+  // when there's more room there; right-aligned with the button.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = wrapRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const below = window.innerHeight - r.bottom - 16;
+      const above = r.top - 16;
+      const right = Math.max(16, window.innerWidth - r.right);
+      setPos(below >= 260 || below >= above ? { top: r.bottom + 6, right, maxHeight: below - 6 } : { bottom: window.innerHeight - r.top + 6, right, maxHeight: above - 6 });
+    };
+    place();
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!wrapRef.current?.contains(target) && !popRef.current?.contains(target)) close(false);
+    };
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [open]);
+  useEffect(() => {
+    if (open && pos) popRef.current?.querySelector<HTMLElement>('input')?.focus();
+  }, [open, Boolean(pos)]);
+
+  const preview = open ? daysText(data, days, { hours, now }) : null;
   return (
-    <span className="copy-day">
-      <button className="btn ghost small" onClick={copy} title={t(week ? 'copy.weekHint' : 'copy.dayHint')} aria-live="polite">
-        <Icon name={done ? 'check' : 'content_copy'} size={16} /> {done ?? t(week ? 'copy.week' : 'copy.day')}
+    <span
+      className="copy-text"
+      ref={wrapRef}
+      onKeyDown={(e) => {
+        // Escape closes the options first, not the day panel around them.
+        if (open && e.key === 'Escape') (e.stopPropagation(), close());
+      }}
+    >
+      <button className="btn ghost small copy-main" onClick={copy} title={t(multi ? 'copy.weekHint' : 'copy.dayHint')} aria-live="polite">
+        <Icon name={done ? 'check' : 'notes'} size={16} /> {done ?? t('copy.asText')}
       </button>
       <button
-        className={`icon-btn ${hours ? 'live' : ''}`}
-        title={t('copy.withHoursHint')}
-        aria-pressed={hours}
-        onClick={() => update((d) => ({ ...d, settings: { ...d.settings, copyHours: !hours } }))}
+        ref={moreRef}
+        className={`btn ghost small copy-more ${open ? 'open' : ''}`}
+        title={t('copy.options')}
+        aria-label={t('copy.options')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => (open ? close() : (setPos(null), setOpen(true)))}
       >
-        <Icon name="schedule" size={16} />
+        <Icon name="arrow_drop_down" size={18} />
       </button>
+      {open &&
+        pos &&
+        preview &&
+        createPortal(
+          <div
+            ref={popRef}
+            className="copy-pop"
+            role="dialog"
+            aria-label={t('copy.options')}
+            style={{ top: pos.top, bottom: pos.bottom, right: pos.right, maxHeight: Math.max(160, pos.maxHeight) }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') (e.stopPropagation(), close());
+            }}
+          >
+            <label className="check-row">
+              <input type="checkbox" checked={hours} onChange={(e) => update((d) => ({ ...d, settings: { ...d.settings, copyHours: e.target.checked } }))} />
+              {t('copy.withHours')}
+            </label>
+            {preview.lines ? (
+              <pre className="copy-preview" tabIndex={0} aria-label={t('copy.preview')}>
+                {preview.text.trimEnd()}
+              </pre>
+            ) : (
+              <p className="muted small">{t('copy.nothing')}</p>
+            )}
+            <div className="copy-pop-actions">
+              <button className="btn primary small" disabled={!preview.lines} onClick={() => (copy(), close())}>
+                <Icon name="notes" size={16} /> {t('copy.copy')}
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </span>
   );
 }

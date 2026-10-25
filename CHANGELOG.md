@@ -3,6 +3,10 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Copy as text is clearer**: one *Copy as text* button with a ▾ for options (hours per line, with a preview of the exact text), under the timesheet for the week and in the day's header; *Copy last week* is now *Fill from last week*, so the two no longer look alike.
+
 ## 0.1.21 · 2026-10-25
 
 - **A new README and About page** that describe Gnomon as it is now: for your Mac, phone and browser on your own, and
