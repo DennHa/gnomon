@@ -158,8 +158,9 @@ to the Admin page (60 minutes), where you set a new one under *Admin password* (
 
 `https://gnomon.example.com/admin`, for admins only. It opens on the **Overview**: how many people are active,
 invited, waiting for approval or disabled; a *Needs attention* list (people waiting for approval, expired
-invitations, email not set up, no backup password or a failed backup, a full disk, a new Gnomon version), each with a
-button that goes where it's fixed; and the server's health at a glance. The menu on the left is grouped:
+invitations, email not set up, data not encrypted at rest or unencrypted copies left behind, no backup password or
+a failed backup, a full disk, a new Gnomon version), each with a button that goes where it's fixed; and the server's
+health at a glance. The menu on the left is grouped:
 
 | Group | Pages |
 |---|---|

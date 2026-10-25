@@ -10,6 +10,7 @@ import { after, before, describe, test } from 'node:test';
 import { createApp } from '../src/app';
 import { Backups } from '../src/backups';
 import { Company } from '../src/company';
+import type { Encryption } from '../src/open-store';
 import { forgetGithubRelease } from '../src/releases';
 import { Store } from '../src/store';
 import { VERSION } from '../src/version';
@@ -36,11 +37,11 @@ before(async () => {
 });
 after(() => gh.close());
 
-async function server() {
+async function server(encryption?: () => Encryption) {
   const dir = fs.mkdtempSync(path.join(tmp, 'server-'));
   const store = new Store(path.join(dir, 'gnomon.db'));
   const company = new Company(store, Buffer.alloc(32, 7), 'env');
-  const s = await listen(createApp({ store, company, backups: new Backups(store, dir) }));
+  const s = await listen(createApp({ store, company, backups: new Backups(store, dir), encryption }));
   const go = async (method: string, p: string, body?: unknown, auth?: string) => {
     const r = await fetch(`${s.url}/api/v1${p}`, {
       method,
@@ -98,6 +99,35 @@ describe('the admin overview', () => {
       assert.ok(!o.attention.some((a: { code: string }) => a.code.startsWith('backup')));
       assert.equal(o.health.backups.count, 1);
       assert.ok(o.health.backups.newest);
+    } finally {
+      await x.close();
+    }
+  });
+
+  test('encryption at rest: on is fine; off, or unencrypted copies left behind, need attention', async () => {
+    let status: Encryption = { encrypted: true, keySource: 'env', plainCopies: [] };
+    const x = await server(() => status);
+    try {
+      let o = (await x.go('GET', '/admin/overview', undefined, x.token)).body;
+      assert.deepEqual(o.health.encryption, { encrypted: true, keySource: 'env', plainCopies: [] });
+      assert.ok(!o.attention.some((a: { code: string }) => a.code === 'notEncrypted' || a.code === 'plainCopies'));
+      status = { encrypted: false, keySource: null, plainCopies: ['gnomon.db.before-encryption-20261025-120000', 'backups/gnomon-20261025-pre-update.db'] };
+      o = (await x.go('GET', '/admin/overview', undefined, x.token)).body;
+      assert.equal(o.health.encryption.encrypted, false);
+      const copies = o.attention.find((a: { code: string }) => a.code === 'plainCopies');
+      assert.ok(o.attention.some((a: { code: string }) => a.code === 'notEncrypted'));
+      assert.deepEqual([copies.n, copies.files], [2, status.plainCopies]);
+    } finally {
+      await x.close();
+    }
+  });
+
+  test('without encryption status (a server not told), health says null and asks for nothing', async () => {
+    const x = await server();
+    try {
+      const o = (await x.go('GET', '/admin/overview', undefined, x.token)).body;
+      assert.equal(o.health.encryption, null);
+      assert.ok(!o.attention.some((a: { code: string }) => a.code === 'notEncrypted'));
     } finally {
       await x.close();
     }

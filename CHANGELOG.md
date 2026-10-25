@@ -3,6 +3,12 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **The Admin page shows whether the data is encrypted at rest:** the server's health says so, with where the key
+  comes from, and *Needs attention* warns when it isn't, or when unencrypted copies of the database are still in the
+  data folder (with their names, to delete once all is well).
+
 ## 0.1.21 · 2026-10-25
 
 - **A new README and About page** that describe Gnomon as it is now: for your Mac, phone and browser on your own, and

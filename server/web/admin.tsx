@@ -456,10 +456,16 @@ const EN = {
   hTested: 'tested {when}',
   hUntested: 'not tested yet',
   hEmailOff: 'Not set up',
-  hEncryption: 'Database encryption',
-  hEncOn: 'On',
-  hEncOff: 'Off',
-  hEncSoon: 'Comes in a later version',
+  hEncryption: 'Data at rest',
+  hEncOn: 'Encrypted, key from {key}',
+  hEncOff: 'Not encrypted',
+  hEncCopies: '{n} unencrypted copies left',
+  atNotEncrypted: 'The data isn’t encrypted at rest: set GNOMON_DATA_KEY so a copied database or disk can’t be read',
+  atPlainCopies: '{n} unencrypted copies of the database are left in the data folder. Check that all is well, then delete them on the server:',
+  atPlainCopy: 'An unencrypted copy of the database is left in the data folder. Check that all is well, then delete it on the server:',
+  hEncCopy: '1 unencrypted copy left',
+  atHowTo: 'How to',
+  atMore: 'and {n} more',
   keyFileShort: 'Key file in the data folder',
   hUpdateTitle: 'Gnomon {v} is available',
   hUpdateHow: 'On the server, this makes a backup first, then downloads and starts the new version. People keep working; their apps reconnect by themselves.',
@@ -908,10 +914,16 @@ const DE: Record<Key, string> = {
   hTested: 'getestet {when}',
   hUntested: 'noch nicht getestet',
   hEmailOff: 'Nicht eingerichtet',
-  hEncryption: 'Datenbank-Verschlüsselung',
-  hEncOn: 'An',
-  hEncOff: 'Aus',
-  hEncSoon: 'Kommt in einer späteren Version',
+  hEncryption: 'Daten auf dem Server',
+  hEncOn: 'Verschlüsselt, Schlüssel aus {key}',
+  hEncOff: 'Nicht verschlüsselt',
+  hEncCopies: '{n} unverschlüsselte Kopien übrig',
+  atNotEncrypted: 'Die Daten sind nicht verschlüsselt gespeichert: setz GNOMON_DATA_KEY, damit eine kopierte Datenbank oder Festplatte nicht lesbar ist',
+  atPlainCopies: '{n} unverschlüsselte Kopien der Datenbank liegen noch im Datenordner. Prüf, ob alles läuft, und lösch sie dann auf dem Server:',
+  atPlainCopy: 'Eine unverschlüsselte Kopie der Datenbank liegt noch im Datenordner. Prüf, ob alles läuft, und lösch sie dann auf dem Server:',
+  hEncCopy: '1 unverschlüsselte Kopie übrig',
+  atHowTo: 'So geht’s',
+  atMore: 'und {n} weitere',
   keyFileShort: 'Schlüsseldatei im Datenordner',
   hUpdateTitle: 'Gnomon {v} ist da',
   hUpdateHow: 'Auf dem Server: das macht zuerst ein Backup, lädt dann die neue Version und startet sie. Alle arbeiten weiter; ihre Apps verbinden sich von selbst neu.',
@@ -2824,7 +2836,7 @@ function Account({ s, setS, setErr }: Ctx) {
 
 // ---- The Admin page after the setup: an overview, then pages grouped by People, Inbox, Company and Server ----------
 
-type Attention = { code: string; n?: number; at?: string; error?: string; version?: string };
+type Attention = { code: string; n?: number; at?: string; error?: string; version?: string; files?: string[] };
 type Overview = {
   counts: { active: number; invited: number; expired: number; pending: number; disabled: number; admins: number; devices: number };
   attention: Attention[];
@@ -2836,7 +2848,7 @@ type Overview = {
     email: { ready: boolean; provider: 'smtp' | 'graph' | null; tested: string | null };
     backups: { enabled: boolean; hour: number; keySet: boolean; last: { at: string; ok: boolean; error?: string } | null; newest: string | null; count: number } | null;
     disk: { free: number; total: number } | null;
-    encryption: null | { on: boolean };
+    encryption: null | { encrypted: boolean; keySource: 'env' | 'file' | null; plainCopies: string[] };
     startedAt: string;
   };
 };
@@ -2844,8 +2856,10 @@ type Overview = {
 const gb = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e11 ? 0 : 1)} GB` : `${Math.round(n / 1e6)} MB`);
 const RELEASES = 'https://github.com/DennHa/gnomon/releases';
 
-/** What each attention item says, where its button goes, and what the button says. */
+/** What each attention item says, where its button goes (a page here, or the admin guide), and what the button says. */
 const ATTENTION: Record<string, [IconName, Key, Key, string]> = {
+  notEncrypted: ['lock', 'atNotEncrypted', 'atHowTo', `${GUIDE}#encryption-at-rest`],
+  plainCopies: ['delete', 'atPlainCopies', 'atHowTo', `${GUIDE}#encryption-at-rest`],
   pending: ['how_to_reg', 'atPending', 'atReview', 'invitations'],
   invitesExpired: ['schedule', 'atExpired', 'atResend', 'invitations'],
   emailMissing: ['mail', 'atEmail', 'atSetUp', 'email'],
@@ -2899,8 +2913,16 @@ function healthRows(o: Overview, s: State): ReactNode[] {
       value={h.email.ready ? `${h.email.provider === 'graph' ? t('emailGraph') : t('emailSmtp')} · ${h.email.tested ? t('hTested', { when: since(h.email.tested) }) : t('hUntested')}` : t('hEmailOff')}
     />,
     <HealthRow key="h" label="wHttps" state={h.https === 'local' ? 'warn' : 'ok'} value={t((h.https && HTTPS_TEXT[h.https]) || 'httpsManual')} />,
-    // Encryption at rest is still to come: shown so admins know where it will be, filled in once the server reports it.
-    <HealthRow key="x" label="hEncryption" state={h.encryption ? (h.encryption.on ? 'ok' : 'warn') : 'off'} value={h.encryption ? t(h.encryption.on ? 'hEncOn' : 'hEncOff') : t('hEncSoon')} />,
+    <HealthRow
+      key="x"
+      label="hEncryption"
+      state={!h.encryption ? 'off' : h.encryption.encrypted && !h.encryption.plainCopies.length ? 'ok' : 'warn'}
+      value={
+        !h.encryption
+          ? '—'
+          : [h.encryption.encrypted ? t('hEncOn', { key: h.encryption.keySource === 'file' ? 'GNOMON_DATA_KEY_FILE' : 'GNOMON_DATA_KEY' }) : t('hEncOff'), h.encryption.plainCopies.length ? t(h.encryption.plainCopies.length === 1 ? 'hEncCopy' : 'hEncCopies', { n: h.encryption.plainCopies.length }) : ''].filter(Boolean).join(' · ')
+      }
+    />,
     <HealthRow key="k" label="sKey" state={s.keySource === 'env' ? 'ok' : 'off'} value={t(s.keySource === 'env' ? 'keyEnv' : 'keyFileShort')} />,
   ];
 }
@@ -2931,14 +2953,31 @@ function OverviewPage(ctx: Ctx) {
         {o.attention.length ? (
           <ul className="a-attention">
             {o.attention.map((a) => {
-              const [icon, text, button, href] = ATTENTION[a.code] ?? ['warning', 'atUnknown', 'atOpen', 'health'];
+              const [icon, many, button, href] = ATTENTION[a.code] ?? ['warning', 'atUnknown', 'atOpen', 'health'];
+              const text = a.code === 'plainCopies' && a.n === 1 ? 'atPlainCopy' : many;
               return (
                 <li key={a.code}>
                   <Icon name={icon} size={20} />
-                  <span>{t(text, { n: a.n ?? '', v: a.version ?? '', current: o.health.version, when: a.at ? since(a.at) : '', error: a.error ?? '' })}</span>
-                  <a className="soft a-button a-small" href={`#${href}`}>
-                    {t(button)}
-                  </a>
+                  <span>
+                    {t(text, { n: a.n ?? '', v: a.version ?? '', current: o.health.version, when: a.at ? since(a.at) : '', error: a.error ?? '' })}
+                    {a.files && (
+                      <span className="a-files">
+                        {a.files.slice(0, 3).map((f) => (
+                          <code key={f}>{f}</code>
+                        ))}
+                        {a.files.length > 3 && <span className="a-hint">{t('atMore', { n: a.files.length - 3 })}</span>}
+                      </span>
+                    )}
+                  </span>
+                  {/^https:/.test(href) ? (
+                    <a className="soft a-button a-small" href={href} target="_blank" rel="noreferrer">
+                      {t(button)} <Icon name="open_in_new" size={14} />
+                    </a>
+                  ) : (
+                    <a className="soft a-button a-small" href={`#${href}`}>
+                      {t(button)}
+                    </a>
+                  )}
                 </li>
               );
             })}
