@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.22 · 2026-10-25
 
 - **Copy as text is clearer**: one *Copy as text* button with a ▾ for options (hours per line, with a preview of the exact text), under the timesheet for the week and in the day's header; *Copy last week* is now *Fill from last week*, so the two no longer look alike.
 - **The Admin page shows whether the data is encrypted at rest:** the server's health says so, with where the key

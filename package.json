@@ -1,7 +1,7 @@
 {
   "name": "gnomon",
   "productName": "Gnomon",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "private": true,
   "description": "Gnomon: a personal desktop time tracker with workday clock in/out, project timers and reports.",
   "homepage": "https://github.com/DennHa/gnomon",

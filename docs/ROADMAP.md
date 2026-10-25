@@ -1,6 +1,6 @@
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-25 (0.1.21).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-25 (0.1.22).
 
 ## Now
 
