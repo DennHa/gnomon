@@ -22,6 +22,9 @@ export type CompanyProfile = {
   language?: 'system' | 'en' | 'de';
 };
 
+/** Set by the admin (server/src/company.ts): balance or corridor for everyone, and the corridor's zones and note. */
+export type CompanyHours = { mode?: 'balance' | 'corridor'; weeks?: number; within?: number; critical?: number; note?: string };
+
 /** Hours per weekday (Mon–Sun) from a date on; see src/schedule.ts. */
 export type WorkSchedule = { from: string; hours: number[]; source?: 'personio' };
 
@@ -168,6 +171,10 @@ export type Settings = {
   /** Overtime balance carried over from elsewhere (e.g. the company system), valid at the start of balanceStartDate. */
   balanceStartHours: number;
   balanceStartDate?: string;
+  /** Labs: show the target corridor (src/corridor.ts) instead of the overtime balance; the company's choice wins. */
+  hoursView?: 'balance' | 'corridor';
+  /** The company server's choice and zones for the hours view, as of the last sync; never sent back (not an account setting). */
+  companyHours?: CompanyHours;
   /** Your name; added to CSV exports so they can be told apart (e.g. when collected by the company). */
   userName?: string;
   /** Close a workday and timer left running from an earlier day at 23:59. */
@@ -208,6 +215,8 @@ export type QuickStart = { description: string; projectId?: string; activityId?:
 export type TrayState = {
   title: string;
   tooltip: string;
+  /** Target corridor mode: its one-line status, shown under the workday in the menu. */
+  hoursStatus?: string;
   status: string;
   dayActive: boolean;
   dayEnded: boolean;

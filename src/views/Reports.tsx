@@ -1,5 +1,7 @@
 import { Icon } from '../icons';
 import { balanceByMonth, targetFor } from '../balance';
+import { hoursMode } from '../corridor';
+import { CorridorCard } from './Corridor';
 import { targetHoursOn } from '../schedule';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
@@ -234,6 +236,7 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
   const projectRows = toRows(report.perProject, report.projectOf);
   const activityRows = toRows(report.perActivity, report.activityOf);
   const balance = report.attended - report.target;
+  const corridor = hoursMode(data) === 'corridor';
 
   return (
     <div className="page">
@@ -272,16 +275,24 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
           <span className="muted small">{t('rep.daysWorked')}</span>
           <strong>{report.daysWorked}</strong>
         </div>
-        <div className="card stat">
-          <span className="muted small">{t('rep.balance')}</span>
-          <strong className={balance >= 0 ? 'pos' : 'neg'}>
-            {balance >= 0 ? '+' : ''}
-            {fmtDuration(balance)}
-          </strong>
-        </div>
+        {corridor ? (
+          <div className="card stat">
+            <span className="muted small">{t('bal.target')}</span>
+            <strong>{fmtDuration(report.target)}</strong>
+          </div>
+        ) : (
+          <div className="card stat">
+            <span className="muted small">{t('rep.balance')}</span>
+            <strong className={balance >= 0 ? 'pos' : 'neg'}>
+              {balance >= 0 ? '+' : ''}
+              {fmtDuration(balance)}
+            </strong>
+          </div>
+        )}
       </div>
 
-      <OvertimeBalance onOpenSettings={onOpenSettings} />
+      {/* The company's choice, or the Labs switch: the target corridor replaces the overtime balance. */}
+      {corridor ? <CorridorCard info={(text) => <InfoTip text={text} />} /> : <OvertimeBalance onOpenSettings={onOpenSettings} />}
 
       <section className="card">
         <h3>{t('rep.timeTitle')}</h3>

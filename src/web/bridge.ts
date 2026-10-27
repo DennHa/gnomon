@@ -5,7 +5,7 @@
 // cookie; every request also carries the CSRF token the server gave at sign-in (server/src/web.ts).
 import { version } from '../../package.json';
 import { accountJson, applyChanges, baseOf, localChanges, type Change, type RemoteAccount, type SyncState } from '../sync';
-import type { Data, Settings } from '../types';
+import type { CompanyHours, Data, Settings } from '../types';
 import { browserCopy } from '../platform';
 
 (window as { gnomonWeb?: boolean }).gnomonWeb = true;
@@ -92,7 +92,7 @@ function saveLook(data: unknown) {
   }
 }
 
-type Pull = { cursor: number; more: boolean; changes: Change[]; account?: RemoteAccount | null };
+type Pull = { cursor: number; more: boolean; changes: Change[]; account?: RemoteAccount | null; company?: { hours?: CompanyHours } };
 const pull = (since: number) => call<Pull>('GET', `/sync?since=${since}&limit=5000`);
 
 /** Everything of the signed-in person, as the Mac app's Data, and the sync state that goes with it. */
@@ -100,10 +100,12 @@ async function loadData(): Promise<Data> {
   const changes: Change[] = [];
   let since = 0;
   let account: RemoteAccount | null | undefined;
+  let company: CompanyHours | undefined;
   for (;;) {
     const r = await pull(since);
     changes.push(...r.changes);
     account = r.account;
+    company = r.company?.hours;
     since = r.cursor;
     if (!r.more) break;
   }
@@ -115,6 +117,7 @@ async function loadData(): Promise<Data> {
     settings: {
       ...(account?.values as Partial<Settings>),
       ...readLook(),
+      ...(company && { companyHours: company }),
       // The Mac's first-launch guides, its idle question and its trail don't apply here; the Mac fits workdays itself.
       tourDone: true,
       onboardingDone: true,

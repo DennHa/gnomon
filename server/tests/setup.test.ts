@@ -271,3 +271,29 @@ describe('the setup page', () => {
     }
   });
 });
+
+describe('how people see their hours', () => {
+  test('the admin’s balance-or-corridor choice and zones reach every person with each sync, checked; no times go back', async () => {
+    const x = await freshServer();
+    try {
+      const { key } = x.store.addDevice('Mac', 'mac');
+      const sync = async () => (await fetch(`${x.url}/api/v1/sync?since=0`, { headers: { Authorization: `Bearer ${key}` } })).json();
+      assert.deepEqual((await sync()).company, { hours: { weeks: 4, within: 10, critical: 20 } }, 'not set: each person chooses, the default zones');
+      const r = await x.go('PUT', '/admin/config', { hours: { mode: 'corridor', weeks: 6, within: 8, critical: 15, note: '  Talk to your lead first.  ' } }, x.token);
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.body.config.hours, { mode: 'corridor', weeks: 6, within: 8, critical: 15, note: 'Talk to your lead first.' });
+      assert.deepEqual((await sync()).company.hours, { mode: 'corridor', weeks: 6, within: 8, critical: 15, note: 'Talk to your lead first.' });
+      const pushed = await fetch(`${x.url}/api/v1/sync`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ changes: [] }) });
+      assert.equal((await pushed.json()).company.hours.mode, 'corridor', 'pushing gets the same answer');
+      assert.equal((await x.go('PUT', '/admin/config', { hours: { weeks: 0 } }, x.token)).status, 422);
+      assert.equal((await x.go('PUT', '/admin/config', { hours: { within: 30 } }, x.token)).status, 422, 'within above critical');
+      assert.equal((await x.go('PUT', '/admin/config', { hours: { mode: 'sometimes' } }, x.token)).body.config.hours.mode, 'corridor', 'unknown modes are ignored');
+      await x.go('PUT', '/admin/config', { hours: { mode: 'unset', note: '' } }, x.token);
+      assert.deepEqual((await sync()).company.hours, { weeks: 6, within: 8, critical: 15 });
+      const overview = JSON.stringify((await x.go('GET', '/admin/overview', undefined, x.token)).body);
+      assert.ok(!/worked|deviation|pct/i.test(overview), 'the admin sees no one’s hours');
+    } finally {
+      await x.close();
+    }
+  });
+});

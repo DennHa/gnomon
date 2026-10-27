@@ -166,11 +166,27 @@ health at a glance. The menu on the left is grouped:
 |---|---|
 | **People** | *People*: everyone, searchable and sortable, filtered by status; a click on a person shows their devices and what you can do (send the invitation again, send a password reset, make admin, disable, remove). *Invitations and approvals*: invite one person or a list, approve or decline people who signed up themselves, and send expired invitations again (all at once, too). *Who may sign up*. |
 | **Inbox** | *Feedback* people send from the app. |
-| **Company** | *Company details*, *Mac app and roll-out* (where the app comes from, the rules, the settings profile for Iru), *Float and Personio*. |
+| **Company** | *Company details*, *Working hours* (overtime balance or target corridor, see below), *Mac app and roll-out* (where the app comes from, the rules, the settings profile for Iru), *Float and Personio*. |
 | **Server** | *Health and updates* (version and how to update, backups, disk, email, HTTPS, recent changes, running the setup again), *Email*, *Backups*. |
 
 Your own admin password, your own account and *Sign out* are in the menu under your name at the top right. Admins
 manage accounts here, but **never see anyone's times**: the Admin page has no way to show them.
+
+### Working hours: overtime balance or target corridor
+
+*Company → Working hours* decides how people see their hours against their own work schedule:
+
+- **Each person chooses** (the default): the overtime balance, unless someone switches to the corridor in
+  *Settings → Labs*.
+- **Overtime balance for everyone**: a running total of hours above or below target (*Überstundenkonto*).
+- **Target corridor for everyone**: no bank of hours. People see whether the rolling average of their last finished
+  weeks stays near their target: *within* (default under ±10 %), *elevated* (up to 20 %) or *critical* (beyond).
+  Holidays, closures, vacation and sick days lower the target; a scheduled workday with nothing recorded counts as
+  0 h, and Gnomon asks the person about it. You set the window (default 4 weeks), both limits and the note shown under
+  the chart (empty: a default note in each person's language).
+
+The choice reaches every Mac and the web app with the next sync; on a Mac, the Labs switch is then greyed out.
+Switching keeps all data. Either way the numbers are worked out on each person's own devices: you only set the rules.
 
 ## Email
 

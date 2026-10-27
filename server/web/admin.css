@@ -18,7 +18,7 @@ body { margin: 0; }
 .a-hint { color: var(--muted); font-size: 13px; line-height: 1.45; }
 .a-label { font-size: 13px; font-weight: 600; }
 .a-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-.a-field input, .a-field select, .a-inline input { font: inherit; border: 0; border-radius: 10px; background: var(--field); color: var(--text); padding: 10px 12px; }
+.a-field input, .a-field select, .a-field textarea, .a-inline input { font: inherit; border: 0; border-radius: 10px; background: var(--field); color: var(--text); padding: 10px 12px; }
 .a-row { display: flex; gap: 14px; flex-wrap: wrap; }
 .a-list { display: flex; flex-direction: column; gap: 8px; }
 .a-item, .a-check { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--field); cursor: pointer; }
@@ -261,3 +261,6 @@ h3.a-rm-h { margin: 8px 0 0; font-size: 15px; }
 .a-rm-item { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .a-rm-comments { list-style: none; margin: 2px 0 0; padding: 0 0 0 12px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .a-rm-x { padding: 0 4px; vertical-align: middle; }
+
+/* Working hours: the note under the chart */
+.a-field textarea { resize: vertical; line-height: 1.5; }

@@ -4,6 +4,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Store } from './store';
+import type { CompanyHours } from '../../src/types';
 import { graphTransport, plainAddress, smtpTransport, type EmailConfig, type Transport } from './mail';
 
 // ---- Secrets ------------------------------------------------------------------------------------
@@ -56,6 +57,12 @@ export type Rules = {
   phoneApp: boolean;
 };
 
+/**
+ * How people see their hours (src/corridor.ts): 'unset' lets each person choose (Labs), otherwise everyone sees the
+ * overtime balance or the target corridor. The corridor's window, zones and note apply to anyone who sees it.
+ */
+export type HoursConfig = { mode: 'unset' | 'balance' | 'corridor'; weeks: number; within: number; critical: number; note: string };
+
 export type CompanyConfig = {
   setupDone: boolean;
   checklist: { https: boolean; signedApp: boolean; companyLogin: boolean; integrations: boolean; macManagement: boolean };
@@ -65,6 +72,7 @@ export type CompanyConfig = {
   /** How the server sends email (Settings → Email); the password or client secret is a secret of its own. */
   email?: EmailConfig & { tested?: string };
   rules: Rules;
+  hours: HoursConfig;
   /** Where /latest hands out the Mac app from: the official GitHub release, or an upload (see releases.ts). */
   macApp: { source: 'github' | 'upload' };
   audit: { at: string; what: string }[];
@@ -77,6 +85,7 @@ export const defaultConfig = (): CompanyConfig => ({
   float: {},
   personio: {},
   rules: { allowLocalApi: false, allowActivityTrail: true, managed: true, phoneApp: true },
+  hours: { mode: 'unset', weeks: 4, within: 10, critical: 20, note: '' },
   macApp: { source: 'github' },
   audit: [],
 });
@@ -93,7 +102,7 @@ export class Company {
     const base = defaultConfig();
     if (!raw) return base;
     const c = JSON.parse(raw) as Partial<CompanyConfig>;
-    return { ...base, ...c, checklist: { ...base.checklist, ...c.checklist }, company: { ...base.company, ...c.company }, rules: { ...base.rules, ...c.rules }, macApp: { ...base.macApp, ...c.macApp } };
+    return { ...base, ...c, checklist: { ...base.checklist, ...c.checklist }, company: { ...base.company, ...c.company }, rules: { ...base.rules, ...c.rules }, hours: { ...base.hours, ...c.hours }, macApp: { ...base.macApp, ...c.macApp } };
   }
 
   save(c: CompanyConfig, what?: string) {
@@ -181,11 +190,31 @@ export function applyConfigUpdate(c: CompanyConfig, u: Record<string, unknown>):
   if (co.language === 'system' || co.language === 'en' || co.language === 'de') next.company.language = co.language;
   const r = obj(u.rules);
   for (const k of Object.keys(next.rules) as (keyof Rules)[]) if (typeof r[k] === 'boolean') next.rules[k] = r[k] as boolean;
+  const h = obj(u.hours);
+  if (h.mode === 'unset' || h.mode === 'balance' || h.mode === 'corridor') next.hours.mode = h.mode;
+  const num = (k: string, min: number, max: number, what: string) => {
+    if (h[k] === undefined) return;
+    const v = Number(h[k]);
+    if (!Number.isFinite(v) || v < min || v > max) throw new Error(`${what} must be between ${min} and ${max}`);
+    return v;
+  };
+  const weeks = num('weeks', 1, 26, 'The window');
+  if (weeks !== undefined) next.hours.weeks = Math.round(weeks);
+  next.hours.within = num('within', 1, 100, 'Within') ?? next.hours.within;
+  next.hours.critical = num('critical', 1, 200, 'Critical') ?? next.hours.critical;
+  if (next.hours.critical < next.hours.within) throw new Error('Critical must be at least as large as within');
+  if (typeof h.note === 'string') next.hours.note = h.note.trim().slice(0, 1000);
   const m = obj(u.macApp);
   if (m.source === 'github' || m.source === 'upload') next.macApp.source = m.source;
   const p = obj(u.personio);
   if (Array.isArray(p.dayOffTypes)) next.personio.dayOffTypes = p.dayOffTypes.filter((x): x is string => typeof x === 'string').slice(0, 100);
   return next;
+}
+
+/** What every person's devices get with each sync (src/types.ts CompanyHours): no mode when each person chooses. */
+export function companyHours(c: CompanyConfig): CompanyHours {
+  const { mode, weeks, within, critical, note } = c.hours;
+  return { ...(mode !== 'unset' && { mode }), weeks, within, critical, ...(note && { note }) };
 }
 
 // ---- Connection tests ---------------------------------------------------------------------------

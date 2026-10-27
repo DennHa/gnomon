@@ -66,7 +66,8 @@ declare global {
       serverSyncState(): Promise<import('./sync').SyncState | null>;
       serverSetSyncState(state: import('./sync').SyncState): Promise<boolean>;
       /** `account`: the account settings (src/sync.ts); missing from servers that don't keep them yet. */
-      serverSyncPull(since: number): Promise<ServerResult<{ cursor: number; more: boolean; changes: import('./sync').Change[]; account?: import('./sync').RemoteAccount | null }>>;
+      /** `company`: the company's choices every device follows (balance or corridor, src/corridor.ts); missing from older servers. */
+      serverSyncPull(since: number): Promise<ServerResult<{ cursor: number; more: boolean; changes: import('./sync').Change[]; account?: import('./sync').RemoteAccount | null; company?: { hours?: import('./types').CompanyHours } }>>;
       serverSyncPush(changes: import('./sync').Change[], account?: import('./sync').RemoteAccount): Promise<ServerResult<{ applied: number; skipped: { kind: string; id: string; reason: string }[]; cursor: number }>>;
       floatSetToken(token: string | null): Promise<void>;
       floatHasToken(): Promise<boolean>;

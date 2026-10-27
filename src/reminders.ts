@@ -28,9 +28,9 @@ export function weekToAssign(d: Data, date: string, now = Date.now()): number {
 
 /**
  * Whether to remind about filling in the week now: clock-in style, reminders on, the last scheduled workday of the week
- * from 15:00, not yet shown this week, and at least half an hour still to assign.
+ * from 15:00, not yet shown this week, and at least half an hour still to assign (or, in corridor mode, a day left empty).
  */
-export function weekReminderDue(d: Data, now = Date.now()): { monday: string; ms: number } | null {
+export function weekReminderDue(d: Data, now = Date.now(), openDays: string[] = []): { monday: string; ms: number; open: number } | null {
   const s = d.settings;
   if (s.workStyle !== 'clock' || s.reminders === false) return null;
   const date = dayKey(now);
@@ -40,5 +40,7 @@ export function weekReminderDue(d: Data, now = Date.now()): { monday: string; ms
   const laterThisWeek = Array.from({ length: 6 }, (_, i) => dayKey(now + (i + 1) * DAY_MS)).filter((day) => dayKey(startOfWeek(new Date(`${day}T12:00`))) === monday);
   if (laterThisWeek.some((day) => targetHoursOn(d, day) > 0)) return null;
   const ms = weekToAssign(d, date, now);
-  return ms >= 30 * 60_000 ? { monday, ms } : null;
+  // Target corridor: scheduled days this week with nothing recorded (they count as 0 h) are a reason too.
+  const open = openDays.filter((day) => day >= monday && day < date);
+  return ms >= 30 * 60_000 || open.length ? { monday, ms, open: open.length } : null;
 }

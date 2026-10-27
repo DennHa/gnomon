@@ -251,6 +251,7 @@ export const ACCOUNT_SETTINGS = [
   'countAllScheduledDays',
   'balanceStartHours',
   'balanceStartDate',
+  'hoursView',
   'userName',
   'workStyle',
   'reminders',

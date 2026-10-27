@@ -13,7 +13,7 @@ import type { Backups } from './backups';
 import type { Encryption } from './open-store';
 import { VERSION } from './version';
 import { roadmapFeedback } from './roadmap';
-import { applyConfigUpdate, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
+import { applyConfigUpdate, companyHours, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
 import { randomBytes } from 'node:crypto';
 import { clearSessionCookie, csrfFor, csrfOk, sameOrigin, sessionCookie, setSessionCookie, webDeviceName } from './web';
 import { resetEmail, testEmail, type Lang } from './emails';
@@ -245,8 +245,12 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     const changes = store.changesSince(since, limit + 1, personId);
     const more = changes.length > limit;
     const page = changes.slice(0, limit);
-    return { cursor: page.length ? page[page.length - 1].seq : Math.max(since, 0), more, changes: page.map(({ seq: _seq, ...c }) => c), account: remoteAccount(personId) };
+    return { cursor: page.length ? page[page.length - 1].seq : Math.max(since, 0), more, changes: page.map(({ seq: _seq, ...c }) => c), account: remoteAccount(personId), ...companyPart() };
   }
+
+  // The company's choices every device follows (src/corridor.ts): balance or corridor, and the corridor's zones.
+  // Only settings, the same for everyone; nothing about anyone's times goes the other way.
+  const companyPart = () => (company ? { company: { hours: companyHours(company.get()) } } : {});
 
   // Account settings (src/sync.ts): the person's targets, schedule, balance, language…, the same on every device. Kept
   // with the time they last changed; also put into the person's Data, so the phone and the API use the same targets.
@@ -325,7 +329,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     next = oneRunningTimer(next, stamps);
     store.commit(next, (kind, id) => stamps.get(`${kind}:${id}`) ?? new Date().toISOString(), personId);
     if (account) pushAccount(account, personId);
-    return { applied, skipped, cursor: store.cursor(), account: remoteAccount(personId) };
+    return { applied, skipped, cursor: store.cursor(), account: remoteAccount(personId), ...companyPart() };
   }
 
   /** Two devices may each have started a timer while offline: keep the newest, end the others when it began. */

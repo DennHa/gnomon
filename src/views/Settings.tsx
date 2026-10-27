@@ -11,6 +11,7 @@ import { removeSchedule, SCHEDULE_PRESETS, scheduleOn, schedulesOf, setSchedule,
 import { accelFromEvent, DEFAULT_SHORTCUTS, prettyAccel, type LayoutMap } from '../shortcuts';
 import { LANGUAGE_NAMES, locale, resolveLanguage, t, type MsgKey } from '../i18n';
 import { isWeb } from '../platform';
+import { companyDecides, hoursMode } from '../corridor';
 
 /** "Recording · 47 minutes today", so you can see the trail is working. */
 function TrailStatus() {
@@ -451,6 +452,25 @@ export default function Settings() {
             <Icon name="science" size={20} /> {t('set.tab.labs')}
           </h3>
           <p className="muted small section-hint">{t('labs.hint')}</p>
+          {/* Balance or corridor (src/corridor.ts); greyed out when the company's server decides. */}
+          <div className="labs-row">
+            <span>
+              <strong>{t('labs.hours')}</strong>
+              <span className="muted small field-hint">{t('labs.hoursHint')}</span>
+              {companyDecides(data) && (
+                <span className="muted small field-hint">
+                  <Icon name="apartment" size={14} /> {t('labs.hoursCompany')}
+                </span>
+              )}
+            </span>
+            <div className="segmented" role="radiogroup" aria-label={t('labs.hours')}>
+              {(['balance', 'corridor'] as const).map((m) => (
+                <button key={m} role="radio" aria-checked={hoursMode(data) === m} className={hoursMode(data) === m ? 'active' : ''} disabled={companyDecides(data)} onClick={() => set({ hoursView: m })}>
+                  {t(m === 'balance' ? 'labs.balance' : 'labs.corridor')}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="labs-row">
             <span>
               <strong>{t('set.morning')}</strong>
@@ -531,7 +551,7 @@ export default function Settings() {
           </span>
           <input value={s.userName ?? ''} placeholder={t('set.userNamePlaceholder')} onChange={(e) => set({ userName: e.target.value || undefined })} />
         </label>
-        <label className="field">
+        {hoursMode(data) === 'balance' && <label className="field">
           <span>
             {t('set.balanceStart')}
             <span className="muted small field-hint">{t('set.balanceHint')}</span>
@@ -547,7 +567,7 @@ export default function Settings() {
             {t('set.balanceDate')}
             <input type="date" value={s.balanceStartDate ?? ''} onChange={(e) => set({ balanceStartDate: e.target.value || undefined })} />
           </span>
-        </label>
+        </label>}
         <label className="check-row">
           <input type="checkbox" checked={s.billableEnabled} onChange={(e) => set({ billableEnabled: e.target.checked })} />
           {t('set.billable')}

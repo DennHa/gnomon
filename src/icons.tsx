@@ -67,6 +67,9 @@ import i_lightbulb from '@material-symbols/svg-400/rounded/lightbulb.svg?raw';
 import i_chat_bubble from '@material-symbols/svg-400/rounded/chat_bubble.svg?raw';
 import i_campaign from '@material-symbols/svg-400/rounded/campaign.svg?raw';
 import i_map from '@material-symbols/svg-400/rounded/map.svg?raw';
+import i_target from '@material-symbols/svg-400/rounded/target.svg?raw';
+import i_error from '@material-symbols/svg-400/rounded/error.svg?raw';
+import i_apartment from '@material-symbols/svg-400/rounded/apartment.svg?raw';
 
 const ICONS = {
   timer: i_timer,
@@ -127,6 +130,9 @@ const ICONS = {
   laptop_mac: i_laptop_mac,
   admin_panel_settings: i_admin_panel_settings,
   science: i_science,
+  target: i_target,
+  error: i_error,
+  apartment: i_apartment,
   link: i_link,
   tune: i_tune,
   keyboard: i_keyboard,
