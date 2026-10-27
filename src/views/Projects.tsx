@@ -120,6 +120,7 @@ function RolePicker() {
 
 export default function Projects() {
   const { data, update } = useStore();
+  const activitiesOn = data.settings.activitiesEnabled !== false;
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROJECT_COLORS[data.projects.length % PROJECT_COLORS.length]);
   const [activity, setActivity] = useState('');
@@ -185,22 +186,16 @@ export default function Projects() {
         </div>
       </section>
 
-      {data.settings.activitiesEnabled === false ? (
-        <section className="card onb-entry">
-          <span className="onb-entry-text">
-            <strong>{t('act.activities')}</strong>
-            <span className="muted small">{t('act.offHint')}</span>
-          </span>
-          <button className="btn" onClick={() => update((d) => ({ ...d, settings: { ...d.settings, activitiesEnabled: true } }))}>
-            {t('act.turnOn')}
-          </button>
-        </section>
-      ) : (
+      {/* Activities are switched on and off here, next to the list (Settings has no switch for them). */}
       <section className="card">
         <h3>{t('act.activities')}</h3>
-        <p className="muted small section-hint">
-          {t('act.hint')}
-        </p>
+        <p className="muted small section-hint">{t(activitiesOn ? 'act.hint' : 'act.offHint')}</p>
+        <label className="check-row">
+          <input type="checkbox" checked={activitiesOn} onChange={(e) => update((d) => ({ ...d, settings: { ...d.settings, activitiesEnabled: e.target.checked } }))} />
+          {t('act.turnOn')}
+        </label>
+        {activitiesOn && (
+        <>
         <RolePicker />
         <form className="add-row" onSubmit={(e) => (e.preventDefault(), submitActivity())}>
           <input placeholder={t('act.newPlaceholder')} value={activity} onChange={(e) => setActivity(e.target.value)} />
@@ -232,8 +227,9 @@ export default function Projects() {
             </div>
           ))}
         </div>
+        </>
+        )}
       </section>
-      )}
     </div>
   );
 }

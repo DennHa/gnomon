@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { activitiesOn, addEntry, isOnBreak, runningEntry, startTimer, stopTimer, switchActivity, todayWorkday, updateEntry, type TimerInput } from '../actions';
-import { ActivityChips, BillableToggle, ProjectSelect, TrailSummary } from '../components';
+import { ActivityChips, ProjectSelect, TrailSummary } from '../components';
 import { EntryFeed, TaskPicker } from '../feed';
 import { Icon } from '../icons';
 import { dayKey, entryMs, fmtClock, fmtDayLong, useNow } from '../time';
@@ -101,7 +101,6 @@ function TimerHero({ onOpenProjects }: { onOpenProjects: () => void }) {
           <div className="hero-meta">
             <ProjectSelect value={current.projectId} onChange={(projectId) => edit({ projectId, taskId: undefined, taskName: undefined })} />
             <TaskPicker projectId={current.projectId} day={dayKey(now)} value={current.taskId} name={current.taskName} onChange={(taskId, taskName) => edit({ taskId, taskName })} />
-            <BillableToggle value={current.billable} onChange={(billable) => edit({ billable })} />
           </div>
           {showSuggestions && (
             <ul className="hero-suggest" role="listbox">

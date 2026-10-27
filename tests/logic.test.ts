@@ -16,6 +16,7 @@ import type { Data } from '../src/types';
 import * as Sync from '../src/sync';
 import { setLanguage, t, trayStrings } from '../src/i18n';
 import { dayText, daysText } from '../src/copytext';
+import { normalize } from '../src/datafile';
 
 let passed = 0;
 const test = (name: string, fn: () => void) => { try { fn(); passed++; console.log('✓', name); } catch (e) { console.log('✗', name, '\n  ', (e as Error).message); process.exitCode = 1; } };
@@ -705,6 +706,19 @@ test('corridor: the company’s mode wins over the person’s Labs switch', () =
   assert.equal(hoursMode({ ...d, settings: { ...d.settings, companyHours: { mode: 'corridor' } } }), 'corridor');
   assert.equal(hoursMode({ ...d, settings: { ...d.settings, hoursView: 'corridor', companyHours: { weeks: 6 } } }), 'corridor', 'zones without a mode: the person chooses');
   assert.ok(!Sync.ACCOUNT_SETTINGS.includes('companyHours' as never) && Sync.ACCOUNT_SETTINGS.includes('hoursView' as never));
+});
+
+test('an older settings file loads with the same values after the Settings cleanup', () => {
+  // Switches that moved to Labs or lost their Settings control (billable, hours per line, activities) keep what was set.
+  const old = { version: 1, projects: [], activities: [{ id: 'a1', name: 'Call', color: '#333' }], entries: [{ id: 'e1', description: 'x', start: '2026-10-12T09:00:00.000Z', end: '2026-10-12T10:00:00.000Z', billable: true }], workdays: [], plan: [], reviewedWeeks: [],
+    settings: { language: 'de', dailyTargetHours: 7, autoStartDay: true, startDayWithTimer: false, autoStopMidnight: false, reviewOnLeave: false, countAllScheduledDays: true, activityTrail: true, apiEnabled: true, apiPort: 8123, apiLan: true,
+      billableEnabled: true, copyHours: false, activitiesEnabled: false, daylight: true, labs: true, idleMinutes: 15, shortcutsEnabled: false, menuBarLabel: 'time', menuBarColor: 'mono', balanceStartHours: -3.5, workStyle: 'clock', reminders: false, morningWelcome: false } };
+  const d = normalize(JSON.parse(JSON.stringify(old)));
+  for (const [k, v] of Object.entries(old.settings)) assert.deepEqual((d.settings as Record<string, unknown>)[k], v, k);
+  assert.equal(d.entries[0].billable, true, 'entries keep their billable flag');
+  const fresh = normalize({ version: 1, settings: { language: 'en' } });
+  assert.equal(fresh.settings.autoStopMidnight, true); assert.equal(fresh.settings.startDayWithTimer, true); assert.equal(fresh.settings.apiEnabled, false);
+  assert.ok(!('billableEnabled' in fresh.settings), 'new files no longer get a billable switch');
 });
 
 console.log(`\n${passed} passed`);

@@ -1,3 +1,5 @@
+// Settings holds what most people set once. The rule: if a setting needs more than one line to explain, it belongs in
+// Labs (five clicks on the icon under Info & feedback). A switch that moves keeps its stored value and keeps working.
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
@@ -247,11 +249,9 @@ function ApiSettings() {
   };
 
   return (
-    <section className="card">
-      <h3>API</h3>
-      <p className="muted small">
-        {t('api.intro')}
-      </p>
+    <>
+      <h4>{t('api.title')}</h4>
+      <p className="muted small">{t('api.intro')}</p>
       <label className="check-row">
         <input type="checkbox" checked={s.apiEnabled} onChange={(e) => set({ apiEnabled: e.target.checked })} />
         {t('api.enable')}
@@ -296,7 +296,29 @@ function ApiSettings() {
           )}
         </>
       )}
-    </section>
+    </>
+  );
+}
+
+/** The activity trail (Mac only): the switch, today's status, what it records and how to delete it. */
+function TrailSettings() {
+  const { data, update, profile } = useStore();
+  const s = data.settings;
+  if (profile?.allowActivityTrail === false) return <p className="muted small">{t('managed.trailOff')}</p>;
+  return (
+    <>
+      <label className="check-row">
+        <input type="checkbox" checked={s.activityTrail} onChange={(e) => update((d) => ({ ...d, settings: { ...d.settings, activityTrail: e.target.checked } }))} />
+        {t('set.trail')}
+      </label>
+      {s.activityTrail && <TrailStatus />}
+      <p className="muted small">
+        {t('set.trailInfo')}{' '}
+        <button className="link" onClick={() => confirm(t('set.deleteTrailConfirm')) && window.api.trailClear()}>
+          {t('set.deleteTrail')}
+        </button>
+      </p>
+    </>
   );
 }
 
@@ -335,7 +357,6 @@ const ACCENTS: { id: NonNullable<S['accent']>; color: string }[] = [
 /** Work schedule: hours per weekday, in periods that start on a date (see src/schedule.ts). */
 function WorkScheduleCard() {
   const { data, update } = useStore();
-  const s = data.settings;
   const periods = schedulesOf(data);
   const current = scheduleOn(data, dayKey(new Date())).from;
   const [adding, setAdding] = useState(false);
@@ -405,13 +426,6 @@ function WorkScheduleCard() {
           <Icon name="add" size={18} /> {t('sched.change')}
         </button>
       )}
-      <label className="check-row sched-count">
-        <input type="checkbox" checked={Boolean(s.countAllScheduledDays)} onChange={(e) => update((d) => ({ ...d, settings: { ...d.settings, countAllScheduledDays: e.target.checked } }))} />
-        <span>
-          {t('sched.countAll')}
-          <span className="muted small field-hint">{t('sched.countAllHint')}</span>
-        </span>
-      </label>
     </section>
   );
 }
@@ -447,11 +461,13 @@ export default function Settings() {
       </nav>
 
       {tab === 'labs' && labs && (
-        <section className="card">
+        <section className="card labs-card">
           <h3>
             <Icon name="science" size={20} /> {t('set.tab.labs')}
           </h3>
           <p className="muted small section-hint">{t('labs.hint')}</p>
+
+          <h4>{t('labs.groupHours')}</h4>
           {/* Balance or corridor (src/corridor.ts); greyed out when the company's server decides. */}
           <div className="labs-row">
             <span>
@@ -471,15 +487,45 @@ export default function Settings() {
               ))}
             </div>
           </div>
-          <div className="labs-row">
+          <label className="check-row">
+            <input type="checkbox" checked={Boolean(s.countAllScheduledDays)} onChange={(e) => set({ countAllScheduledDays: e.target.checked })} />
             <span>
-              <strong>{t('set.morning')}</strong>
-              <span className="muted small field-hint">{t('labs.morningHint')}</span>
+              {t('sched.countAll')}
+              <span className="muted small field-hint">{t('sched.countAllHint')}</span>
             </span>
-            <button className="btn" onClick={() => window.dispatchEvent(new Event('gnomon:morning-preview'))}>
-              <Icon name="wb_sunny" size={18} /> {t('labs.morningShow')}
-            </button>
-          </div>
+          </label>
+
+          <h4>{t('labs.groupDay')}</h4>
+          <label className="check-row">
+            <input type="checkbox" checked={s.autoStartDay} onChange={(e) => set({ autoStartDay: e.target.checked })} />
+            {t('set.autoStartDay')}
+          </label>
+          <label className="check-row">
+            <input type="checkbox" checked={s.startDayWithTimer} onChange={(e) => set({ startDayWithTimer: e.target.checked })} />
+            {t('set.startDayWithTimer')}
+          </label>
+          <label className="check-row">
+            <input type="checkbox" checked={s.autoStopMidnight} onChange={(e) => set({ autoStopMidnight: e.target.checked })} />
+            {t('set.autoStop')}
+          </label>
+          {/* "Close the day" opens from the menu bar, so it means nothing in the browser. */}
+          {!isWeb() && (
+            <label className="check-row">
+              <input type="checkbox" checked={s.reviewOnLeave} onChange={(e) => set({ reviewOnLeave: e.target.checked })} />
+              {t('set.reviewOnLeave')}
+            </label>
+          )}
+
+          {/* The trail and the local API run on the Mac; a company profile can switch either off. */}
+          {!isWeb() && (
+            <>
+              <h4>{t('labs.groupMac')}</h4>
+              <TrailSettings />
+              {profile?.allowLocalApi === false ? <p className="muted small">{t('managed.apiOff')}</p> : <ApiSettings />}
+            </>
+          )}
+
+          <h4>{t('labs.groupLook')}</h4>
           <label className="check-row">
             <input type="checkbox" checked={Boolean(s.daylight)} onChange={(e) => set({ daylight: e.target.checked })} />
             <span>
@@ -489,14 +535,26 @@ export default function Settings() {
           </label>
           <div className="labs-row">
             <span>
-              <strong>{t('tour.open')}</strong>
-              <span className="muted small field-hint">{t('tour.openHint')}</span>
+              <strong>{t('set.morning')}</strong>
+              <span className="muted small field-hint">{t('labs.morningHint')}</span>
             </span>
-            <button className="btn" onClick={() => set({ tourDone: false })}>
-              <Icon name="waving_hand" size={18} /> {t('tour.open')}
+            <button className="btn" onClick={() => window.dispatchEvent(new Event('gnomon:morning-preview'))}>
+              <Icon name="wb_sunny" size={18} /> {t('labs.morningShow')}
             </button>
           </div>
-          <div className="labs-row">
+          {/* On the Mac the tour sits under General; the browser has only this one. */}
+          {isWeb() && (
+            <div className="labs-row">
+              <span>
+                <strong>{t('tour.open')}</strong>
+                <span className="muted small field-hint">{t('tour.openHint')}</span>
+              </span>
+              <button className="btn" onClick={() => set({ tourDone: false })}>
+                <Icon name="waving_hand" size={18} /> {t('tour.open')}
+              </button>
+            </div>
+          )}
+          <div className="labs-row labs-hide">
             <span className="muted small">{t('labs.hideHint')}</span>
             <button className="btn ghost" onClick={() => (set({ labs: false }), choose('general'))}>
               <Icon name="visibility_off" size={18} /> {t('labs.hide')}
@@ -568,10 +626,6 @@ export default function Settings() {
             <input type="date" value={s.balanceStartDate ?? ''} onChange={(e) => set({ balanceStartDate: e.target.value || undefined })} />
           </span>
         </label>}
-        <label className="check-row">
-          <input type="checkbox" checked={s.billableEnabled} onChange={(e) => set({ billableEnabled: e.target.checked })} />
-          {t('set.billable')}
-        </label>
           </section>
           <WorkScheduleCard />
           {!isWeb() && (
@@ -589,99 +643,48 @@ export default function Settings() {
       )}
 
       {tab === 'tracking' && (
-        <>
-          <section className="card">
-            <h3>{t('set.clockIn')}</h3>
-        <label className="field">
-          <span>
-            {t('style.setting')}
-            <span className="muted small field-hint">{t('style.settingHint')}</span>
-          </span>
-          <select value={s.workStyle ?? ''} onChange={(e) => e.target.value && set(workStyleDefaults(e.target.value as 'clock' | 'live'))}>
-            {!s.workStyle && <option value="">—</option>}
-            <option value="clock">{t('style.clock')}</option>
-            <option value="live">{t('style.live')}</option>
-          </select>
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.activitiesEnabled !== false} onChange={(e) => set({ activitiesEnabled: e.target.checked })} />
-          <span>
-            {t('set.activities')}
-            <span className="muted small field-hint">{t('set.activitiesHint')}</span>
-          </span>
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.morningWelcome !== false} onChange={(e) => set({ morningWelcome: e.target.checked })} />
-          <span>
-            {t('set.morning')}
-            <span className="muted small field-hint">{t('set.morningHint')}</span>
-          </span>
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.reminders !== false} onChange={(e) => set({ reminders: e.target.checked })} />
-          <span>
-            {t('rem.setting')}
-            <span className="muted small field-hint">{t(s.workStyle === 'clock' ? 'rem.settingClock' : 'rem.settingLive')}</span>
-          </span>
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.autoStartDay} onChange={(e) => set({ autoStartDay: e.target.checked })} />
-          {t('set.autoStartDay')}
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.startDayWithTimer} onChange={(e) => set({ startDayWithTimer: e.target.checked })} />
-          {t('set.startDayWithTimer')}
-        </label>
-          </section>
-          <section className="card">
-            <h3>{t('set.accurate')}</h3>
-        {/* Idle detection and the activity trail need the Mac. */}
-        {!isWeb() && (
-        <label className="field">
-          <span>{t('set.idleAsk')}</span>
-          <select value={s.idleMinutes} onChange={(e) => set({ idleMinutes: Number(e.target.value) })}>
-            <option value={0}>{t('set.never')}</option>
-            {[5, 10, 15, 30].map((n) => (
-              <option key={n} value={n}>
-                {t('set.minutes', { n })}
-              </option>
-            ))}
-          </select>
-        </label>
-        )}
-        <label className="check-row">
-          <input type="checkbox" checked={s.autoStopMidnight} onChange={(e) => set({ autoStopMidnight: e.target.checked })} />
-          {t('set.autoStop')}
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.reviewOnLeave} onChange={(e) => set({ reviewOnLeave: e.target.checked })} />
-          {t('set.reviewOnLeave')}
-        </label>
-        <label className="check-row">
-          <input type="checkbox" checked={s.copyHours !== false} onChange={(e) => set({ copyHours: e.target.checked })} />
-          {t('set.copyHours')}
-        </label>
-        {isWeb() ? null : profile?.allowActivityTrail === false ? (
-          <p className="muted small">{t('managed.trailOff')}</p>
-        ) : (
-          <>
-            <label className="check-row">
-              <input type="checkbox" checked={s.activityTrail} onChange={(e) => set({ activityTrail: e.target.checked })} />
-              {t('set.trail')}
+        <section className="card">
+          <h3>{t('set.dayCard')}</h3>
+          <label className="field">
+            <span>
+              {t('style.setting')}
+              <span className="muted small field-hint">{t('style.settingHint')}</span>
+            </span>
+            <select value={s.workStyle ?? ''} onChange={(e) => e.target.value && set(workStyleDefaults(e.target.value as 'clock' | 'live'))}>
+              {!s.workStyle && <option value="">—</option>}
+              <option value="clock">{t('style.clock')}</option>
+              <option value="live">{t('style.live')}</option>
+            </select>
+          </label>
+          <label className="check-row">
+            <input type="checkbox" checked={s.reminders !== false} onChange={(e) => set({ reminders: e.target.checked })} />
+            <span>
+              {t('rem.setting')}
+              <span className="muted small field-hint">{t(s.workStyle === 'clock' ? 'rem.settingClock' : 'rem.settingLive')}</span>
+            </span>
+          </label>
+          <label className="check-row">
+            <input type="checkbox" checked={s.morningWelcome !== false} onChange={(e) => set({ morningWelcome: e.target.checked })} />
+            <span>
+              {t('set.morning')}
+              <span className="muted small field-hint">{t('set.morningHint')}</span>
+            </span>
+          </label>
+          {/* Idle detection needs the Mac. */}
+          {!isWeb() && (
+            <label className="field">
+              <span>{t('set.idleAsk')}</span>
+              <select value={s.idleMinutes} onChange={(e) => set({ idleMinutes: Number(e.target.value) })}>
+                <option value={0}>{t('set.never')}</option>
+                {[5, 10, 15, 30].map((n) => (
+                  <option key={n} value={n}>
+                    {t('set.minutes', { n })}
+                  </option>
+                ))}
+              </select>
             </label>
-            {s.activityTrail && <TrailStatus />}
-          </>
-        )}
-        {!isWeb() && (
-        <p className="muted small">
-          {t('set.trailInfo')}{' '}
-          <button className="link" onClick={() => confirm(t('set.deleteTrailConfirm')) && window.api.trailClear()}>
-            {t('set.deleteTrail')}
-          </button>
-        </p>
-        )}
-          </section>
-        </>
+          )}
+        </section>
       )}
 
       {tab === 'menubar' && (
@@ -737,7 +740,6 @@ export default function Settings() {
           </section>
           {/* Until company sign-in exists, a managed Mac connects with the invitation link from the Admin page. */}
           {profile.signIn !== 'oidc' && <ServerSettings />}
-          {profile.allowLocalApi === false ? <p className="muted small">{t('managed.apiOff')}</p> : <ApiSettings />}
         </>
       )}
 
@@ -763,7 +765,6 @@ export default function Settings() {
         <h3>Personio</h3>
         <PersonioConnect />
       </section>
-          {profile?.allowLocalApi === false ? <p className="muted small">{t('managed.apiOff')}</p> : <ApiSettings />}
         </>
       )}
     </div>
