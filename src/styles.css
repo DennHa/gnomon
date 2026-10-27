@@ -1172,7 +1172,8 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .corridor-side { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .corridor-status { display: inline-flex; align-items: center; gap: 6px; }
 .corridor-ask { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--warn-bg); border: 1px solid var(--warn-border); }
-.corridor-ask > span:first-child { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.corridor-ask > span:first-child { display: flex; align-items: flex-start; gap: 6px; }
+.corridor-ask > span:first-child .icon { flex: none; margin-top: 1px; }
 .corridor-ask-actions { display: flex; gap: 6px; }
 @media (max-width: 760px) {
   .corridor-tiles { grid-template-columns: 1fr; }

@@ -34,7 +34,10 @@ function noteFor(d: Data): string {
 }
 
 /** The rolling average week by week: ±(at least 20 %) around the target, the "within" band shaded, gaps for weeks without data. */
-function CorridorChart({ c }: { c: Corridor }) {
+function CorridorChart({ c: all }: { c: Corridor }) {
+  // Start where the data starts (a newcomer's first months aren't gaps), but always show at least 8 weeks.
+  const first = all.points.findIndex((p) => p.pct !== null);
+  const c = { ...all, points: all.points.slice(Math.max(0, Math.min(first < 0 ? Infinity : first, all.points.length - 8))) };
   const W = 640;
   const HT = 190;
   const left = 44;

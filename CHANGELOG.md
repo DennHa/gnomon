@@ -3,6 +3,17 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Target corridor instead of an overtime balance (optional):** instead of a running bank of hours, Reports can show
+  whether the rolling average of your last finished weeks stays near your work schedule's target: within ±10 %,
+  elevated up to 20 %, or critical, with a chart of the last 12 months and the current week on its own tile. Holidays,
+  closures, vacation and sick days lower the target; a scheduled workday with nothing recorded counts as 0 h, and the
+  sidebar asks about it (*Add hours* or *Day off*). The sidebar and the menu bar show a short status such as
+  "4 weeks: −6.7 % · within". On a company server, the admin chooses balance or corridor for everyone under
+  *Company → Working hours*, with the window, the zones and the note under the chart; otherwise it's a switch in
+  *Settings → Labs*. Admins still never see anyone's times, and switching back shows the balance again.
+
 ## 0.1.22 · 2026-10-25
 
 - **Copy as text is clearer**: one *Copy as text* button with a ▾ for options (hours per line, with a preview of the exact text), under the timesheet for the week and in the day's header; *Copy last week* is now *Fill from last week*, so the two no longer look alike.
