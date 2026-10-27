@@ -168,6 +168,7 @@ export class Store {
     if (!cols('devices').includes('client')) this.db.exec('ALTER TABLE devices ADD COLUMN client TEXT');
     if (!cols('devices').includes('is_admin')) this.db.exec('ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
     this.ownerId = this.migrateToPeople(cols);
+    this.createRoadmapTables();
     if (file !== ':memory:') for (const f of [file, `${file}-wal`, `${file}-shm`]) if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
     this.seed(this.ownerId);
   }
@@ -515,6 +516,83 @@ export class Store {
   deleteFeedback(id: string) {
     this.db.prepare('DELETE FROM feedback_messages WHERE thread_id = ?').run(id);
     this.db.prepare('DELETE FROM feedback_threads WHERE id = ?').run(id);
+  }
+
+  // ---- Roadmap votes, comments and suggestions (Info & feedback → What's coming) --------------------------
+  // A target is a roadmap item's id (src/roadmap.ts) or a suggestion's ("idea-3"). Who voted is never handed out.
+
+  private createRoadmapTables() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS roadmap_votes (
+        target TEXT NOT NULL,
+        person_id TEXT NOT NULL,
+        at TEXT NOT NULL,
+        PRIMARY KEY (target, person_id)
+      );
+      CREATE TABLE IF NOT EXISTS roadmap_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target TEXT NOT NULL,
+        person_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        anonymous INTEGER NOT NULL DEFAULT 0,
+        at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS roadmap_suggestions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        person_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        text TEXT NOT NULL,
+        anonymous INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'waiting',
+        created_at TEXT NOT NULL,
+        decided_at TEXT
+      );
+    `);
+  }
+
+  setRoadmapVote(target: string, personId: string, on: boolean) {
+    if (on) this.db.prepare('INSERT OR IGNORE INTO roadmap_votes (target, person_id, at) VALUES (?, ?, ?)').run(target, personId, new Date().toISOString());
+    else this.db.prepare('DELETE FROM roadmap_votes WHERE target = ? AND person_id = ?').run(target, personId);
+  }
+
+  /** Votes per target, and the targets this person voted for. */
+  roadmapVotes(personId?: string): { counts: Map<string, number>; mine: Set<string>; people: number } {
+    const counts = new Map((this.db.prepare('SELECT target, COUNT(*) AS n FROM roadmap_votes GROUP BY target').all() as { target: string; n: number }[]).map((r) => [r.target, r.n]));
+    const mine = new Set(personId ? (this.db.prepare('SELECT target FROM roadmap_votes WHERE person_id = ?').all(personId) as { target: string }[]).map((r) => r.target) : []);
+    const people = (this.db.prepare('SELECT COUNT(DISTINCT person_id) AS n FROM roadmap_votes').get() as { n: number }).n;
+    return { counts, mine, people };
+  }
+
+  addRoadmapComment(target: string, personId: string, text: string, anonymous: boolean): number {
+    return Number(this.db.prepare('INSERT INTO roadmap_comments (target, person_id, text, anonymous, at) VALUES (?, ?, ?, ?, ?)').run(target, personId, text, anonymous ? 1 : 0, new Date().toISOString()).lastInsertRowid);
+  }
+
+  /** Comments, oldest first, with the first name to show ("Someone" when asked for, or the person is gone). */
+  roadmapComments(): { id: number; target: string; personId: string; name: string; text: string; at: string }[] {
+    const rows = this.db.prepare('SELECT c.id, c.target, c.person_id, c.text, c.anonymous, c.at, p.name FROM roadmap_comments c LEFT JOIN people p ON p.id = c.person_id ORDER BY c.id').all() as { id: number; target: string; person_id: string; text: string; anonymous: number; at: string; name: string | null }[];
+    return rows.map((r) => ({ id: r.id, target: r.target, personId: r.person_id, name: r.anonymous || !r.name?.trim() ? '' : r.name.trim().split(/\s+/)[0], text: r.text, at: r.at }));
+  }
+
+  roadmapComment(id: number) {
+    return this.db.prepare('SELECT id, target, person_id AS personId FROM roadmap_comments WHERE id = ?').get(id) as { id: number; target: string; personId: string } | undefined;
+  }
+
+  deleteRoadmapComment(id: number) {
+    this.db.prepare('DELETE FROM roadmap_comments WHERE id = ?').run(id);
+  }
+
+  addRoadmapSuggestion(personId: string, title: string, text: string, anonymous: boolean): number {
+    return Number(this.db.prepare('INSERT INTO roadmap_suggestions (person_id, title, text, anonymous, created_at) VALUES (?, ?, ?, ?, ?)').run(personId, title, text, anonymous ? 1 : 0, new Date().toISOString()).lastInsertRowid);
+  }
+
+  roadmapSuggestions(): { id: string; personId: string; name: string; title: string; text: string; status: 'waiting' | 'approved' | 'hidden'; createdAt: string }[] {
+    const rows = this.db.prepare('SELECT s.id, s.person_id, s.title, s.text, s.anonymous, s.status, s.created_at, p.name FROM roadmap_suggestions s LEFT JOIN people p ON p.id = s.person_id ORDER BY s.id').all() as { id: number; person_id: string; title: string; text: string; anonymous: number; status: 'waiting' | 'approved' | 'hidden'; created_at: string; name: string | null }[];
+    return rows.map((r) => ({ id: `idea-${r.id}`, personId: r.person_id, name: r.anonymous || !r.name?.trim() ? '' : r.name.trim().split(/\s+/)[0], title: r.title, text: r.text, status: r.status, createdAt: r.created_at }));
+  }
+
+  setRoadmapSuggestionStatus(id: string, status: 'waiting' | 'approved' | 'hidden'): boolean {
+    const n = Number(id.replace(/^idea-/, ''));
+    return this.db.prepare('UPDATE roadmap_suggestions SET status = ?, decided_at = ? WHERE id = ?').run(status, new Date().toISOString(), n).changes > 0;
   }
 
   // ---- Passwords, invitations and who may register (docs/accounts-design.md, step 2) ------------

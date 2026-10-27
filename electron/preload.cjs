@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('api', {
   serverRegister: (form) => ipcRenderer.invoke('server:register', form),
   serverAccount: () => ipcRenderer.invoke('server:account'),
   serverAccountLink: () => ipcRenderer.invoke('server:accountLink'),
+  roadmapCall: (method, apiPath, body) => ipcRenderer.invoke('roadmap:call', { method, apiPath, body }),
   feedbackAvailable: () => ipcRenderer.invoke('feedback:available'),
   feedbackSend: (msg) => ipcRenderer.invoke('feedback:send', msg),
   feedbackThreads: () => ipcRenderer.invoke('feedback:threads'),

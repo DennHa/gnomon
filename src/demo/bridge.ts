@@ -47,6 +47,7 @@ window.api = {
   serverRegister: async () => ({ ok: false, error: DEMO_ERROR }),
   serverAccount: async () => null,
   serverAccountLink: async () => ({ ok: false, error: DEMO_ERROR }),
+  roadmapCall: async () => ({ ok: false, error: DEMO_ERROR }),
   feedbackAvailable: async () => false,
   feedbackSend: async () => ({ ok: false, error: DEMO_ERROR }),
   feedbackThreads: async () => [],

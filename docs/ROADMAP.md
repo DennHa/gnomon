@@ -1,3 +1,10 @@
+<!--
+Each "- **Title.** Text" bullet is an item people can vote on and comment in the app (Info & feedback → What's
+coming). Its id is made from the title ("A drafted day." → a-drafted-day). Renaming an item? Keep its votes by
+writing the old id right after the bullet's text as a one-line HTML comment: the opening <!--, then
+"id: a-drafted-day", then the closing marker. Votes for an id that is gone show up in the admin's export, they
+aren't lost.
+-->
 # Roadmap
 
 What's coming to Gnomon, and what it already does well. Updated 2026-10-25 (0.1.22).

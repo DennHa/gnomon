@@ -12,6 +12,7 @@ import { currentRelease, githubRelease, looksLikeDmg, peekGithubRelease, pickLan
 import type { Backups } from './backups';
 import type { Encryption } from './open-store';
 import { VERSION } from './version';
+import { roadmapFeedback } from './roadmap';
 import { applyConfigUpdate, mobileconfig, parseEmailSettings, testFloat, testPersonio, type Company } from './company';
 import { randomBytes } from 'node:crypto';
 import { clearSessionCookie, csrfFor, csrfOk, sameOrigin, sessionCookie, setSessionCookie, webDeviceName } from './web';
@@ -343,7 +344,12 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     };
   }
 
+  // Votes, comments and ideas on the roadmap (roadmap.ts).
+  const roadmap = roadmapFeedback(store, roadmapDir, VERSION, (status, code, message) => new HttpError(status, code, message));
+
   function serverRoute(method: string, p: string, query: Record<string, string>, body: unknown, device: Device): ApiResponse | undefined {
+    const rm = roadmap.route(method, p, body, device.personId);
+    if (rm) return rm;
     if (method === 'GET' && p === '/me') return { status: 200, body: { id: device.id, name: device.name } };
     // Whose account this device is signed in to, for "Signed in as …" on the Mac.
     if (method === 'GET' && p === '/me/account') {
@@ -482,6 +488,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       devices: store.listDevices().filter((d) => !d.revokedAt).length,
       passwordSet: store.hasPassword(me.id),
       feedbackUnread: store.listFeedback().filter((t) => t.unread).length,
+      roadmapWaiting: roadmap.waiting(),
       me: { id: me.id, email: me.email, name: me.name },
       registration: store.registration(),
       pending: store.listPeople().filter((x) => x.status === 'pending').length,
@@ -532,6 +539,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     if (!store.hasPassword(meId)) attention.push({ code: 'adminPassword' });
     const unread = store.listFeedback().filter((t) => t.unread).length;
     if (unread) attention.push({ code: 'feedback', n: unread });
+    if (roadmap.waiting()) attention.push({ code: 'roadmap', n: roadmap.waiting() });
     return {
       counts,
       attention,
@@ -1008,6 +1016,9 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
       company.save(c, [mode && `Registration: ${mode}`, days !== undefined && `Invitations valid for ${days} days`].filter(Boolean).join(', '));
       return [200, peopleOut()];
     }
+    // Roadmap: suggestions to approve, comments to remove, the export (roadmap.ts).
+    const rmAdmin = roadmap.adminRoute(method, p, body);
+    if (rmAdmin) return rmAdmin;
     // Feedback inbox: conversations, reading one marks it seen, replies, status, deleting.
     if (method === 'GET' && p === '/admin/feedback') return [200, { threads: store.listFeedback() }];
     const fid = p.match(/^\/admin\/feedback\/([\w-]{36})(\/reply)?$/);

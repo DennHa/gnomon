@@ -252,3 +252,12 @@ a.soft.a-button { background: var(--surface); color: var(--text); font-weight: 6
 .a-cleanup-row { align-items: center; gap: 12px; padding-top: 4px; }
 .a-files { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
 .a-files code { padding: 1px 6px; border-radius: 6px; background: var(--surface); font-size: 12px; overflow-wrap: anywhere; }
+
+/* Roadmap: ideas to approve, votes and comments, Copy for Claude. */
+.a-rm-copy { align-items: center; flex-wrap: wrap; margin: 14px 0 4px; }
+.a-rm-export { white-space: pre-wrap; font-size: 12px; line-height: 1.5; max-height: 320px; overflow: auto; padding: 12px 14px; border-radius: 12px; background: var(--field); margin: 8px 0 0; }
+h3.a-rm-h { margin: 8px 0 0; font-size: 15px; }
+.a-rm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.a-rm-item { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.a-rm-comments { list-style: none; margin: 2px 0 0; padding: 0 0 0 12px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.a-rm-x { padding: 0 4px; vertical-align: middle; }

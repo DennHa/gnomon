@@ -1135,3 +1135,32 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .tour .acc-form .field input { width: 100%; box-sizing: border-box; }
 .tour .acc-form > .muted.small { margin: 0; }
 .tour .acc-form > .segmented { justify-self: start; }
+
+/* Info & feedback → What's coming: the roadmap as a small board with votes and comments (About.tsx). */
+.about-tabs { margin: 16px 0; position: static; }
+.roadmap .card-head { align-items: flex-start; }
+.rm-intro { margin: 0; flex: 1; }
+.rm-note { margin: 10px 0 0; }
+.rm-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; align-items: start; }
+.rm-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rm-col h4 { margin: 0; font-size: 12px; color: var(--muted); font-weight: 600; }
+.rm-item { background: var(--bg); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
+.rm-title { border: 0; background: none; padding: 0; text-align: left; font-weight: 600; cursor: pointer; }
+.rm-title:hover { text-decoration: underline; }
+.rm-text { margin: 0; }
+.rm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; }
+.rm-vote, .rm-count { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 2px 9px; font-size: 12px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.rm-count { border-color: transparent; background: none; color: var(--muted); padding: 2px 4px; }
+.rm-vote:hover { border-color: var(--muted); }
+.rm-vote.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); font-weight: 600; }
+.rm-waiting { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--warn-bg); border: 1px solid var(--warn-border); }
+.rm-comments { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--divider); padding-top: 6px; }
+.rm-comments p { margin: 0; overflow-wrap: anywhere; }
+.rm-comments form { display: flex; flex-direction: column; gap: 4px; }
+.rm-comments input:not([type='checkbox']), .rm-suggest input:not([type='checkbox']), .rm-suggest textarea { width: 100%; font: inherit; }
+.rm-remove { margin: 0 0 0 6px; }
+.rm-suggest { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg); }
+.rm-suggest textarea { resize: vertical; line-height: 1.45; border: 0; background: var(--field); color: var(--text); border-radius: 8px; padding: 7px 10px; }
+.rm-more { border-top: 1px solid var(--divider); margin-top: 12px; padding-top: 8px; }
+.rm-more summary { cursor: pointer; font-weight: 600; }
+.rm-more ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }

@@ -3,6 +3,13 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Vote on the roadmap:** Info & feedback now has three tabs, *What's new*, *What's coming* and *Feedback*. *What's
+  coming* shows the roadmap as a small board; with an account on a Gnomon server you can vote, comment and suggest an
+  idea, in the Mac app and the web app. Others only see how many voted, never who. Ideas wait for the admin's OK, on
+  the Admin page's new *Roadmap* page, which also copies everything as one text for planning (*Copy for Claude*).
+
 ## 0.1.22 · 2026-10-25
 
 - **Copy as text is clearer**: one *Copy as text* button with a ▾ for options (hours per line, with a preview of the exact text), under the timesheet for the week and in the day's header; *Copy last week* is now *Fill from last week*, so the two no longer look alike.

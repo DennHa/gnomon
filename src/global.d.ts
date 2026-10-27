@@ -54,6 +54,8 @@ declare global {
       serverAccount(): Promise<{ name: string; email: string | null; role: 'admin' | 'member' } | null>;
       serverAccountLink(): Promise<ServerResult<object>>;
       serverMyDevices(): Promise<ServerResult<{ devices: { id: string; name: string; client: string | null; lastSeenAt: string | null; current: boolean }[] }>>;
+      /** Votes, comments and ideas on the roadmap of the server this device is signed in to (server/src/roadmap.ts). */
+      roadmapCall(method: 'GET' | 'PUT' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<ServerResult<{ board: import('./roadmap').RoadmapBoard }>>;
       feedbackAvailable(): Promise<boolean>;
       feedbackSend(msg: { text: string; sender?: string; withInfo: boolean }): Promise<ServerResult<object>>;
       feedbackThreads(): Promise<FeedbackThread[]>;

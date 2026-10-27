@@ -62,6 +62,11 @@ import i_link from '@material-symbols/svg-400/rounded/link.svg?raw';
 import i_tune from '@material-symbols/svg-400/rounded/tune.svg?raw';
 import i_keyboard from '@material-symbols/svg-400/rounded/keyboard.svg?raw';
 import i_hub from '@material-symbols/svg-400/rounded/hub.svg?raw';
+import i_thumb_up from '@material-symbols/svg-400/rounded/thumb_up.svg?raw';
+import i_lightbulb from '@material-symbols/svg-400/rounded/lightbulb.svg?raw';
+import i_chat_bubble from '@material-symbols/svg-400/rounded/chat_bubble.svg?raw';
+import i_campaign from '@material-symbols/svg-400/rounded/campaign.svg?raw';
+import i_map from '@material-symbols/svg-400/rounded/map.svg?raw';
 
 const ICONS = {
   timer: i_timer,
@@ -126,6 +131,11 @@ const ICONS = {
   tune: i_tune,
   keyboard: i_keyboard,
   hub: i_hub,
+  thumb_up: i_thumb_up,
+  lightbulb: i_lightbulb,
+  chat_bubble: i_chat_bubble,
+  campaign: i_campaign,
+  map: i_map,
 } as const;
 
 export type IconName = keyof typeof ICONS;

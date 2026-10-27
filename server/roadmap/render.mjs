@@ -13,6 +13,8 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 
 /** Returns { title, html }: the first heading is the page title, each ## a section of its own. */
 export function renderRoadmap(md) {
+  // Comments (the file's top note, `<!-- id: … -->` after a bullet) aren't shown; a line that is only a comment goes.
+  md = md.replace(/^[ \t]*<!--[\s\S]*?-->[ \t]*\r?\n/gm, '').replace(/\s*<!--[\s\S]*?-->/g, '');
   let title = 'Roadmap';
   const out = [];
   let list = null; // items of the list being read

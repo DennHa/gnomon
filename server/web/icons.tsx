@@ -54,8 +54,13 @@ import open_in_new from '@material-symbols/svg-400/rounded/open_in_new.svg';
 import update from '@material-symbols/svg-400/rounded/update.svg';
 import arrow_upward from '@material-symbols/svg-400/rounded/arrow_upward.svg';
 import arrow_downward from '@material-symbols/svg-400/rounded/arrow_downward.svg';
+import lightbulb from '@material-symbols/svg-400/rounded/lightbulb.svg';
+import content_copy from '@material-symbols/svg-400/rounded/content_copy.svg';
+import thumb_up from '@material-symbols/svg-400/rounded/thumb_up.svg';
+import visibility_off from '@material-symbols/svg-400/rounded/visibility_off.svg';
+import check from '@material-symbols/svg-400/rounded/check.svg';
 
-const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail, backup, upload, dns, how_to_reg, admin_panel_settings, home, monitor_heart, person_add, search, extension, hard_drive, account_circle, open_in_new, update, arrow_upward, arrow_downward };
+const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail, backup, upload, dns, how_to_reg, admin_panel_settings, home, monitor_heart, person_add, search, extension, hard_drive, account_circle, open_in_new, update, arrow_upward, arrow_downward, lightbulb, content_copy, thumb_up, visibility_off, check };
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {

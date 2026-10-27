@@ -391,6 +391,22 @@ const EN = {
   invitationsTitle: 'Invitations and approvals',
   signupTitle: 'Who may sign up',
   inboxGroup: 'Inbox',
+  rmTitle: 'Roadmap',
+  rmIntro: 'Votes, comments and ideas from people with an account, from Info & feedback → What’s coming in the app. Ideas wait here for your OK before others see them. Nobody, you included, sees who voted.',
+  rmCopy: 'Copy for Claude',
+  rmCopied: 'Copied. Paste it into the planning chat; the text is below too.',
+  rmWaiting: 'Waiting for your OK',
+  rmNoneWaiting: 'No ideas waiting.',
+  rmApprove: 'Approve',
+  rmHide: 'Hide',
+  rmApproved: 'Approved ideas',
+  rmHidden: 'Hidden ideas',
+  rmItems: 'Roadmap items',
+  rmVotes: '{n} votes',
+  rmPeople: '{n} people voted so far.',
+  rmOrphans: 'Ids no longer on the roadmap',
+  rmRemove: 'Remove comment',
+  atRoadmap: '{n} roadmap ideas waiting for your OK',
   companyGroup: 'Company',
   companyDetails: 'Company details',
   macRollout: 'Mac app and roll-out',
@@ -849,6 +865,22 @@ const DE: Record<Key, string> = {
   invitationsTitle: 'Einladungen und Freigaben',
   signupTitle: 'Wer sich anmelden darf',
   inboxGroup: 'Posteingang',
+  rmTitle: 'Roadmap',
+  rmIntro: 'Stimmen, Kommentare und Ideen von Leuten mit Konto, aus Info & Feedback → Was kommt in der App. Ideen warten hier auf dein OK, bevor andere sie sehen. Niemand, auch du nicht, sieht, wer abgestimmt hat.',
+  rmCopy: 'Für Claude kopieren',
+  rmCopied: 'Kopiert. Füg es in den Planungs-Chat ein; der Text steht auch unten.',
+  rmWaiting: 'Wartet auf dein OK',
+  rmNoneWaiting: 'Keine Ideen offen.',
+  rmApprove: 'Freigeben',
+  rmHide: 'Ausblenden',
+  rmApproved: 'Freigegebene Ideen',
+  rmHidden: 'Ausgeblendete Ideen',
+  rmItems: 'Punkte der Roadmap',
+  rmVotes: '{n} Stimmen',
+  rmPeople: 'Bisher haben {n} Leute abgestimmt.',
+  rmOrphans: 'Ids, die nicht mehr auf der Roadmap stehen',
+  rmRemove: 'Kommentar entfernen',
+  atRoadmap: '{n} Roadmap-Ideen warten auf dein OK',
   companyGroup: 'Firma',
   companyDetails: 'Firmendaten',
   macRollout: 'Mac-App und Verteilung',
@@ -956,7 +988,7 @@ type State = {
   https: string | null;
   macApp: { from: 'folder' | 'upload' | 'github'; upload: string | null };
   backups: BackupStatus | null;
-  config: Config; secrets: { float: boolean; personio: boolean; email: boolean }; email: { ready: boolean; publicUrl: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; me: { id: string; email: string | null; name: string }; registration: 'invite' | 'approval' | 'open'; pending: number };
+  config: Config; secrets: { float: boolean; personio: boolean; email: boolean }; email: { ready: boolean; publicUrl: boolean }; keySource: 'env' | 'file'; release: { version: string; size: number } | null; devices: number; passwordSet: boolean; feedbackUnread: number; roadmapWaiting?: number; me: { id: string; email: string | null; name: string }; registration: 'invite' | 'approval' | 'open'; pending: number };
 
 let token = '';
 try {
@@ -2680,6 +2712,138 @@ function Feedback(ctx: Ctx) {
   );
 }
 
+// ---- Roadmap: ideas to approve, votes and comments, and one text for the product owner (server/src/roadmap.ts) -----
+
+type RmComment = { id: number; target: string; name: string; text: string; at: string };
+type RmIdea = { id: string; name: string; title: string; text: string; status: 'waiting' | 'approved' | 'hidden'; createdAt: string; votes: number; comments: RmComment[] };
+type RmAdmin = {
+  people: number;
+  sections: { key: string; title: string; votable: boolean; items: { id: string; title: string; votes: number; comments: RmComment[] }[] }[];
+  suggestions: RmIdea[];
+  orphans: { id: string; votes: number; comments: RmComment[] }[];
+};
+
+function RoadmapAdmin(ctx: Ctx) {
+  const [v, setV] = useState<RmAdmin | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const run = (method: string, path: string, body?: unknown) =>
+    call<RmAdmin>(method, path, body).then(
+      (r) => {
+        setV(r);
+        ctx.setErr(null);
+        // The badge in the side menu follows.
+        if (method !== 'GET') void call<State>('GET', '/state').then(ctx.setS, () => {});
+      },
+      (e) => ctx.setErr((e as Error).message),
+    );
+  useEffect(() => {
+    void run('GET', '/roadmap');
+  }, []);
+  if (!v) return null;
+  const comments = (cs: RmComment[]) =>
+    cs.length > 0 && (
+      <ul className="a-rm-comments">
+        {cs.map((c) => (
+          <li key={c.id}>
+            <span className="a-hint">{c.name || t('fbAnonymous')}:</span> {c.text}{' '}
+            <button className="soft a-rm-x" title={t('rmRemove')} aria-label={t('rmRemove')} onClick={() => run('DELETE', `/roadmap/comments/${c.id}`)}>
+              <Icon name="close" size={14} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  const idea = (x: RmIdea) => (
+    <li key={x.id} className="a-card">
+      <div className="a-card-head">
+        <strong>{x.title}</strong>
+        <span className="a-inline">
+          {x.status !== 'approved' && (
+            <button className="soft" onClick={() => run('PUT', `/roadmap/suggestions/${x.id}`, { status: 'approved' })}>
+              <Icon name="check" size={16} /> {t('rmApprove')}
+            </button>
+          )}
+          {x.status !== 'hidden' && (
+            <button className="soft" onClick={() => run('PUT', `/roadmap/suggestions/${x.id}`, { status: 'hidden' })}>
+              <Icon name="visibility_off" size={16} /> {t('rmHide')}
+            </button>
+          )}
+        </span>
+      </div>
+      {x.text && <span>{x.text}</span>}
+      <span className="a-hint">{[x.name || t('fbAnonymous'), when(x.createdAt), x.status === 'approved' && t('rmVotes', { n: x.votes })].filter(Boolean).join(' · ')}</span>
+      {comments(x.comments)}
+    </li>
+  );
+  const by = (st: RmIdea['status']) => v.suggestions.filter((x) => x.status === st);
+  return (
+    <>
+      <p className="a-intro">{t('rmIntro')}</p>
+      <div className="a-inline a-rm-copy">
+        <button
+          className="primary"
+          onClick={async () => {
+            try {
+              const { text } = await call<{ text: string }>('GET', '/roadmap/export');
+              setCopied(text);
+              await navigator.clipboard?.writeText(text).catch(() => {});
+            } catch (e) {
+              ctx.setErr((e as Error).message);
+            }
+          }}
+        >
+          <Icon name="content_copy" size={18} /> {t('rmCopy')}
+        </button>
+        <span className="a-hint">{copied ? t('rmCopied') : t('rmPeople', { n: v.people })}</span>
+      </div>
+      {copied && <pre className="a-rm-export">{copied}</pre>}
+      <h3 className="a-rm-h">{t('rmWaiting')}</h3>
+      {by('waiting').length ? <ul className="a-rm-list">{by('waiting').map(idea)}</ul> : <p className="a-hint">{t('rmNoneWaiting')}</p>}
+      {by('approved').length > 0 && (
+        <>
+          <h3 className="a-rm-h">{t('rmApproved')}</h3>
+          <ul className="a-rm-list">{by('approved').map(idea)}</ul>
+        </>
+      )}
+      <h3 className="a-rm-h">{t('rmItems')}</h3>
+      <ul className="a-rm-list">
+        {v.sections
+          .filter((s) => s.votable)
+          .flatMap((s) => s.items.map((it) => ({ ...it, section: s.title })))
+          .map((it) => (
+            <li key={it.id} className="a-rm-item">
+              <span>
+                <strong>{it.title}</strong> <span className="a-hint">· {it.section} · {t('rmVotes', { n: it.votes })}</span>
+              </span>
+              {comments(it.comments)}
+            </li>
+          ))}
+      </ul>
+      {v.orphans.length > 0 && (
+        <>
+          <h3 className="a-rm-h">{t('rmOrphans')}</h3>
+          <ul className="a-rm-list">
+            {v.orphans.map((o) => (
+              <li key={o.id} className="a-rm-item">
+                <span>
+                  <code>{o.id}</code> <span className="a-hint">· {t('rmVotes', { n: o.votes })}</span>
+                </span>
+                {comments(o.comments)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {by('hidden').length > 0 && (
+        <>
+          <h3 className="a-rm-h">{t('rmHidden')}</h3>
+          <ul className="a-rm-list">{by('hidden').map(idea)}</ul>
+        </>
+      )}
+    </>
+  );
+}
+
 // ---- The owner's account: asked once after the update to people (docs/accounts-design.md) -----------------
 
 function OwnerPrompt({ s, setS }: { s: State; setS: (s: State) => void }) {
@@ -2872,6 +3036,7 @@ const ATTENTION: Record<string, [IconName, Key, Key, string]> = {
   update: ['update', 'atUpdate', 'atHowUpdate', 'health'],
   adminPassword: ['lock', 'atPassword', 'atSetUp', 'account'],
   feedback: ['forum', 'atFeedback', 'atRead', 'feedback'],
+  roadmap: ['lightbulb', 'atRoadmap', 'atReview', 'roadmap'],
 };
 
 function useOverview(ctx: Ctx) {
@@ -3087,7 +3252,13 @@ const ADMIN_NAV: { group?: Key; pages: Page[] }[] = [
       { key: 'signup', title: 'signupTitle', icon: 'how_to_reg', view: (c) => <><p className="a-intro">{t('regStepIntro')}</p><People {...c} part="registration" /></> },
     ],
   },
-  { group: 'inboxGroup', pages: [{ key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} />, badge: (s) => s.feedbackUnread }] },
+  {
+    group: 'inboxGroup',
+    pages: [
+      { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} />, badge: (s) => s.feedbackUnread },
+      { key: 'roadmap', title: 'rmTitle', icon: 'lightbulb', view: (c) => <RoadmapAdmin {...c} />, badge: (s) => s.roadmapWaiting ?? 0 },
+    ],
+  },
   {
     group: 'companyGroup',
     pages: [
@@ -3213,6 +3384,7 @@ function AdminShell({ ctx, rerun }: { ctx: Ctx; rerun: () => void }) {
 type Section = { key: string; title: Key; icon: IconName; view: (ctx: Ctx) => ReactNode };
 const PEOPLE: Section = { key: 'people', title: 'peopleTitle', icon: 'group', view: (c) => <PeopleList ctx={c} /> };
 const FEEDBACK: Section = { key: 'feedback', title: 'fbTitle', icon: 'forum', view: (c) => <Feedback {...c} /> };
+const ROADMAP: Section = { key: 'roadmap', title: 'rmTitle', icon: 'lightbulb', view: (c) => <RoadmapAdmin {...c} /> };
 const ACCOUNT: Section = { key: 'account', title: 'accountTitle', icon: 'lock', view: (c) => <Account {...c} /> };
 /** After the setup, these steps are Settings pages of their own (the others only make sense in the wizard). */
 const SETTINGS_KEYS = ['company', 'email', 'macapp', 'backups', 'float', 'personio', 'rules', 'rollout', 'done'];
@@ -3299,7 +3471,7 @@ function App() {
   // The setup wizard on the Admin page: Manage (everyday: devices, feedback, account), then either the setup wizard (numbered steps, until
   // it's finished or when run again) or Settings (the same pages, each on its own, without steps). /setup is the wizard.
   const setupMode = !admin || !s.config.setupDone || wizard;
-  const MANAGE = admin ? [PEOPLE, FEEDBACK, ACCOUNT] : [];
+  const MANAGE = admin ? [PEOPLE, FEEDBACK, ROADMAP, ACCOUNT] : [];
   const rest = setupMode ? STEPS : STEPS.filter((x) => SETTINGS_KEYS.includes(x.key));
   const SECTIONS = [...MANAGE, ...rest];
   const offset = MANAGE.length;
@@ -3345,6 +3517,7 @@ function App() {
                 <span className="a-num">{i < offset || !setupMode ? <Icon name={st.icon} size={14} /> : i - offset + 1}</span>
                 {t(titleOf(st))}
                 {st.key === 'feedback' && s.feedbackUnread > 0 && <span className="a-badge">{s.feedbackUnread}</span>}
+                {st.key === 'roadmap' && (s.roadmapWaiting ?? 0) > 0 && <span className="a-badge">{s.roadmapWaiting}</span>}
                 {st.key === 'people' && s.pending > 0 && <span className="a-badge">{s.pending}</span>}
               </button>
             </Fragment>

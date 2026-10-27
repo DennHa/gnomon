@@ -113,5 +113,7 @@ if (process.argv.includes('--tests')) {
     fs.mkdirSync(path.join(out, 'roadmap'));
     fs.writeFileSync(path.join(out, 'roadmap/index.html'), roadmapPage(fs.readFileSync(roadmap, 'utf8')));
     fs.copyFileSync(path.join(root, 'roadmap/roadmap.css'), path.join(out, 'roadmap/roadmap.css'));
+    // The Markdown too, for the board in the app (votes and comments per item, src/roadmap.ts).
+    fs.copyFileSync(roadmap, path.join(out, 'roadmap/ROADMAP.md'));
   }
 }

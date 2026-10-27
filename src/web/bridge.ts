@@ -194,6 +194,13 @@ window.api = {
   serverSignIn: async () => unavailable,
   serverRegister: async () => unavailable,
   serverAccount: async () => session?.me ?? null,
+  roadmapCall: async (method, path, body) => {
+    try {
+      return { ok: true, board: await call<import('../roadmap').RoadmapBoard>(method, path, body) };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message, status: err instanceof WebError ? err.status : undefined };
+    }
+  },
   feedbackAvailable: async () => false,
   feedbackSend: async () => unavailable,
   feedbackThreads: async () => [],

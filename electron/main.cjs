@@ -1177,6 +1177,14 @@ ipcMain.handle('server:pairCode', async (_e, name) => {
   if (!r.ok) return r;
   return { ok: true, code: r.data.code, expiresAt: r.data.expiresAt, link: `${s.url}/#pair=${r.data.code}` };
 });
+/** Votes, comments and ideas on this server's roadmap (Info & feedback → What's coming); only its /roadmap/ routes. */
+ipcMain.handle('roadmap:call', async (_e, { method, apiPath, body }) => {
+  const s = readServer();
+  if (!s) return { ok: false, error: 'not_connected' };
+  if (!['GET', 'PUT', 'POST', 'DELETE'].includes(method) || typeof apiPath !== 'string' || !/^\/roadmap\/[\w/-]+$/.test(apiPath)) return { ok: false, error: 'invalid' };
+  const r = await serverCall(s.url, method, apiPath, body, s.key);
+  return r.ok ? { ok: true, board: r.data } : r;
+});
 /** This account's devices on the server (only its own), e.g. whether a phone is connected yet. */
 ipcMain.handle('server:myDevices', async () => {
   const s = readServer();
