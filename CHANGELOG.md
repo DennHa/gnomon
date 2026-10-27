@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.23 · 2026-10-27
 
 - **Vote on the roadmap:** Info & feedback now has three tabs, *What's new*, *What's coming* and *Feedback*. *What's
   coming* shows the roadmap as a small board; with an account on a Gnomon server you can vote, comment and suggest an

@@ -7,7 +7,7 @@ aren't lost.
 -->
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-25 (0.1.22).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-27 (0.1.23).
 
 ## Now
 
@@ -57,6 +57,10 @@ Nothing in progress right now; the next step is chosen from the list below.
 - **A clear admin page.** An overview of who's in, who's invited, what needs attention and the server's health.
 - **Data encrypted at rest.** The server's database and backups are encrypted, with the key kept outside the data.
 - **Copy the day as text.** One click turns a day or a week into bullet points for Weblog or a status message.
+- **Target corridor instead of an overtime bank.** Optional: a rolling average of your hours against your target,
+  with zones, as an alternative to the overtime balance. A company can switch it on for everyone.
+- **Vote and suggest on the roadmap.** In the app under Info & feedback: vote, comment and suggest ideas, with an
+  account on a Gnomon server.
 - **Public roadmap.** This page, at `/roadmap` on your Gnomon server and linked from Info & feedback.
 
 ## Left out on purpose
