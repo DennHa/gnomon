@@ -688,6 +688,15 @@ test('corridor: a missing day counts as 0 h; a week without records is a gap (as
   assert.equal(byWeek.get('2026-09-21'), null, 'so is everything before the first record');
   assert.equal(c.points.length, 52);
   assert.equal(corridorOf({ ...base(), workdays: [] }, corNow).rolling, null, 'no records at all: no average');
+  // Starting later, with holidays imported from long before: counting starts on the first day worked.
+  let late: Data = { ...base(), workdays: weekDays('2026-10-21', [8, 8, 8]) }; // Wed–Fri of the last finished week
+  for (const day of ['2026-01-01', '2026-05-01', '2026-10-05']) late = A.markDayOff(late, day);
+  late = A.markDayOff(late, '2026-09-30', 'overtime');
+  const l = corridorOf(late, corNow);
+  assert.deepEqual(l.window.map((w) => w.target / H), [0, 0, 0, 24], 'only Wed–Fri of the first week');
+  assert.equal(l.rolling?.basis, 1); assert.equal(l.rolling?.pct, 0);
+  assert.deepEqual(l.ask, { days: ['2026-10-26', '2026-10-27'], weeks: [] }, 'nothing before the first workday is asked about');
+  assert.equal(l.points.filter((p) => p.pct !== null).length, 1);
 });
 test('corridor: a schedule change mid-window uses each day’s own schedule; the window follows the company’s weeks', () => {
   let d = setSchedule(base(), '2026-10-12', [8, 8, 8, 8, 0, 0, 0]);

@@ -75,8 +75,8 @@ export function weekOf(d: Data, monday: string, now = Date.now(), firstDay = fir
       continue;
     }
     if (w?.off) {
-      // Overtime off: the target stays and nothing is worked, as in the balance.
-      addTarget(date, scheduled);
+      // Overtime off: the target stays and nothing is worked, as in the balance (from the first workday on).
+      if (firstDay && date >= firstDay) addTarget(date, scheduled);
       continue;
     }
     if (w) {
@@ -93,10 +93,13 @@ export function weekOf(d: Data, monday: string, now = Date.now(), firstDay = fir
   return week;
 }
 
-/** The first day with any record: before it, nothing counts as missing. */
+/**
+ * The first day you worked (clocked in, or bookings): before it, nothing counts, so someone who starts later or has no
+ * history isn't short for the weeks before. Days off don't count here: Float and Personio import them far back.
+ */
 export function firstRecord(d: Data): string | undefined {
   let first: string | undefined;
-  for (const w of d.workdays) if (!first || w.date < first) first = w.date;
+  for (const w of d.workdays) if (!w.off && (!first || w.date < first)) first = w.date;
   return first;
 }
 
