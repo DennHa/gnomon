@@ -41,10 +41,12 @@ function CorridorChart({ c: all }: { c: Corridor }) {
   const W = 640;
   const HT = 190;
   const left = 44;
-  const right = 52;
+  const right = 64;
   const top = 10;
   const bottom = 24;
-  const max = Math.max(20, Math.ceil((c.rules.critical * 1.25) / 5) * 5);
+  // Room for the critical zone and for every value shown (in steps of 10), up to ±100 %; beyond that, at the edge.
+  const extreme = Math.max(c.rules.critical * 1.25, ...c.points.map((p) => Math.abs(p.pct ?? 0)));
+  const max = Math.min(100, Math.max(20, Math.ceil(extreme / 10) * 10));
   const x = (i: number) => left + (i * (W - left - right)) / Math.max(1, c.points.length - 1);
   const y = (pct: number) => top + ((max - Math.max(-max, Math.min(max, pct))) / (2 * max)) * (HT - top - bottom);
   const runs: { i: number; pct: number }[][] = [];
@@ -54,7 +56,9 @@ function CorridorChart({ c: all }: { c: Corridor }) {
     runs[runs.length - 1].push({ i, pct: p.pct });
   });
   const lastIndex = c.points.map((p) => p.pct !== null).lastIndexOf(true);
-  const ticks = [max, c.rules.within, 0, -c.rules.within, -max];
+  // The band's limits get a label only when there's room for it next to 0.
+  const roomy = y(0) - y(c.rules.within) >= 14;
+  const ticks = roomy ? [max, c.rules.within, 0, -c.rules.within, -max] : [max, 0, -max];
   // A month label on the first week that starts in it, every other month when they'd crowd.
   const months = c.points.flatMap((p, i) => (i === 0 || p.monday.slice(5, 7) !== c.points[i - 1].monday.slice(5, 7) ? [{ i, label: fmtDate(p.monday, { month: 'short' }) }] : [])).filter((_, k, all) => all.length <= 8 || k % 2 === 0);
   return (
@@ -143,7 +147,7 @@ export function CorridorCard({ info }: { info: (text: string) => JSX.Element }) 
         <div className="corridor-tile">
           <span className="muted small">{t('cor.absences')}</span>
           <strong>{absent ? fmtH(absent) : '0 h'}</strong>
-          <span className="muted small">{current.daysOff.length ? [t('count.daysOff', { n: current.daysOff.length }), ...reasons].join(' · ') : t('cor.noAbsences')}</span>
+          <span className="muted small">{current.daysOff.length ? [t('cor.offDays', { n: current.daysOff.length }), ...reasons].join(' · ') : t('cor.noAbsences')}</span>
         </div>
       </div>
       {banner}

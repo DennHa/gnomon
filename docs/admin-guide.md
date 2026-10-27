@@ -180,7 +180,7 @@ manage accounts here, but **never see anyone's times**: the Admin page has no wa
   *Settings → Labs*.
 - **Overtime balance for everyone**: a running total of hours above or below target (*Überstundenkonto*).
 - **Target corridor for everyone**: no bank of hours. People see whether the rolling average of their last finished
-  weeks stays near their target: *within* (default under ±10 %), *elevated* (up to 20 %) or *critical* (beyond).
+  weeks stays near their target: *fine* (default under ±10 %), *outside* (up to 20 %) or *far outside* (beyond).
   Holidays, closures, vacation and sick days lower the target; a scheduled workday with nothing recorded counts as
   0 h, and Gnomon asks the person about it. You set the window (default 4 weeks), both limits and the note shown under
   the chart (empty: a default note in each person's language).
