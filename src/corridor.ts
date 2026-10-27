@@ -43,6 +43,8 @@ export type Week = {
   monday: string;
   worked: number;
   target: number;
+  /** The target up to and including today (the whole target for a finished week): what the current week is measured against. */
+  targetToDate: number;
   /** Whether anything was recorded (a workday or a day off); weeks without are gaps. */
   recorded: boolean;
   /** Normal days off (vacation, sick, holiday, closure) with the hours the schedule would have had. */
@@ -58,7 +60,11 @@ const plusDays = (date: string, n: number) => dayKey(addDays(new Date(`${date}T1
 export function weekOf(d: Data, monday: string, now = Date.now(), firstDay = firstRecord(d)): Week {
   const today = dayKey(now);
   const byDate = new Map(d.workdays.map((w) => [w.date, w]));
-  const week: Week = { monday, worked: 0, target: 0, recorded: false, daysOff: [], missing: [] };
+  const week: Week = { monday, worked: 0, target: 0, targetToDate: 0, recorded: false, daysOff: [], missing: [] };
+  const addTarget = (date: string, ms: number) => {
+    week.target += ms;
+    if (date <= today) week.targetToDate += ms;
+  };
   for (let i = 0; i < 7; i++) {
     const date = plusDays(monday, i);
     const scheduled = hoursToMs(targetHoursOn(d, date));
@@ -70,18 +76,18 @@ export function weekOf(d: Data, monday: string, now = Date.now(), firstDay = fir
     }
     if (w?.off) {
       // Overtime off: the target stays and nothing is worked, as in the balance.
-      week.target += scheduled;
+      addTarget(date, scheduled);
       continue;
     }
     if (w) {
       // A past day still open (forgot to clock out) waits until it's fixed; today counts up to now.
       if (!w.end && date < today) continue;
       week.worked += Math.max(0, workdayMs(w, now));
-      week.target += scheduled;
+      addTarget(date, scheduled);
       continue;
     }
     if (!firstDay || date < firstDay || scheduled <= 0) continue;
-    week.target += scheduled;
+    addTarget(date, scheduled);
     if (date < today) week.missing.push(date);
   }
   return week;

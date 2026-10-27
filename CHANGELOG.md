@@ -7,7 +7,8 @@ Gnomon server shows the newest entry.
 
 - **Target corridor instead of an overtime balance (optional):** instead of a running bank of hours, Reports can show
   whether the rolling average of your last finished weeks stays near your work schedule's target: within ±10 %,
-  elevated up to 20 %, or critical, with a chart of the last 12 months and the current week on its own tile. Holidays,
+  elevated up to 20 %, or critical, with a chart of the last 12 months and the current week on its own tile (against
+  the target up to today). Holidays,
   closures, vacation and sick days lower the target; a scheduled workday with nothing recorded counts as 0 h, and the
   sidebar asks about it (*Add hours* or *Day off*). The menu bar's menu shows a short status such as
   "4 weeks: −6.7 % · within"; the sidebar shows it only when you're outside the corridor. On a company server, the admin chooses balance or corridor for everyone under

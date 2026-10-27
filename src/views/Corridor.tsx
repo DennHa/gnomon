@@ -137,8 +137,8 @@ export function CorridorCard({ info }: { info: (text: string) => JSX.Element }) 
         </div>
         <div className="corridor-tile">
           <span className="muted small">{t('cor.current')}</span>
-          <strong>{fmtH(current.worked - current.target, true)}</strong>
-          <span className="muted small">{t('cor.currentSub', { worked: fmtH(current.worked), target: fmtH(current.target) })}</span>
+          <strong>{fmtH(current.worked - current.targetToDate, true)}</strong>
+          <span className="muted small">{t('cor.currentSub', { worked: fmtH(current.worked), target: fmtH(current.targetToDate), week: fmtH(current.target) })}</span>
         </div>
         <div className="corridor-tile">
           <span className="muted small">{t('cor.absences')}</span>

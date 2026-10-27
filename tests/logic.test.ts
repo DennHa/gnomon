@@ -639,6 +639,8 @@ test('corridor: full weeks on target are 0 % and within; the current week is its
   assert.equal(c.rolling?.pct, 0); assert.equal(c.rolling?.basis, 4); assert.equal(c.rolling?.zone, 'within');
   assert.equal(c.current.monday, '2026-10-26');
   assert.equal(c.current.worked, 2 * H); assert.equal(c.current.target, 40 * H, 'the whole week’s target');
+  assert.equal(c.current.targetToDate, 24 * H, 'the tile compares with Monday to Wednesday, today included');
+  assert.equal(c.window[0].targetToDate, c.window[0].target, 'a finished week: the whole target');
   assert.deepEqual(c.ask.days, ['2026-10-27'], 'Tuesday is empty; today (Wednesday) and later aren’t asked about');
   const p = c.points[c.points.length - 1];
   assert.equal(p.monday, '2026-10-19'); assert.equal(p.pct, 0);
