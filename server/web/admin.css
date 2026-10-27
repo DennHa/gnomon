@@ -18,7 +18,7 @@ body { margin: 0; }
 .a-hint { color: var(--muted); font-size: 13px; line-height: 1.45; }
 .a-label { font-size: 13px; font-weight: 600; }
 .a-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-.a-field input, .a-field select, .a-inline input { font: inherit; border: 0; border-radius: 10px; background: var(--field); color: var(--text); padding: 10px 12px; }
+.a-field input, .a-field select, .a-field textarea, .a-inline input { font: inherit; border: 0; border-radius: 10px; background: var(--field); color: var(--text); padding: 10px 12px; }
 .a-row { display: flex; gap: 14px; flex-wrap: wrap; }
 .a-list { display: flex; flex-direction: column; gap: 8px; }
 .a-item, .a-check { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--field); cursor: pointer; }
@@ -252,3 +252,6 @@ a.soft.a-button { background: var(--surface); color: var(--text); font-weight: 6
 .a-cleanup-row { align-items: center; gap: 12px; padding-top: 4px; }
 .a-files { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
 .a-files code { padding: 1px 6px; border-radius: 6px; background: var(--surface); font-size: 12px; overflow-wrap: anywhere; }
+
+/* Working hours: the note under the chart */
+.a-field textarea { resize: vertical; line-height: 1.5; }

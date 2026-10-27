@@ -54,8 +54,9 @@ import open_in_new from '@material-symbols/svg-400/rounded/open_in_new.svg';
 import update from '@material-symbols/svg-400/rounded/update.svg';
 import arrow_upward from '@material-symbols/svg-400/rounded/arrow_upward.svg';
 import arrow_downward from '@material-symbols/svg-400/rounded/arrow_downward.svg';
+import target from '@material-symbols/svg-400/rounded/target.svg';
 
-const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail, backup, upload, dns, how_to_reg, admin_panel_settings, home, monitor_heart, person_add, search, extension, hard_drive, account_circle, open_in_new, update, arrow_upward, arrow_downward };
+const ICONS = { play_arrow, stop, coffee, login, logout, today, calendar_view_week, devices, laptop_mac, mobile, language, edit, link_off, qr_code_2, forum, send, person, chevron_left, chevron_right, close, delete: delete_, history, add, cloud_off, timer, schedule, qr_code_scanner, check_circle, download, link, warning, arrow_forward, arrow_back, rocket_launch, lock, verified_user, apartment, group, mail, backup, upload, dns, how_to_reg, admin_panel_settings, home, monitor_heart, person_add, search, extension, hard_drive, account_circle, open_in_new, update, arrow_upward, arrow_downward, target };
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {

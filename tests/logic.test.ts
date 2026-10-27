@@ -5,6 +5,7 @@ import { applyFloatImport, type FloatImport } from '../src/float';
 import { applyPersonioImport, mapPersonioAbsences, periodDays, type PersonioPeriod } from '../src/personio';
 import { goalFor } from '../src/plan';
 import { balanceByMonth } from '../src/balance';
+import { corridorOf, hoursMode, rulesOf, zoneOf } from '../src/corridor';
 import { daySummary, weekSummary } from '../src/motion';
 import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { fitAll, fitWorkdays } from '../src/fit';
@@ -619,6 +620,86 @@ test('dayText and daysText in German; a week has one block per day with entries'
   assert.equal(week.lines, 6);
   assert.ok(week.text.startsWith('Dienstag, 20. Okt. · 1:00 h\n\n- Internal: Workshop (1:00)\n\nFreitag, 23. Okt.'), week.text);
   setLanguage('en');
+});
+
+// Target corridor: now is Wednesday 28 Oct 2026; the 4-week window is the weeks of 28 Sep, 5, 12 and 19 Oct.
+const corNow = Date.parse('2026-10-28T12:00:00');
+const workday = (date: string, hours: number) => ({ date, start: atTime(date, '08:00'), end: new Date(Date.parse(atTime(date, '08:00')) + hours * H).toISOString(), breaks: [] });
+const weekDays = (monday: string, hours: number[]) => hours.flatMap((h, i) => (h ? [workday(dayKey(new Date(Date.parse(`${monday}T12:00`) + i * 86_400_000)), h)] : []));
+const WINDOW = ['2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19'];
+test('corridor: full weeks on target are 0 % and within; the current week is its own tile and not in the average', () => {
+  const d: Data = { ...base(), workdays: [...WINDOW.flatMap((m) => weekDays(m, [8, 8, 8, 8, 8])), workday('2026-10-26', 2)] };
+  const c = corridorOf(d, corNow);
+  assert.deepEqual(c.window.map((w) => w.monday), WINDOW);
+  assert.equal(c.rolling?.pct, 0); assert.equal(c.rolling?.basis, 4); assert.equal(c.rolling?.zone, 'within');
+  assert.equal(c.current.monday, '2026-10-26');
+  assert.equal(c.current.worked, 2 * H); assert.equal(c.current.target, 40 * H, 'the whole week’s target');
+  assert.deepEqual(c.ask.days, ['2026-10-27'], 'Tuesday is empty; today (Wednesday) and later aren’t asked about');
+  const p = c.points[c.points.length - 1];
+  assert.equal(p.monday, '2026-10-19'); assert.equal(p.pct, 0);
+});
+test('corridor: part time, the deviation is in % of the person’s own target; zone thresholds', () => {
+  let d = setSchedule(base(), '2000-01-01', [4, 4, 4, 4, 4, 0, 0]);
+  d = { ...d, workdays: WINDOW.flatMap((m) => weekDays(m, [4, 4, 4, 4, 6])) }; // 22 of 20 h: +10 %
+  const c = corridorOf(d, corNow);
+  assert.equal(Math.round(c.rolling!.pct * 100) / 100, 10); assert.equal(c.rolling?.zone, 'elevated', 'exactly 10 % is no longer within');
+  assert.equal(c.rolling?.avgPerWeek, 2 * H);
+  const r = rulesOf();
+  assert.deepEqual(r, { weeks: 4, within: 10, critical: 20 });
+  assert.equal(zoneOf(9.99, r), 'within'); assert.equal(zoneOf(-9.99, r), 'within');
+  assert.equal(zoneOf(20, r), 'elevated'); assert.equal(zoneOf(-15, r), 'elevated');
+  assert.equal(zoneOf(20.01, r), 'critical'); assert.equal(zoneOf(-25, r), 'critical');
+  assert.deepEqual(rulesOf({ weeks: 6, within: 5, critical: 3 }), { weeks: 6, within: 5, critical: 5 }, 'critical is never below within');
+  assert.deepEqual(rulesOf({ weeks: 0, within: -1 }), r, 'nonsense falls back to the defaults');
+});
+test('corridor: holidays, closures, vacation and sick days lower the target; overtime off keeps it', () => {
+  let d: Data = { ...base(), workdays: [...weekDays('2026-09-28', [8, 8, 8, 8, 8]), ...weekDays('2026-10-05', [0, 8, 8, 8, 8]), ...weekDays('2026-10-12', [8, 8, 0, 0, 8]), ...weekDays('2026-10-19', [8, 8, 8, 8, 0])] };
+  d = A.markDayOff(d, '2026-10-05');
+  d = { ...d, workdays: d.workdays.map((w) => (w.date === '2026-10-05' ? { ...w, offSource: 'float' as const, offReason: 'Holiday' } : w)) };
+  d = A.markDayOff(d, '2026-10-14'); d = A.markDayOff(d, '2026-10-15');
+  d = { ...d, workdays: d.workdays.map((w) => (w.date === '2026-10-14' || w.date === '2026-10-15' ? { ...w, offSource: 'personio' as const } : w)) };
+  d = A.markDayOff(d, '2026-10-23', 'overtime');
+  const c = corridorOf(d, corNow);
+  assert.deepEqual(c.window.map((w) => w.target / H), [40, 32, 24, 40]);
+  assert.deepEqual(c.window.map((w) => w.daysOff.length), [0, 1, 2, 0]);
+  assert.equal(c.window[1].daysOff[0].hours, 8 * H);
+  assert.equal(c.rolling!.pct, (-8 / 136) * 100, 'only the overtime-off Friday is short');
+  assert.deepEqual(c.daysOff, { float: 1, personio: 2, manual: 0 });
+  assert.deepEqual(c.ask.days, ['2026-10-26', '2026-10-27'], 'days off aren’t missing; this week’s empty days are');
+});
+test('corridor: a missing day counts as 0 h; a week without records is a gap (asked about once); nothing before the first record', () => {
+  const d: Data = { ...base(), workdays: [...weekDays('2026-09-28', [0, 0, 8, 8, 8]), ...weekDays('2026-10-05', [8, 8, 8, 8, 0]), ...weekDays('2026-10-19', [8, 8, 8, 8, 8])] };
+  const c = corridorOf(d, corNow);
+  assert.deepEqual(c.window.map((w) => w.target / H), [24, 40, 40, 40], 'the first week counts from the first record (Wednesday)');
+  assert.deepEqual(c.window[1].missing, ['2026-10-09']);
+  assert.equal(c.rolling?.basis, 3, 'the empty week of 12 Oct is left out');
+  assert.equal(c.rolling!.pct, (-8 / 104) * 100);
+  assert.deepEqual(c.ask.weeks, ['2026-10-12']);
+  assert.ok(c.ask.days.includes('2026-10-09') && !c.ask.days.includes('2026-09-28') && !c.ask.days.some((x) => x >= '2026-10-12' && x < '2026-10-19'));
+  const byWeek = new Map(c.points.map((p) => [p.monday, p.pct]));
+  assert.equal(byWeek.get('2026-10-12'), null, 'a week without data is a gap in the chart');
+  assert.equal(byWeek.get('2026-09-21'), null, 'so is everything before the first record');
+  assert.equal(c.points.length, 52);
+  assert.equal(corridorOf({ ...base(), workdays: [] }, corNow).rolling, null, 'no records at all: no average');
+});
+test('corridor: a schedule change mid-window uses each day’s own schedule; the window follows the company’s weeks', () => {
+  let d = setSchedule(base(), '2026-10-12', [8, 8, 8, 8, 0, 0, 0]);
+  d = { ...d, workdays: [...weekDays('2026-09-28', [8, 8, 8, 8, 8]), ...weekDays('2026-10-05', [8, 8, 8, 8, 8]), ...weekDays('2026-10-12', [8, 8, 8, 8]), ...weekDays('2026-10-19', [8, 8, 8, 8])] };
+  const c = corridorOf(d, corNow);
+  assert.deepEqual(c.window.map((w) => w.target / H), [40, 40, 32, 32]);
+  assert.equal(c.rolling?.pct, 0);
+  assert.equal(c.current.target, 32 * H);
+  const two = corridorOf({ ...d, settings: { ...d.settings, companyHours: { mode: 'corridor', weeks: 2 } } }, corNow);
+  assert.deepEqual(two.window.map((w) => w.monday), ['2026-10-12', '2026-10-19']);
+});
+test('corridor: the company’s mode wins over the person’s Labs switch', () => {
+  const d = base();
+  assert.equal(hoursMode(d), 'balance');
+  assert.equal(hoursMode({ ...d, settings: { ...d.settings, hoursView: 'corridor' } }), 'corridor');
+  assert.equal(hoursMode({ ...d, settings: { ...d.settings, hoursView: 'corridor', companyHours: { mode: 'balance' } } }), 'balance');
+  assert.equal(hoursMode({ ...d, settings: { ...d.settings, companyHours: { mode: 'corridor' } } }), 'corridor');
+  assert.equal(hoursMode({ ...d, settings: { ...d.settings, hoursView: 'corridor', companyHours: { weeks: 6 } } }), 'corridor', 'zones without a mode: the person chooses');
+  assert.ok(!Sync.ACCOUNT_SETTINGS.includes('companyHours' as never) && Sync.ACCOUNT_SETTINGS.includes('hoursView' as never));
 });
 
 console.log(`\n${passed} passed`);

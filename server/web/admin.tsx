@@ -83,6 +83,24 @@ const EN = {
   rTrailWhy: 'An opt-in memory aid: which app was in front, once a minute. It never leaves the Mac.',
   rPhone: 'Phone web app on this server',
   rPhoneWhy: 'People can clock in and track from their phone at this address.',
+  // Working hours (after the setup: Company → Working hours)
+  hoursTitle: 'Working hours',
+  hoursIntro: 'How people see their hours against their own work schedule. Either way, the numbers are worked out on each person’s devices: admins never see anyone’s times or deviations.',
+  hoursMode: 'What people see',
+  hoursUnset: 'Each person chooses (overtime balance unless they switch)',
+  hoursBalance: 'Overtime balance for everyone',
+  hoursCorridor: 'Target corridor for everyone',
+  hoursModeHint: 'Overtime balance: a running total above or below target. Target corridor: whether the average of the last few weeks stays near the target, without a bank of hours. Switching keeps all data.',
+  hoursWeeks: 'Window (weeks)',
+  hoursWeeksHint: 'The rolling average covers this many finished weeks.',
+  hoursWithin: 'Within (± %)',
+  hoursWithinHint: 'Less than this: within the corridor.',
+  hoursCritical: 'Critical above (%)',
+  hoursCriticalHint: 'More than this: critical. In between: elevated.',
+  hoursZones: 'Within: under {within} % · elevated: {within}–{critical} % · critical: over {critical} %. Under and over target count alike.',
+  hoursNote: 'Note under the chart',
+  hoursNoteHint: 'Leave it empty for Gnomon’s note in each person’s language (shown as the placeholder).',
+  hoursNoteDefault: 'Larger deviations that last should be agreed with your line manager beforehand; approval happens outside Gnomon. Always stay within the Working Time Act (ArbZG). Vacation and other absences go through Personio.',
   // 7
   rolloutTitle: 'Roll-out with Iru (optional)',
   rolloutIntro: 'Two files, and a checklist for your Mac management.',
@@ -544,6 +562,23 @@ const DE: Record<Key, string> = {
   rTrailWhy: 'Eine freiwillige Gedächtnisstütze: welche App vorne war, einmal pro Minute. Sie verlässt den Mac nie.',
   rPhone: 'Handy-Web-App auf diesem Server',
   rPhoneWhy: 'Alle können sich unter dieser Adresse auch per Handy einstempeln und Zeiten erfassen.',
+  hoursTitle: 'Arbeitszeit',
+  hoursIntro: 'Wie alle ihre Stunden im Vergleich zum eigenen Arbeitszeitmodell sehen. So oder so wird auf den Geräten jeder Person gerechnet: Admins sehen nie die Zeiten oder Abweichungen anderer.',
+  hoursMode: 'Was alle sehen',
+  hoursUnset: 'Jede Person wählt selbst (Überstundenkonto, solange sie nicht umschaltet)',
+  hoursBalance: 'Überstundenkonto für alle',
+  hoursCorridor: 'Zielkorridor für alle',
+  hoursModeHint: 'Überstundenkonto: ein laufender Saldo über oder unter dem Soll. Zielkorridor: ob der Durchschnitt der letzten Wochen nahe am Soll bleibt, ohne Stundenkonto. Beim Umschalten bleiben alle Daten erhalten.',
+  hoursWeeks: 'Zeitraum (Wochen)',
+  hoursWeeksHint: 'So viele abgeschlossene Wochen umfasst der gleitende Durchschnitt.',
+  hoursWithin: 'Im Korridor (± %)',
+  hoursWithinHint: 'Weniger als das: im Zielkorridor.',
+  hoursCritical: 'Kritisch ab (%)',
+  hoursCriticalHint: 'Mehr als das: kritisch. Dazwischen: erhöht.',
+  hoursZones: 'Im Korridor: unter {within} % · erhöht: {within}–{critical} % · kritisch: über {critical} %. Unter und über dem Soll zählen gleich.',
+  hoursNote: 'Hinweis unter dem Diagramm',
+  hoursNoteHint: 'Leer lassen für den Hinweis von Gnomon in der Sprache der jeweiligen Person (als Platzhalter zu sehen).',
+  hoursNoteDefault: 'Größere, länger anhaltende Abweichungen stimmst du vorher mit deiner Führungskraft ab; die Freigabe erfolgt außerhalb von Gnomon. Halte immer das Arbeitszeitgesetz (ArbZG) ein. Urlaub und andere Abwesenheiten laufen über Personio.',
   rolloutTitle: 'Verteilen mit Iru (optional)',
   rolloutIntro: 'Zwei Dateien und eine Checkliste für deine Mac-Verwaltung.',
   profile: 'Einstellungsprofil',
@@ -946,6 +981,7 @@ type Config = {
   float: { tested?: string; people?: number };
   personio: { tested?: string; people?: number; absenceTypes?: { id: string; name: string; unit?: string }[]; dayOffTypes?: string[] };
   rules: Record<'managed' | 'allowLocalApi' | 'allowActivityTrail' | 'phoneApp', boolean>;
+  hours: { mode: 'unset' | 'balance' | 'corridor'; weeks: number; within: number; critical: number; note: string };
   email?: EmailSettings;
   macApp: { source: 'github' | 'upload' };
   audit: { at: string; what: string }[];
@@ -1351,6 +1387,53 @@ function RulesStep({ s, setS }: Ctx) {
         <Toggle on={r.allowActivityTrail} onChange={(v) => set('allowActivityTrail', v)} label={t('rTrail')} why={t('rTrailWhy')} />
         <Toggle on={r.phoneApp} onChange={(v) => set('phoneApp', v)} label={t('rPhone')} why={t('rPhoneWhy')} />
       </div>
+    </>
+  );
+}
+
+/** Balance or corridor for everyone (or each person's choice), and the corridor's zones and note (src/corridor.ts). */
+function HoursStep({ s, setS, setErr }: Ctx) {
+  const [v, setV] = useState(s.config.hours);
+  const [saved, setSaved] = useState(false);
+  const save = async () => {
+    try {
+      setS(await call('PUT', '/config', { hours: v }));
+      setErr(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  const num = (k: 'weeks' | 'within' | 'critical') => (e: { target: { value: string } }) => setV({ ...v, [k]: Number(e.target.value) });
+  return (
+    <>
+      <p className="a-intro">{t('hoursIntro')}</p>
+      <Field label={t('hoursMode')} hint={t('hoursModeHint')}>
+        <select value={v.mode} onChange={(e) => setV({ ...v, mode: e.target.value as Config['hours']['mode'] })}>
+          <option value="unset">{t('hoursUnset')}</option>
+          <option value="balance">{t('hoursBalance')}</option>
+          <option value="corridor">{t('hoursCorridor')}</option>
+        </select>
+      </Field>
+      <div className="a-row">
+        <Field label={t('hoursWeeks')} hint={t('hoursWeeksHint')}>
+          <input type="number" min={1} max={26} step={1} value={v.weeks} onChange={num('weeks')} />
+        </Field>
+        <Field label={t('hoursWithin')} hint={t('hoursWithinHint')}>
+          <input type="number" min={1} max={100} step={1} value={v.within} onChange={num('within')} />
+        </Field>
+        <Field label={t('hoursCritical')} hint={t('hoursCriticalHint')}>
+          <input type="number" min={1} max={200} step={1} value={v.critical} onChange={num('critical')} />
+        </Field>
+      </div>
+      <p className="a-hint">{t('hoursZones', { within: v.within, critical: v.critical })}</p>
+      <Field label={t('hoursNote')} hint={t('hoursNoteHint')}>
+        <textarea rows={3} maxLength={1000} value={v.note} placeholder={t('hoursNoteDefault')} onChange={(e) => setV({ ...v, note: e.target.value })} />
+      </Field>
+      <button className="primary a-save" onClick={save}>
+        {saved ? t('saved') : t('save')}
+      </button>
     </>
   );
 }
@@ -3092,6 +3175,7 @@ const ADMIN_NAV: { group?: Key; pages: Page[] }[] = [
     group: 'companyGroup',
     pages: [
       { key: 'company', title: 'companyDetails', icon: 'apartment', view: (c) => <CompanyStep {...c} /> },
+      { key: 'hours', title: 'hoursTitle', icon: 'target', view: (c) => <HoursStep {...c} /> },
       { key: 'macapp', title: 'macRollout', icon: 'laptop_mac', view: (c) => parts(c, [['macTitle', (x) => <MacAppStep {...x} />], ['rulesTitle', (x) => <RulesStep {...x} />], ['rolloutTitle', (x) => <Rollout {...x} />]]) },
       { key: 'integrations', title: 'integrationsTitle', icon: 'extension', view: (c) => parts(c, [['floatTitle', (x) => <FloatStep {...x} />], ['personioTitle', (x) => <PersonioStep {...x} />]]) },
     ],
