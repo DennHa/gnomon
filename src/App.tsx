@@ -24,6 +24,8 @@ import Tour from './views/Tour';
 import About from './views/About';
 import { isWeb } from './platform';
 import { copyDays } from './views/day';
+import { corridorOf, hoursMode } from './corridor';
+import { CorridorSidebar, corridorShort } from './views/Corridor';
 import { locale, t, trayStrings, type MsgKey } from './i18n';
 
 const VIEWS = [
@@ -124,9 +126,14 @@ function useTrayBridge(onShowReview: () => void) {
   }
   const runningColor = !running || menuBarColor === 'mono' ? undefined : (menuBarColor === 'activity' && runningActivity?.color) || runningProject?.color || '#B0BEC5';
 
+  // Corridor mode: its status under the workday in the menu (once a minute is plenty).
+  const minute = Math.floor(now / 60_000);
+  const hoursStatus = useMemo(() => (hoursMode(data) === 'corridor' ? corridorShort(corridorOf(data, minute * 60_000, 1)) : undefined), [data, minute]);
+
   useEffect(() => {
     const p = running && data.projects.find((x) => x.id === running.projectId);
     window.api.updateTray({
+      hoursStatus,
       title,
       tooltip: dayStatus(data, now),
       status: dayStatus(data, now),
@@ -158,7 +165,7 @@ function useTrayBridge(onShowReview: () => void) {
       strings: trayStrings(),
     });
     // `now` changes every second, which keeps the menu bar clock ticking.
-  }, [title, data, wd, running, recent, todayPlan, now]);
+  }, [title, data, wd, running, recent, todayPlan, now, hoursStatus]);
 
   useEffect(
     () =>
@@ -454,10 +461,12 @@ export default function App() {
   // Clocking in first: on the week's last workday afternoon, a reminder to fill in the week (once a week).
   const minute = useNow(60_000);
   useEffect(() => {
-    const due = weekReminderDue(data, minute);
+    const open = hoursMode(data) === 'corridor' ? corridorOf(data, minute, 1).current.missing : [];
+    const due = weekReminderDue(data, minute, open);
     if (!due) return;
     update((d) => ({ ...d, settings: { ...d.settings, weekReminded: due.monday } }));
-    window.api.notify(t('rem.weekTitle'), t('rem.weekBody', { duration: fmtDuration(due.ms) }));
+    const body = [due.ms >= 30 * 60_000 && t('rem.weekBody', { duration: fmtDuration(due.ms) }), due.open > 0 && t('rem.weekOpen', { n: due.open })].filter(Boolean).join(' ');
+    window.api.notify(t('rem.weekTitle'), body);
   }, [minute]);
 
   // Appearance and highlight colour from Settings.
@@ -538,6 +547,7 @@ export default function App() {
         <nav>{topViews(data.settings.workStyle).map(navButton)}</nav>
         <span className="spacer" />
         <Attendance onOpenDay={openDay} />
+        {hoursMode(data) === 'corridor' && <CorridorSidebar onOpenDay={openDay} />}
         {/* In the browser you're signed in already; the phone signs in with the same account. */}
         {!isWeb() && <PhoneTile />}
         <nav className="nav-bottom">

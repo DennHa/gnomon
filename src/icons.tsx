@@ -62,6 +62,9 @@ import i_link from '@material-symbols/svg-400/rounded/link.svg?raw';
 import i_tune from '@material-symbols/svg-400/rounded/tune.svg?raw';
 import i_keyboard from '@material-symbols/svg-400/rounded/keyboard.svg?raw';
 import i_hub from '@material-symbols/svg-400/rounded/hub.svg?raw';
+import i_target from '@material-symbols/svg-400/rounded/target.svg?raw';
+import i_error from '@material-symbols/svg-400/rounded/error.svg?raw';
+import i_apartment from '@material-symbols/svg-400/rounded/apartment.svg?raw';
 
 const ICONS = {
   timer: i_timer,
@@ -122,6 +125,9 @@ const ICONS = {
   laptop_mac: i_laptop_mac,
   admin_panel_settings: i_admin_panel_settings,
   science: i_science,
+  target: i_target,
+  error: i_error,
+  apartment: i_apartment,
   link: i_link,
   tune: i_tune,
   keyboard: i_keyboard,

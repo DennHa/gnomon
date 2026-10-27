@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Activity, Data, Entry, CompanyProfile } from './types';
+import type { Activity, Data, Entry, CompanyHours, CompanyProfile } from './types';
 import { DEFAULT_SHORTCUTS } from './shortcuts';
 import { applyFloatImport, fetchFloatPlan } from './float';
 import { applyPersonioImport, fetchPersonioAbsences } from './personio';
@@ -195,13 +195,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const pullAll = async (since: number) => {
         const changes: Change[] = [];
         let account: RemoteAccount | null | undefined;
+        let company: CompanyHours | undefined;
         for (;;) {
           const r = await window.api.serverSyncPull(since);
           if (!r.ok) throw new Error(r.error);
           changes.push(...r.changes);
           account = r.account;
+          company = r.company?.hours;
           since = r.cursor;
-          if (!r.more) return { changes, cursor: since, account };
+          if (!r.more) return { changes, cursor: since, account, company };
         }
       };
       const first = !state;
@@ -232,7 +234,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setData((d) => {
         if (!d) return d;
         const next = rebase(d, before, merged);
-        return fit(d, take && accountJson(d) === accountJson(before) && accountJson(next) !== accountJson(withAccountSettings(next, take)) ? withAccountSettings(next, take) : next);
+        const fitted = fit(d, take && accountJson(d) === accountJson(before) && accountJson(next) !== accountJson(withAccountSettings(next, take)) ? withAccountSettings(next, take) : next);
+        // The company's hours view and zones (src/corridor.ts): kept on this device, never sent back.
+        return withCompanyHours(fitted, after.company);
       });
       // Edits up to the start of this sync are settled; later ones keep their time for the next sync.
       for (const [k, at] of changedAt.current) if (at <= now) changedAt.current.delete(k);
@@ -251,6 +255,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshServer = useCallback(async () => {
     const st = await window.api.serverStatus();
     setServerSync((s) => ({ ...s, connected: st.connected, error: undefined, ...(st.connected ? {} : { at: undefined }) }));
+    // Without a server, the company no longer decides: the Labs switch does.
+    if (!st.connected) setData((d) => (d ? withCompanyHours(d, undefined) : d));
   }, []);
 
   useEffect(() => {
@@ -293,6 +299,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   if (!data) return <div className="loading">{t('loading')}</div>;
   return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, serverSync, runServerSync, refreshServer, getData, commit, profile, fitNotices, dismissFitNotices }}>{children}</StoreContext.Provider>;
+}
+
+/** The company's hours setting as the last sync brought it; the same object when nothing changed (no extra save). */
+function withCompanyHours(d: Data, c: CompanyHours | undefined): Data {
+  if (JSON.stringify(d.settings.companyHours ?? null) === JSON.stringify(c ?? null)) return d;
+  const { companyHours: _old, ...settings } = d.settings;
+  return { ...d, settings: c ? { ...settings, companyHours: c } : settings };
 }
 
 export function useStore(): Store {

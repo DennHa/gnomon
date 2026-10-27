@@ -215,6 +215,8 @@ export type QuickStart = { description: string; projectId?: string; activityId?:
 export type TrayState = {
   title: string;
   tooltip: string;
+  /** Target corridor mode: its one-line status, shown under the workday in the menu. */
+  hoursStatus?: string;
   status: string;
   dayActive: boolean;
   dayEnded: boolean;

@@ -513,6 +513,11 @@ test('reminders: time to assign, and the week reminder only for clocking in, on 
   assert.equal(weekReminderDue({ ...d, settings: { ...d.settings, weekReminded: '2026-10-12' } }, fri), null, 'once a week');
   assert.equal(weekReminderDue({ ...d, settings: { ...d.settings, reminders: false } }, fri), null);
   assert.equal(A.workStyleDefaults('clock').menuBarLabel, 'workday');
+  // Target corridor: empty workdays this week are a reason on their own; last week's aren't this week's.
+  const assigned = { ...d, entries: [...d.entries, { id: 'f', description: '', start: atTime('2026-10-12', '15:00'), end: atTime('2026-10-12', '17:00') }, { id: 'g', description: '', start: atTime('2026-10-16', '08:00'), end: atTime('2026-10-16', '15:00') }] };
+  assert.equal(weekReminderDue(assigned, fri), null, 'everything assigned');
+  assert.equal(weekReminderDue(assigned, fri, ['2026-10-09', '2026-10-13', '2026-10-14'])?.open, 2);
+  assert.equal(weekReminderDue(assigned, fri, ['2026-10-09']), null);
 });
 
 test('breaks: overlapping breaks count once, and only inside the workday', () => {

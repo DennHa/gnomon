@@ -566,6 +566,8 @@ function buildTrayMenu(state) {
 
   // Workday
   items.push({ type: 'separator' }, header(tr('workday')), { label: state.status, enabled: false });
+  // Target corridor mode: "4 weeks: −6.7 % · within" (src/views/Corridor.tsx).
+  if (state.hoursStatus) items.push({ label: state.hoursStatus, enabled: false });
   if (state.dayActive) {
     items.push({ label: tr(state.onBreak ? 'endBreak' : 'takeBreak'), icon: menuIcon(state.onBreak ? 'play_arrow' : 'coffee'), accelerator: acc(sc.breakToggle), click: () => sendAction({ type: 'toggle-break' }) });
     items.push({ label: tr('clockOut'), icon: menuIcon('logout'), click: leaveFromMenu });
