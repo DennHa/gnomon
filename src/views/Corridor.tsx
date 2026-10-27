@@ -158,7 +158,7 @@ export function CorridorCard({ info }: { info: (text: string) => JSX.Element }) 
   );
 }
 
-/** Sidebar: the corridor's status line, and the latest scheduled day (or week) without a record, with what to do about it. */
+/** Sidebar, only when there's something to do: the latest scheduled day (or week) without a record, and the status when it's outside the corridor. */
 export function CorridorSidebar({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const { data, update } = useStore();
   const now = useNow(60_000);
@@ -175,6 +175,8 @@ export function CorridorSidebar({ onOpenDay }: { onOpenDay: (day: string) => voi
       }
       return next;
     });
+  const attention = c.rolling && c.rolling.zone !== 'within';
+  if (!day && !week && !attention) return null;
   return (
     <div className="corridor-side">
       {(day || week) && (
@@ -193,9 +195,12 @@ export function CorridorSidebar({ onOpenDay }: { onOpenDay: (day: string) => voi
           </span>
         </div>
       )}
-      <span className={`corridor-status small ${c.rolling ? `zone-${c.rolling.zone}` : 'muted'}`}>
-        <Icon name="target" size={16} /> {corridorShort(c)}
-      </span>
+      {/* Only when it needs attention: inside the corridor, Reports and the menu bar say so. */}
+      {attention && (
+        <span className={`corridor-status small zone-${c.rolling!.zone}`}>
+          <Icon name="target" size={16} /> {corridorShort(c)}
+        </span>
+      )}
     </div>
   );
 }

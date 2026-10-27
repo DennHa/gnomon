@@ -9,8 +9,8 @@ Gnomon server shows the newest entry.
   whether the rolling average of your last finished weeks stays near your work schedule's target: within ±10 %,
   elevated up to 20 %, or critical, with a chart of the last 12 months and the current week on its own tile. Holidays,
   closures, vacation and sick days lower the target; a scheduled workday with nothing recorded counts as 0 h, and the
-  sidebar asks about it (*Add hours* or *Day off*). The sidebar and the menu bar show a short status such as
-  "4 weeks: −6.7 % · within". On a company server, the admin chooses balance or corridor for everyone under
+  sidebar asks about it (*Add hours* or *Day off*). The menu bar's menu shows a short status such as
+  "4 weeks: −6.7 % · within"; the sidebar shows it only when you're outside the corridor. On a company server, the admin chooses balance or corridor for everyone under
   *Company → Working hours*, with the window, the zones and the note under the chart; otherwise it's a switch in
   *Settings → Labs*. Admins still never see anyone's times, and switching back shows the balance again.
 
