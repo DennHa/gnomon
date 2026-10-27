@@ -51,7 +51,12 @@ export type Week = {
   daysOff: DayOff[];
   /** Past scheduled workdays without any record: they count as 0 h. */
   missing: string[];
+  /** Finished days with more than MAX_DAY worked (the Working Time Act's daily limit): worth a second look. */
+  long: { date: string; worked: number }[];
 };
+
+/** 10 hours: the most the Working Time Act allows on a day. */
+export const MAX_DAY = 10 * 3_600_000;
 
 const mondayOf = (date: string) => dayKey(startOfWeek(new Date(`${date}T12:00`)));
 const plusDays = (date: string, n: number) => dayKey(addDays(new Date(`${date}T12:00`), n));
@@ -60,7 +65,7 @@ const plusDays = (date: string, n: number) => dayKey(addDays(new Date(`${date}T1
 export function weekOf(d: Data, monday: string, now = Date.now(), firstDay = firstRecord(d)): Week {
   const today = dayKey(now);
   const byDate = new Map(d.workdays.map((w) => [w.date, w]));
-  const week: Week = { monday, worked: 0, target: 0, targetToDate: 0, recorded: false, daysOff: [], missing: [] };
+  const week: Week = { monday, worked: 0, target: 0, targetToDate: 0, recorded: false, daysOff: [], missing: [], long: [] };
   const addTarget = (date: string, ms: number) => {
     week.target += ms;
     if (date <= today) week.targetToDate += ms;
@@ -82,8 +87,10 @@ export function weekOf(d: Data, monday: string, now = Date.now(), firstDay = fir
     if (w) {
       // A past day still open (forgot to clock out) waits until it's fixed; today counts up to now.
       if (!w.end && date < today) continue;
-      week.worked += Math.max(0, workdayMs(w, now));
+      const worked = Math.max(0, workdayMs(w, now));
+      week.worked += worked;
       addTarget(date, scheduled);
+      if (w.end && date < today && worked > MAX_DAY) week.long.push({ date, worked });
       continue;
     }
     if (!firstDay || date < firstDay || scheduled <= 0) continue;
@@ -127,8 +134,11 @@ export type Corridor = {
   rolling: Rolling | null;
   /** The chart: the rolling value at the end of each finished week (null where that week has no data), oldest first. */
   points: { monday: string; pct: number | null; zone: Zone | null }[];
-  /** What to ask about: past scheduled days without a record, and finished weeks with nothing at all, in the window. */
-  ask: { days: string[]; weeks: string[] };
+  /**
+   * What to ask about, in the window and this week: past scheduled days without a record, finished weeks with nothing
+   * at all, and days over 10 h that weren't confirmed yet (settings.longDaysOk).
+   */
+  ask: { days: string[]; weeks: string[]; long: { date: string; worked: number }[] };
   /** Days off in the window and this week, by where they came from (the header line). */
   daysOff: { float: number; personio: number; manual: number };
 };
@@ -157,7 +167,11 @@ export function corridorOf(d: Data, now = Date.now(), chartWeeks = 52): Corridor
     rolling: rollingOf(window, rules),
     points,
     // This week's empty days are asked about too (yesterday is the likeliest one to forget).
-    ask: { days: [...window.flatMap((w) => (w.recorded ? w.missing : [])), ...current.missing], weeks: askWeeks },
+    ask: {
+      days: [...window.flatMap((w) => (w.recorded ? w.missing : [])), ...current.missing],
+      weeks: askWeeks,
+      long: [...window, current].flatMap((w) => w.long).filter((l) => !d.settings.longDaysOk?.includes(l.date)),
+    },
     daysOff,
   };
 }

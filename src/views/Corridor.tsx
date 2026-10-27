@@ -162,14 +162,18 @@ export function CorridorCard({ info }: { info: (text: string) => JSX.Element }) 
   );
 }
 
-/** Sidebar, only when there's something to do: the latest scheduled day (or week) without a record, and the status when it's outside the corridor. */
+/**
+ * Sidebar, only when there's something to do: the latest day to look at (nothing recorded, or more than 10 h), else an
+ * empty week; and the status when it's outside the corridor.
+ */
 export function CorridorSidebar({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const { data, update } = useStore();
   const now = useNow(60_000);
   const c = useMemo(() => corridorOf(data, now, 1), [data, now]);
-  const day = c.ask.days[c.ask.days.length - 1];
+  const days = [...c.ask.days.map((date) => ({ date, worked: undefined as number | undefined })), ...c.ask.long].sort((a, b) => a.date.localeCompare(b.date));
+  const day = days[days.length - 1];
   const week = !day ? c.ask.weeks[c.ask.weeks.length - 1] : undefined;
-  const more = c.ask.days.length + c.ask.weeks.length - 1;
+  const more = days.length + c.ask.weeks.length - 1;
   const weekOff = (monday: string) =>
     update((d) => {
       let next = d;
@@ -179,22 +183,35 @@ export function CorridorSidebar({ onOpenDay }: { onOpenDay: (day: string) => voi
       }
       return next;
     });
+  // "It's right": remembered with the account settings, only for the last two months (older days leave the window).
+  const confirmLong = (date: string) =>
+    update((d) => {
+      const since = dayKey(addDays(new Date(now), -60));
+      const ok = [...(d.settings.longDaysOk ?? []).filter((x) => x >= since), date];
+      return { ...d, settings: { ...d.settings, longDaysOk: ok } };
+    });
   const attention = c.rolling && c.rolling.zone !== 'within';
   if (!day && !week && !attention) return null;
+  const long = day?.worked !== undefined;
   return (
     <div className="corridor-side">
       {(day || week) && (
-        <div className="corridor-ask" title={t('cor.missingHint')}>
+        <div className="corridor-ask" title={t(long ? 'cor.longHint' : 'cor.missingHint')}>
           <span className="small">
-            <Icon name="event_busy" size={16} /> {day ? t('cor.missingDay', { day: fmtDayLabel(day) }) : t('cor.missingWeek', { day: fmtDayLabel(week!) })}
+            <Icon name={long ? 'warning' : 'event_busy'} size={16} />{' '}
+            {long
+              ? t('cor.longDay', { day: fmtDayLabel(day.date), duration: fmtH(day.worked!) })
+              : day
+                ? t('cor.missingDay', { day: fmtDayLabel(day.date) })
+                : t('cor.missingWeek', { day: fmtDayLabel(week!) })}
             {more > 0 && <span className="muted"> · {t('cor.more', { n: more })}</span>}
           </span>
           <span className="corridor-ask-actions">
-            <button className="btn small" onClick={() => onOpenDay(day ?? week!)}>
-              {t('cor.addHours')}
+            <button className="btn small" onClick={() => onOpenDay(day?.date ?? week!)}>
+              {t(long ? 'cor.checkDay' : 'cor.addHours')}
             </button>
-            <button className="btn ghost small" onClick={() => (day ? update((d) => markDayOff(d, day)) : weekOff(week!))}>
-              {t(day ? 'cor.dayOff' : 'cor.weekOff')}
+            <button className="btn ghost small" onClick={() => (long ? confirmLong(day.date) : day ? update((d) => markDayOff(d, day.date)) : weekOff(week!))}>
+              {t(long ? 'cor.longOk' : day ? 'cor.dayOff' : 'cor.weekOff')}
             </button>
           </span>
         </div>

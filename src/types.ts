@@ -175,6 +175,8 @@ export type Settings = {
   hoursView?: 'balance' | 'corridor';
   /** The company server's choice and zones for the hours view, as of the last sync; never sent back (not an account setting). */
   companyHours?: CompanyHours;
+  /** Days over 10 h you confirmed as right, so the target corridor stops asking about them (YYYY-MM-DD, recent ones). */
+  longDaysOk?: string[];
   /** Your name; added to CSV exports so they can be told apart (e.g. when collected by the company). */
   userName?: string;
   /** Close a workday and timer left running from an earlier day at 23:59. */
