@@ -15,7 +15,8 @@
     "start": "npm run build && node node_modules/electron/cli.js .",
     "dist": "npm run build && node node_modules/electron-builder/cli.js --mac",
     "icon": "node node_modules/electron/cli.js scripts/make-icon.cjs",
-    "test": "node_modules/.bin/esbuild tests/logic.test.ts --bundle --platform=node --format=esm --outfile=dist-test/logic.test.mjs --log-level=warning && node dist-test/logic.test.mjs",
+    "test": "node_modules/.bin/esbuild tests/logic.test.ts --bundle --platform=node --format=esm --outfile=dist-test/logic.test.mjs --log-level=warning && node dist-test/logic.test.mjs && node tests/instance-lock.test.cjs",
+    "test:instances": "npm run build && node tests/instances.test.cjs",
     "release:manifest": "node scripts/release-manifest.cjs",
     "credits": "node scripts/credits.cjs"
   },

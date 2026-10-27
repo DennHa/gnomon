@@ -153,8 +153,12 @@ npm install
 npm run dev     # Vite + Electron with hot reload
 npm start       # production build, then launch
 npm test        # logic tests
+npm run test:instances  # one Gnomon per data folder, with real app starts on scratch folders
 npm run dist    # Gnomon.app and a .dmg in release/
 ```
+
+**Never start a test copy on the real data folder.** Always give it a scratch one, e.g.
+`USER_DATA_DIR=$(mktemp -d) npm start`. Only one Gnomon runs per data folder; a second start on the same folder quits.
 
 Keep the project outside synced folders such as Nextcloud, which strip the execute permission from files in
 `node_modules` and break the build.
@@ -183,6 +187,7 @@ close-ups; `npm run icon` renders the icons from `build/*.svg`.
 | `data.json` | Entries, workdays, projects, activities, settings, imported plan. Plain JSON, written atomically. |
 | `float-token.json`, `personio-credentials.json`, `api-key.json`, `server.json` | Secrets, encrypted with a key in the macOS keychain (Electron `safeStorage`); never sent to the window. |
 | `server-sync.json` | Sync state with your Gnomon server. |
+| `gnomon.lock` | Which process has the folder open, so a second Gnomon stays off it. Removed on quit. |
 | `trail.json` | Activity trail, only if switched on: app names and times, never window titles. |
 
 **Security.** Windows are sandboxed with context isolation and no Node.js access; the page reaches the system only

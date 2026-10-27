@@ -10,6 +10,28 @@ const PERSONIO_API_BASE = process.env.PERSONIO_API_BASE || 'https://api.personio
 
 // Lets tests and screenshots run against a throwaway data folder.
 if (process.env.USER_DATA_DIR) app.setPath('userData', process.env.USER_DATA_DIR);
+
+// One Gnomon per data folder: two copies would each keep the data in memory and write it over each other's changes.
+// Electron's lock lives in the data folder, so test copies with their own USER_DATA_DIR still run side by side. A second
+// start hands over to the running one (second-instance below) and quits before touching any data.
+const { acquireLock, releaseLock, fileStamp } = require('./instance-lock.cjs');
+if (!app.requestSingleInstanceLock()) {
+  console.log(`[instance] Gnomon already runs on ${app.getPath('userData')}; quitting`);
+  process.exit(0);
+}
+// The same as a file, for a different build on the same folder that doesn't share Electron's lock.
+const instanceLock = acquireLock(app.getPath('userData'));
+if (!instanceLock.ok) {
+  const who = instanceLock.holder ? `process ${instanceLock.holder.pid}, started ${new Date(instanceLock.holder.startedAt).toISOString()}` : 'another process';
+  console.error(`[instance] ${app.getPath('userData')} is in use by ${who}; quitting so the two don't overwrite each other's data`);
+  if (!process.env.CAPTURE) dialog.showErrorBox('Gnomon is already running', `Another Gnomon (${who}) is using this data folder:\n${app.getPath('userData')}\n\nQuit it first, or start this copy with its own USER_DATA_DIR.`);
+  process.exit(1);
+}
+process.on('exit', () => releaseLock(app.getPath('userData')));
+app.on('second-instance', () => {
+  console.log('[instance] another start on this data folder was handed over to this one');
+  if (app.isReady() && !process.env.CAPTURE) showWindow();
+});
 // Screenshots in a given appearance (light/dark) regardless of the Mac's setting.
 if (process.env.CAPTURE_THEME) nativeTheme.themeSource = process.env.CAPTURE_THEME;
 
@@ -34,12 +56,42 @@ function writeAtomic(file, contents) {
   fs.renameSync(tmp, file);
 }
 
-function readData() {
+// data.json as this process last read or wrote it (see saveData).
+let dataStamp = null;
+let conflictFile = null;
+
+/** `remember`: the main window's load, which the next save is measured against (the quick switcher only peeks). */
+function readData(remember) {
+  if (remember) {
+    dataStamp = fileStamp(dataFile());
+    conflictFile = null;
+  }
   try {
     return JSON.parse(fs.readFileSync(dataFile(), 'utf8'));
   } catch {
     return null;
   }
+}
+
+/**
+ * Writes data.json, unless someone else changed it since this process last read or wrote it (another copy of Gnomon
+ * on the same folder, despite the locks). Then this window's version goes to data.conflict-<time>.json, nothing is
+ * overwritten, and the window reloads from disk. Merging here would need the sync's record history, which lives in
+ * the window; keeping both versions is simpler and loses nothing.
+ */
+function saveData(data) {
+  const json = JSON.stringify(data, null, 2);
+  if (conflictFile || fileStamp(dataFile()) !== dataStamp) {
+    const first = !conflictFile;
+    conflictFile ||= path.join(app.getPath('userData'), `data.conflict-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    writeAtomic(conflictFile, json);
+    console.error(`[data] data.json was changed by another process; not overwriting it. This window's version is in ${conflictFile}`);
+    if (first && win && !win.isDestroyed()) win.webContents.reload();
+    return false;
+  }
+  writeAtomic(dataFile(), json);
+  dataStamp = fileStamp(dataFile());
+  return true;
 }
 
 // ---- Company profile (Iru or another Mac management tool) --------------------------------------
@@ -1030,11 +1082,10 @@ powerMonitor.on('unlock-screen', () => {
   else idleSince = null;
 });
 
-ipcMain.handle('data:load', () => readData());
-ipcMain.handle('data:save', (_e, data) => writeAtomic(dataFile(), JSON.stringify(data, null, 2)));
+ipcMain.handle('data:load', (e) => readData(e.sender === win?.webContents));
+ipcMain.handle('data:save', (_e, data) => saveData(data));
 ipcMain.on('data:saveSync', (e, data) => {
-  writeAtomic(dataFile(), JSON.stringify(data, null, 2));
-  e.returnValue = true;
+  e.returnValue = saveData(data);
 });
 ipcMain.on('tray:update', (_e, state) => updateTray(state));
 // Feedback opens a new mail to a fixed address; the page can't choose the target.
@@ -1338,7 +1389,10 @@ ipcMain.handle('float:get', (_e, { path: apiPath, contact }) => floatGet(apiPath
 app.on('before-quit', () => {
   quitting = true;
 });
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  releaseLock(app.getPath('userData'));
+});
 
 // ---- Moving over from "Punch", the app's first name -----------------------------------
 // Electron names the data folder and the keychain key after the app, so after the rename both start empty.

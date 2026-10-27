@@ -3,6 +3,12 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Only one Gnomon per data folder:** starting Gnomon again brings the running one to the front instead of opening a
+  second copy that could write its old data over your changes. If `data.json` is changed by something else anyway,
+  Gnomon no longer overwrites it: it keeps its own version as `data.conflict-….json` next to it and reloads.
+
 ## 0.1.23 · 2026-10-27
 
 - **Vote on the roadmap:** Info & feedback now has three tabs, *What's new*, *What's coming* and *Feedback*. *What's
