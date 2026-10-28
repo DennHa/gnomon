@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.24 · 2026-10-28
 
 - **Calmer Settings:** Settings keeps what most people set once (you, your work schedule, your way of working,
   reminders, shortcuts, connections), with shorter texts. The extras moved to *Labs* in groups: clocking in and out

@@ -7,7 +7,7 @@ aren't lost.
 -->
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-27 (0.1.23).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-28 (0.1.24).
 
 ## Now
 
@@ -15,6 +15,8 @@ Nothing in progress right now; the next step is chosen from the list below.
 
 ## Next
 
+- **Tidy up the day.** After Leave, round the day's bookings to 15 minutes (or 5 or 10) so they add up to the booked
+  total, with a preview and Undo. Clocked work hours are never rounded.
 - **A drafted day.** Suggest the day from the calendar plus the activity trail Gnomon already keeps, on the Mac only so
   it stays private.
 - **Calendar as a memory aid.** Show meetings next to the day; one click turns one into an entry. macOS Calendar first
