@@ -41,10 +41,12 @@ function CorridorChart({ c: all }: { c: Corridor }) {
   const W = 640;
   const HT = 190;
   const left = 44;
-  const right = 52;
+  const right = 64;
   const top = 10;
   const bottom = 24;
-  const max = Math.max(20, Math.ceil((c.rules.critical * 1.25) / 5) * 5);
+  // Room for the critical zone and for every value shown (in steps of 10), up to ±100 %; beyond that, at the edge.
+  const extreme = Math.max(c.rules.critical * 1.25, ...c.points.map((p) => Math.abs(p.pct ?? 0)));
+  const max = Math.min(100, Math.max(20, Math.ceil(extreme / 10) * 10));
   const x = (i: number) => left + (i * (W - left - right)) / Math.max(1, c.points.length - 1);
   const y = (pct: number) => top + ((max - Math.max(-max, Math.min(max, pct))) / (2 * max)) * (HT - top - bottom);
   const runs: { i: number; pct: number }[][] = [];
@@ -54,7 +56,9 @@ function CorridorChart({ c: all }: { c: Corridor }) {
     runs[runs.length - 1].push({ i, pct: p.pct });
   });
   const lastIndex = c.points.map((p) => p.pct !== null).lastIndexOf(true);
-  const ticks = [max, c.rules.within, 0, -c.rules.within, -max];
+  // The band's limits get a label only when there's room for it next to 0.
+  const roomy = y(0) - y(c.rules.within) >= 14;
+  const ticks = roomy ? [max, c.rules.within, 0, -c.rules.within, -max] : [max, 0, -max];
   // A month label on the first week that starts in it, every other month when they'd crowd.
   const months = c.points.flatMap((p, i) => (i === 0 || p.monday.slice(5, 7) !== c.points[i - 1].monday.slice(5, 7) ? [{ i, label: fmtDate(p.monday, { month: 'short' }) }] : [])).filter((_, k, all) => all.length <= 8 || k % 2 === 0);
   return (
@@ -137,13 +141,13 @@ export function CorridorCard({ info }: { info: (text: string) => JSX.Element }) 
         </div>
         <div className="corridor-tile">
           <span className="muted small">{t('cor.current')}</span>
-          <strong>{fmtH(current.worked - current.target, true)}</strong>
-          <span className="muted small">{t('cor.currentSub', { worked: fmtH(current.worked), target: fmtH(current.target) })}</span>
+          <strong>{fmtH(current.worked - current.targetToDate, true)}</strong>
+          <span className="muted small">{t('cor.currentSub', { worked: fmtH(current.worked), target: fmtH(current.targetToDate), week: fmtH(current.target) })}</span>
         </div>
         <div className="corridor-tile">
           <span className="muted small">{t('cor.absences')}</span>
           <strong>{absent ? fmtH(absent) : '0 h'}</strong>
-          <span className="muted small">{current.daysOff.length ? [t('count.daysOff', { n: current.daysOff.length }), ...reasons].join(' · ') : t('cor.noAbsences')}</span>
+          <span className="muted small">{current.daysOff.length ? [t('cor.offDays', { n: current.daysOff.length }), ...reasons].join(' · ') : t('cor.noAbsences')}</span>
         </div>
       </div>
       {banner}
@@ -158,14 +162,18 @@ export function CorridorCard({ info }: { info: (text: string) => JSX.Element }) 
   );
 }
 
-/** Sidebar: the corridor's status line, and the latest scheduled day (or week) without a record, with what to do about it. */
+/**
+ * Sidebar, only when there's something to do: the latest day to look at (nothing recorded, or more than 10 h), else an
+ * empty week; and the status when it's outside the corridor.
+ */
 export function CorridorSidebar({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const { data, update } = useStore();
   const now = useNow(60_000);
   const c = useMemo(() => corridorOf(data, now, 1), [data, now]);
-  const day = c.ask.days[c.ask.days.length - 1];
+  const days = [...c.ask.days.map((date) => ({ date, worked: undefined as number | undefined })), ...c.ask.long].sort((a, b) => a.date.localeCompare(b.date));
+  const day = days[days.length - 1];
   const week = !day ? c.ask.weeks[c.ask.weeks.length - 1] : undefined;
-  const more = c.ask.days.length + c.ask.weeks.length - 1;
+  const more = days.length + c.ask.weeks.length - 1;
   const weekOff = (monday: string) =>
     update((d) => {
       let next = d;
@@ -175,27 +183,45 @@ export function CorridorSidebar({ onOpenDay }: { onOpenDay: (day: string) => voi
       }
       return next;
     });
+  // "It's right": remembered with the account settings, only for the last two months (older days leave the window).
+  const confirmLong = (date: string) =>
+    update((d) => {
+      const since = dayKey(addDays(new Date(now), -60));
+      const ok = [...(d.settings.longDaysOk ?? []).filter((x) => x >= since), date];
+      return { ...d, settings: { ...d.settings, longDaysOk: ok } };
+    });
+  const attention = c.rolling && c.rolling.zone !== 'within';
+  if (!day && !week && !attention) return null;
+  const long = day?.worked !== undefined;
   return (
     <div className="corridor-side">
       {(day || week) && (
-        <div className="corridor-ask" title={t('cor.missingHint')}>
+        <div className="corridor-ask" title={t(long ? 'cor.longHint' : 'cor.missingHint')}>
           <span className="small">
-            <Icon name="event_busy" size={16} /> {day ? t('cor.missingDay', { day: fmtDayLabel(day) }) : t('cor.missingWeek', { day: fmtDayLabel(week!) })}
+            <Icon name={long ? 'warning' : 'event_busy'} size={16} />{' '}
+            {long
+              ? t('cor.longDay', { day: fmtDayLabel(day.date), duration: fmtH(day.worked!) })
+              : day
+                ? t('cor.missingDay', { day: fmtDayLabel(day.date) })
+                : t('cor.missingWeek', { day: fmtDayLabel(week!) })}
             {more > 0 && <span className="muted"> · {t('cor.more', { n: more })}</span>}
           </span>
           <span className="corridor-ask-actions">
-            <button className="btn small" onClick={() => onOpenDay(day ?? week!)}>
-              {t('cor.addHours')}
+            <button className="btn small" onClick={() => onOpenDay(day?.date ?? week!)}>
+              {t(long ? 'cor.checkDay' : 'cor.addHours')}
             </button>
-            <button className="btn ghost small" onClick={() => (day ? update((d) => markDayOff(d, day)) : weekOff(week!))}>
-              {t(day ? 'cor.dayOff' : 'cor.weekOff')}
+            <button className="btn ghost small" onClick={() => (long ? confirmLong(day.date) : day ? update((d) => markDayOff(d, day.date)) : weekOff(week!))}>
+              {t(long ? 'cor.longOk' : day ? 'cor.dayOff' : 'cor.weekOff')}
             </button>
           </span>
         </div>
       )}
-      <span className={`corridor-status small ${c.rolling ? `zone-${c.rolling.zone}` : 'muted'}`}>
-        <Icon name="target" size={16} /> {corridorShort(c)}
-      </span>
+      {/* Only when it needs attention: inside the corridor, Reports and the menu bar say so. */}
+      {attention && (
+        <span className={`corridor-status small zone-${c.rolling!.zone}`}>
+          <Icon name="target" size={16} /> {corridorShort(c)}
+        </span>
+      )}
     </div>
   );
 }

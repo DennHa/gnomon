@@ -252,6 +252,7 @@ export const ACCOUNT_SETTINGS = [
   'balanceStartHours',
   'balanceStartDate',
   'hoursView',
+  'longDaysOk',
   'userName',
   'workStyle',
   'reminders',

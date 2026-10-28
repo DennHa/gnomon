@@ -640,6 +640,8 @@ test('corridor: full weeks on target are 0 % and within; the current week is its
   assert.equal(c.rolling?.pct, 0); assert.equal(c.rolling?.basis, 4); assert.equal(c.rolling?.zone, 'within');
   assert.equal(c.current.monday, '2026-10-26');
   assert.equal(c.current.worked, 2 * H); assert.equal(c.current.target, 40 * H, 'the whole week’s target');
+  assert.equal(c.current.targetToDate, 24 * H, 'the tile compares with Monday to Wednesday, today included');
+  assert.equal(c.window[0].targetToDate, c.window[0].target, 'a finished week: the whole target');
   assert.deepEqual(c.ask.days, ['2026-10-27'], 'Tuesday is empty; today (Wednesday) and later aren’t asked about');
   const p = c.points[c.points.length - 1];
   assert.equal(p.monday, '2026-10-19'); assert.equal(p.pct, 0);
@@ -687,6 +689,19 @@ test('corridor: a missing day counts as 0 h; a week without records is a gap (as
   assert.equal(byWeek.get('2026-09-21'), null, 'so is everything before the first record');
   assert.equal(c.points.length, 52);
   assert.equal(corridorOf({ ...base(), workdays: [] }, corNow).rolling, null, 'no records at all: no average');
+  // Days over 10 h are asked about until confirmed; today and days outside the window aren't.
+  const long: Data = { ...base(), workdays: [workday('2026-09-21', 12), ...weekDays('2026-10-19', [8, 10.5, 8, 8, 8]), workday('2026-10-28', 11)] };
+  assert.deepEqual(corridorOf(long, Date.parse('2026-10-28T23:00:00')).ask.long.map((l) => [l.date, l.worked / H]), [['2026-10-20', 10.5]]);
+  assert.deepEqual(corridorOf({ ...long, settings: { ...long.settings, longDaysOk: ['2026-10-20'] } }, corNow).ask.long, [], 'confirmed as right');
+  // Starting later, with holidays imported from long before: counting starts on the first day worked.
+  let late: Data = { ...base(), workdays: weekDays('2026-10-21', [8, 8, 8]) }; // Wed–Fri of the last finished week
+  for (const day of ['2026-01-01', '2026-05-01', '2026-10-05']) late = A.markDayOff(late, day);
+  late = A.markDayOff(late, '2026-09-30', 'overtime');
+  const l = corridorOf(late, corNow);
+  assert.deepEqual(l.window.map((w) => w.target / H), [0, 0, 0, 24], 'only Wed–Fri of the first week');
+  assert.equal(l.rolling?.basis, 1); assert.equal(l.rolling?.pct, 0);
+  assert.deepEqual(l.ask, { days: ['2026-10-26', '2026-10-27'], weeks: [], long: [] }, 'nothing before the first workday is asked about');
+  assert.equal(l.points.filter((p) => p.pct !== null).length, 1);
 });
 test('corridor: a schedule change mid-window uses each day’s own schedule; the window follows the company’s weeks', () => {
   let d = setSchedule(base(), '2026-10-12', [8, 8, 8, 8, 0, 0, 0]);
@@ -705,7 +720,7 @@ test('corridor: the company’s mode wins over the person’s Labs switch', () =
   assert.equal(hoursMode({ ...d, settings: { ...d.settings, hoursView: 'corridor', companyHours: { mode: 'balance' } } }), 'balance');
   assert.equal(hoursMode({ ...d, settings: { ...d.settings, companyHours: { mode: 'corridor' } } }), 'corridor');
   assert.equal(hoursMode({ ...d, settings: { ...d.settings, hoursView: 'corridor', companyHours: { weeks: 6 } } }), 'corridor', 'zones without a mode: the person chooses');
-  assert.ok(!Sync.ACCOUNT_SETTINGS.includes('companyHours' as never) && Sync.ACCOUNT_SETTINGS.includes('hoursView' as never));
+  assert.ok(!Sync.ACCOUNT_SETTINGS.includes('companyHours' as never) && Sync.ACCOUNT_SETTINGS.includes('hoursView' as never) && Sync.ACCOUNT_SETTINGS.includes('longDaysOk' as never));
 });
 
 test('an older settings file loads with the same values after the Settings cleanup', () => {

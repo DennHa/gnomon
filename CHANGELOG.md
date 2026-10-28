@@ -19,13 +19,15 @@ Gnomon server shows the newest entry.
   idea, in the Mac app and the web app. Others only see how many voted, never who. Ideas wait for the admin's OK, on
   the Admin page's new *Roadmap* page, which also copies everything as one text for planning (*Copy for Claude*).
 - **Target corridor instead of an overtime balance (optional):** instead of a running bank of hours, Reports can show
-  whether the rolling average of your last finished weeks stays near your work schedule's target: within ±10 %,
-  elevated up to 20 %, or critical, with a chart of the last 12 months and the current week on its own tile. Holidays,
-  closures, vacation and sick days lower the target; a scheduled workday with nothing recorded counts as 0 h, and the
-  sidebar asks about it (*Add hours* or *Day off*). The sidebar and the menu bar show a short status such as
-  "4 weeks: −6.7 % · within". On a company server, the admin chooses balance or corridor for everyone under
-  *Company → Working hours*, with the window, the zones and the note under the chart; otherwise it's a switch in
-  *Settings → Labs*. Admins still never see anyone's times, and switching back shows the balance again.
+  whether the rolling average of your last finished weeks stays near your work schedule's target: fine within ±10 %,
+  outside up to 20 %, far outside beyond, with a chart of the last 12 months and the current week on its own tile
+  (against the target up to today). Holidays, closures, vacation and sick days lower the target; a scheduled workday
+  with nothing recorded counts as 0 h, and the sidebar asks about it (*Add hours* or *Day off*). It also asks about
+  days over 10 hours, the Working Time Act's limit (*Check day* or *It's right*). The menu bar's menu shows a short
+  status such as "4 weeks: −6.7 % · fine"; the sidebar shows it only when you're outside the corridor. On a company
+  server, the admin chooses balance or corridor for everyone under *Company → Working hours*, with the window, the
+  zones and the note under the chart; otherwise it's a switch in *Settings → Labs*. Admins still never see anyone's
+  times, and switching back shows the balance again.
 
 ## 0.1.22 · 2026-10-25
 
