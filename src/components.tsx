@@ -172,17 +172,6 @@ export function ActivityChips({ value, onPick, onEdit }: { value?: string; onPic
   );
 }
 
-/** € switch; hidden unless billable tracking is turned on in Settings. */
-export function BillableToggle({ value, onChange }: { value?: boolean; onChange: (v: boolean) => void }) {
-  const { data } = useStore();
-  if (!data.settings.billableEnabled) return null;
-  return (
-    <button type="button" className={`billable ${value ? 'on' : ''}`} title={t(value ? 'comp.billable' : 'comp.notBillable')} onClick={() => onChange(!value)}>
-      €
-    </button>
-  );
-}
-
 /**
  * Edits the time-of-day of an ISO timestamp, keeping its calendar day. Saves on Enter or when you leave the field, not
  * on every keystroke: typing "09:30" passes through "00:30", which would otherwise move your arrival to midnight.

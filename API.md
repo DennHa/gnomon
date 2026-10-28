@@ -6,9 +6,9 @@ anything you send appears in the app immediately.
 
 ## Turning it on
 
-Settings → **API**:
+Settings → **Labs** → **Local API** (Labs opens with five clicks on the icon under Info & feedback):
 
-1. **Enable the local API.** It listens on `http://127.0.0.1:7799/api/v1` (port configurable).
+1. **Turn on the local API.** It listens on `http://127.0.0.1:7799/api/v1` (port configurable).
 2. **Create API key.** It's shown **once**; copy it into the other system. Gnomon stores it encrypted in the keychain.
    "Create new key" invalidates the old one.
 3. Optional: **Allow other devices on my network.** Gnomon then listens on all interfaces instead of only your Mac.
@@ -106,7 +106,7 @@ Send **either** exact times **or** a day plus a duration:
 | `description` | Text, optional |
 | `projectId` / `projectExternalId` / `project` | Pick the project by Gnomon id, by your id, or by name. A **new name creates the project**. |
 | `activityId` / `activity` | By id or by name (must exist) |
-| `billable` | `true` / `false` |
+| `billable` | `true` / `false`; kept on the entry for your own tools (the app no longer shows it) |
 | `externalId` | Your id; repeating it updates this entry |
 
 ### `PUT /workdays/:date`

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from './store';
 import { activitiesOn, appendEntry, deleteEntry, startTimer, updateEntry } from './actions';
-import { BillableToggle, ProjectSelect, TimeField } from './components';
+import { ProjectSelect, TimeField } from './components';
 import { Icon } from './icons';
 import { planItemsOn } from './plan';
 import type { Entry } from './types';
@@ -112,7 +112,6 @@ function FeedRow({ entry, mode, showProject, readOnly, tasks, added }: { entry: 
         {showProject && <ProjectSelect value={entry.projectId} onChange={(projectId) => set({ projectId, taskId: undefined, taskName: undefined })} />}
         <TaskPicker keepSpace={mode === 'times' && tasks} projectId={entry.projectId} day={day} value={entry.taskId} name={entry.taskName} onChange={(taskId, taskName) => set({ taskId, taskName })} />
         <ActivityPicker value={entry.activityId} onChange={(activityId) => set({ activityId })} />
-        <BillableToggle value={entry.billable} onChange={(billable) => set({ billable })} />
       </div>
       {mode === 'times' ? (
         <span className="feed-times">

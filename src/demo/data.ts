@@ -124,7 +124,6 @@ export function demoData(now: Date, language: 'en' | 'de' = 'en'): Data {
       idleMinutes: 10,
       reviewOnLeave: true,
       autoStopMidnight: true,
-      billableEnabled: false,
       balanceStartHours: 6.5,
       balanceStartDate: dayKey(start),
       userName: 'Alex Miller',

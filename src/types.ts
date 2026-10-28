@@ -166,8 +166,9 @@ export type Settings = {
   reviewOnLeave: boolean;
   /** Copy day (src/copytext.ts): hours after each line; on unless switched off. */
   copyHours?: boolean;
-  /** Opt-in: show a billable (€) switch on entries and billable totals in reports. */
-  billableEnabled: boolean;
+  /** No longer read: billable tracking was removed (invoicing is left out on purpose, docs/ROADMAP.md). Kept so older
+   * files and synced accounts load unchanged; entries keep their `billable` flag for the API and imports. */
+  billableEnabled?: boolean;
   /** Overtime balance carried over from elsewhere (e.g. the company system), valid at the start of balanceStartDate. */
   balanceStartHours: number;
   balanceStartDate?: string;

@@ -3,6 +3,15 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Calmer Settings:** Settings keeps what most people set once (you, your work schedule, your way of working,
+  reminders, shortcuts, connections), with shorter texts. The extras moved to *Labs* in groups: clocking in and out
+  automatically, stopping at midnight, *Close the day*, counting every scheduled day, the activity trail and the local
+  API. Activities are switched on and off under *Projects & activities*, hours per line only in *Copy as text ▾*.
+  Billable time is gone (Gnomon leaves invoicing out on purpose); entries keep their flag for the API. Everything you
+  set before keeps its value.
+
 ## 0.1.23 · 2026-10-27
 
 - **Vote on the roadmap:** Info & feedback now has three tabs, *What's new*, *What's coming* and *Feedback*. *What's

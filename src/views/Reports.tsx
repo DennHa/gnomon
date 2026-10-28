@@ -177,12 +177,10 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
     const activityOf = (id?: string) => data.activities.find((a) => a.id === id) ?? noActivity();
     const perProject = new Map<string, number>();
     const perActivity = new Map<string, number>();
-    let billable = 0;
     for (const e of entries) {
       const ms = entryMs(e, now);
       const aid = activityOf(e.activityId).id;
       perActivity.set(aid, (perActivity.get(aid) ?? 0) + ms);
-      if (e.billable) billable += ms;
       const pid = projectOf(e.projectId).id;
       const day = perDay.get(dayKey(e.start))!;
       day.set(pid, (day.get(pid) ?? 0) + ms);
@@ -201,7 +199,7 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
       workdays.reduce((sum, w) => sum + targetFor(data, w), 0) +
       (data.settings.countAllScheduledDays ? days.filter((d) => !recorded.has(d) && d < today).reduce((sum, d) => sum + hoursToMs(targetHoursOn(data, d)), 0) : 0);
     const dayTotals = days.map((d) => [...perDay.get(d)!.values()].reduce((a, b) => a + b, 0));
-    return { entries, days, perDay, perProject, perActivity, billable, activityOf, tracked, workdays, daysWorked: worked.length, attended, target, projectOf, maxDay: Math.max(1, ...dayTotals) };
+    return { entries, days, perDay, perProject, perActivity, activityOf, tracked, workdays, daysWorked: worked.length, attended, target, projectOf, maxDay: Math.max(1, ...dayTotals) };
   }, [data, fromKey, toKey, from, to, now]);
 
   const exportCsv = () => {
@@ -210,7 +208,7 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
     // With a name set in Settings, every row starts with it, so exports from several people can be combined.
     const name = data.settings.userName?.trim();
     const withName = (row: (string | number)[]) => (name ? [name, ...row] : row);
-    const rows: (string | number)[][] = [withName(data.settings.billableEnabled ? head : head.filter((_, i) => i !== 6)).map((c, i) => (name && i === 0 ? t('csv.name') : c))];
+    const rows: (string | number)[][] = [withName(head).map((c, i) => (name && i === 0 ? t('csv.name') : c))];
     for (const e of [...report.entries].sort((a, b) => a.start.localeCompare(b.start))) {
       rows.push(withName([
         dayKey(e.start),
@@ -219,7 +217,6 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
         hours(entryMs(e, now)),
         report.projectOf(e.projectId).name,
         e.activityId ? report.activityOf(e.activityId).name : '',
-        ...(data.settings.billableEnabled ? [e.billable ? t('csv.yes') : ''] : []),
         e.description,
       ]));
     }
@@ -265,7 +262,6 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
         <div className="card stat">
           <span className="muted small">{t('tracked')}</span>
           <strong>{fmtDuration(report.tracked)}</strong>
-          {data.settings.billableEnabled && report.billable > 0 && <span className="muted small">{t('rep.billable', { duration: fmtDuration(report.billable) })}</span>}
         </div>
         <div className="card stat">
           <span className="muted small">{t('atWork')}</span>

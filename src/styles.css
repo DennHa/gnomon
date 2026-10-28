@@ -269,7 +269,7 @@ input[type='color'] { width: 30px; height: 30px; padding: 0; border: 0; backgrou
 .table tr.clickable { cursor: pointer; }
 .table tr.clickable:hover td { background: var(--bg); }
 
-/* Activities & billable */
+/* Activities */
 .activity-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .activity-chip {
   --chip: var(--accent);
@@ -288,12 +288,6 @@ input[type='color'] { width: 30px; height: 30px; padding: 0; border: 0; backgrou
   font-weight: 600; font-size: 13px; padding: 3px 8px !important; max-width: 140px;
 }
 .activity-select:not(.has) select:hover { border-color: var(--border) !important; }
-.billable {
-  width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: none;
-  color: var(--border); cursor: pointer; font-weight: 700; padding: 0;
-}
-.billable:hover { color: var(--muted); }
-.billable.on { color: var(--ok); border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
 .section-hint { margin: -6px 0 12px; }
 .stat .muted.small + .muted.small { margin-top: -2px; }
 
@@ -480,8 +474,6 @@ kbd { font: 11px ui-monospace, SFMono-Regular, monospace; padding: 1px 5px; bord
 input:not([type='checkbox']):not([type='color']), select { border: 0; background: var(--field); }
 input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 0; }
 .activity-chip { border: 0; }
-.billable { border: 0; background: var(--field); color: var(--muted); }
-.billable.on { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .break-chip { border: 0; background: var(--field); }
 .trail { background: var(--bg); }
 .plan-item { background: var(--bg); }
@@ -903,7 +895,7 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .feed-clock { color: var(--muted); margin-right: 2px; }
 .entries-add { background: var(--accent-soft) !important; color: var(--accent-strong) !important; border: 0 !important; font-weight: 700; }
 .card-head { display: flex; align-items: center; gap: 12px; }
-/* Compact times so project, task and billable fit without clipping. */
+/* Compact times so project and task fit without clipping. */
 .feed.mode-times .feed-row { grid-template-columns: minmax(110px, 1fr) minmax(0, max-content) 214px 60px; }
 .feed.mode-times .feed-times { gap: 2px; }
 .feed.mode-times .feed-times .time-field { width: 58px; }
@@ -1085,6 +1077,9 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 /* Settings → Labs: a row with an explanation and a button. */
 .labs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
 .labs-row > span { display: flex; flex-direction: column; gap: 2px; }
+/* Labs groups: a heading with a hairline above, so the switches read as a few small sets. */
+.labs-card h4 { border-top: 1px solid var(--border); padding-top: 14px; }
+.labs-card .labs-hide { border-top: 1px solid var(--border); margin-top: 14px; }
 .egg .link-btn { color: var(--accent-strong); font-weight: 600; margin: 0; }
 /* The "moved to fit your entries" note: one line each, Undo on the right. */
 .fit-line { display: flex; align-items: baseline; gap: 12px; justify-content: space-between; }
