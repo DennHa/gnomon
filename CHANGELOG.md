@@ -11,6 +11,9 @@ Gnomon server shows the newest entry.
   API. Activities are switched on and off under *Projects & activities*, hours per line only in *Copy as text ▾*.
   Billable time is gone (Gnomon leaves invoicing out on purpose); entries keep their flag for the API. Everything you
   set before keeps its value.
+- **Only one Gnomon per data folder:** starting Gnomon again brings the running one to the front instead of opening a
+  second copy that could write its old data over your changes. If `data.json` is changed by something else anyway,
+  Gnomon no longer overwrites it: it keeps its own version as `data.conflict-….json` next to it and reloads.
 
 ## 0.1.23 · 2026-10-27
 
