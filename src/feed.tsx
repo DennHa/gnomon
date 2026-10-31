@@ -92,13 +92,14 @@ export function HoursInput({ ms, onCommit, disabled, autoFocus, inputRef }: { ms
   );
 }
 
-function FeedRow({ entry, mode, showProject, readOnly, tasks, added }: { entry: Entry; mode: 'hours' | 'times'; showProject: boolean; readOnly?: boolean; tasks: boolean; added?: boolean }) {
+function FeedRow({ entry, mode, showProject, readOnly, tasks, added, selected, onSelect }: { entry: Entry; mode: 'hours' | 'times'; showProject: boolean; readOnly?: boolean; tasks: boolean; added?: boolean; selected?: boolean; onSelect?: (id: string) => void }) {
   const { update, getData, commit, showNote } = useStore();
   const rowRef = useRef<HTMLDivElement>(null);
   // A typed-in entry goes into the first free stretch of the day, often mid-list: show where it landed.
+  // Likewise a block picked on the timeline: its row may be further down.
   useEffect(() => {
-    if (added) rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [added]);
+    if (added || selected) rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [added, selected]);
   const now = Date.now();
   const day = dayKey(entry.start);
   const set = (p: Partial<Entry>) => update((d) => updateEntry(d, entry.id, p));
@@ -106,7 +107,12 @@ function FeedRow({ entry, mode, showProject, readOnly, tasks, added }: { entry: 
 
   return (
     // Slides in when it was just started or stopped (not on every render of older rows).
-    <div ref={rowRef} className={`feed-row ${running ? 'running' : ''} ${now - Date.parse(entry.end ?? entry.start) < 3000 ? 'fresh' : ''} ${added ? 'just-added' : ''}`}>
+    <div
+      ref={rowRef}
+      className={`feed-row ${running ? 'running' : ''} ${now - Date.parse(entry.end ?? entry.start) < 3000 ? 'fresh' : ''} ${added ? 'just-added' : ''} ${selected ? 'selected' : ''}`}
+      onClick={() => onSelect?.(entry.id)}
+      onFocus={() => onSelect?.(entry.id)}
+    >
       <input className="feed-desc" value={entry.description} placeholder={t('feed.whatDidYouDo')} disabled={readOnly} onChange={(e) => set({ description: e.target.value })} />
       <div className="feed-meta">
         {showProject && <ProjectSelect value={entry.projectId} onChange={(projectId) => set({ projectId, taskId: undefined, taskName: undefined })} />}
@@ -247,6 +253,8 @@ export function EntryFeed({
   projectId,
   readOnly,
   prefill,
+  selected,
+  onSelect,
 }: {
   day: string;
   entries: Entry[];
@@ -255,6 +263,9 @@ export function EntryFeed({
   projectId?: string | null;
   readOnly?: boolean;
   prefill?: { ms: number; taskId?: number; taskName?: string } | null;
+  /** The entry selected on the day timeline, and picking one here. */
+  selected?: string | null;
+  onSelect?: (id: string) => void;
 }) {
   const { data } = useStore();
   const [added, setAdded] = useState<string | null>(null);
@@ -264,7 +275,7 @@ export function EntryFeed({
   return (
     <div className={`feed mode-${mode} ${showProject ? 'with-project' : ''} ${tasks ? '' : 'no-tasks'}`}>
       {entries.map((e) => (
-        <FeedRow key={e.id} entry={e} mode={mode} showProject={showProject} readOnly={readOnly} tasks={tasks} added={e.id === added} />
+        <FeedRow key={e.id} entry={e} mode={mode} showProject={showProject} readOnly={readOnly} tasks={tasks} added={e.id === added} selected={e.id === selected} onSelect={onSelect} />
       ))}
       {!readOnly && mode === 'hours' && <NewRow day={day} projectId={projectId ?? undefined} showProject={showProject} prefill={prefill} onAdded={setAdded} />}
     </div>

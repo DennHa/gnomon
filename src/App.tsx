@@ -597,7 +597,7 @@ export default function App() {
       </aside>
       <main className="content">
         {daylightOn && <DaylightRuler preview={daylightAt} onPreview={setDaylightAt} />}
-        {view === 'today' && <Today onOpenDay={openDay} onOpenProjects={() => setView('projects')} />}
+        {view === 'today' && <Today onOpenProjects={() => setView('projects')} />}
         {view === 'timesheet' && <Timesheet day={day} setDay={setDay} dayModal={dayModal} setDayModal={setDayModal} />}
         {view === 'reports' && (
           <Reports

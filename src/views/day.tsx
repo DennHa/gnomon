@@ -3,9 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import {
-  addBreak,
   addWorkday,
-  awayDays,
   closeWorkday,
   confirmAutoClose,
   deleteWorkday,
@@ -13,19 +11,16 @@ import {
   markDayOff,
   setOffKind,
   planGaps,
-  removeBreak,
   runningEntry,
   startDay,
   startTimer,
-  updateBreak,
-  updateWorkday,
 } from '../actions';
-import { TimeField, TrailSummary } from '../components';
+import { TrailSummary } from '../components';
 import { Icon } from '../icons';
 import { goalFor, planItemsOn, timeWindow } from '../plan';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
-import { addDays, atTime, breakMs, dayKey, entryMs, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from '../time';
+import { addDays, atTime, dayKey, entryMs, fmtDuration, fmtHM, hoursToMs, useNow, workdayMs } from '../time';
 import { t } from '../i18n';
 import { copyHoursOn, daysText, type CopyText } from '../copytext';
 import { useAddHours, useLeaveEdit } from '../notes';
@@ -236,45 +231,10 @@ export function missingDays(data: Data, now: number): { date: string; worked: nu
 }
 
 /**
- * A past workday that's still open, or that the midnight auto-stop closed at 23:59:
- * ask once for the real leave time.
+ * What a day's timeline can't show, in one compact row: no workday yet, a day off, or a past day whose leave time is
+ * still open or was set by the midnight close. A normal day has none: its times are changed on the timeline.
  */
-export function StaleBanner({ onOpenDay }: { onOpenDay: (d: string) => void }) {
-  const { data, update } = useStore();
-  const leaveEdit = useLeaveEdit();
-  const today = dayKey(new Date());
-  // A day the question after an absence will settle isn't asked about twice.
-  const asking = awayDays(data);
-  const stale = data.workdays.filter((w) => w.date < today && !w.off && (!w.end || w.autoClosed) && !asking.includes(w.date)).sort((a, b) => b.date.localeCompare(a.date))[0];
-  const [leftAt, setLeftAt] = useState<string | null>(null);
-  if (!stale) return null;
-  const suggested = leaveSuggestion(data, stale.date);
-  const value = leftAt ?? suggested;
-  return (
-    <div className="banner warn">
-      <Icon name="warning" size={18} />
-      <span>
-        {t(stale.end ? 'stale.autoBefore' : 'stale.openBefore')}
-        <button className="link" onClick={() => onOpenDay(stale.date)}>
-          {fmtDayLabel(stale.date)}
-        </button>
-        {t(stale.end ? 'stale.autoAfter' : 'stale.openAfter', { time: fmtTime(stale.start) })}
-      </span>
-      <input className="time-field" type="time" value={value} onChange={(e) => setLeftAt(e.target.value)} title={t('stale.suggestHint')} />
-      <button className="btn small primary" onClick={() => leaveEdit(stale.date, (d) => closeWorkday(d, stale.date, atTime(stale.date, value)))}>
-        {t('save')}
-      </button>
-      {stale.end && (
-        <button className="btn small ghost" onClick={() => update((d) => confirmAutoClose(d, stale.date))} title={t('stale.keepHint')}>
-          {t('stale.keep')}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** In/out, breaks, day off: the attendance part of a day, editable for any date. */
-export function WorkdayEditor({ day }: { day: string }) {
+export function DayStatus({ day }: { day: string }) {
   const { data, update } = useStore();
   const leaveEdit = useLeaveEdit();
   const now = useNow(30_000);
@@ -283,40 +243,34 @@ export function WorkdayEditor({ day }: { day: string }) {
   const target = hoursToMs(targetHoursOn(data, day));
   const [inTime, setIn] = useState('08:00');
   const [outTime, setOut] = useState('16:30');
+  const [leftAt, setLeftAt] = useState<string | null>(null);
 
   if (!wd) {
     return (
       <div className="wd-editor empty">
         <span className="muted">{t(isToday ? 'wd.notClockedInYet' : 'wd.noWorkday')}</span>
         {isToday ? (
-          <>
-            <button className="btn primary" onClick={() => update(startDay)}>
-              <Icon name="login" size={18} /> {t('startDay')}
-            </button>
-            <button className="btn" onClick={() => update((d) => markDayOff(d, day))}>
-              <Icon name="event_busy" size={18} /> {t('dayOff')}
-            </button>
-            <button className="btn" onClick={() => update((d) => markDayOff(d, day, 'overtime'))}>
-              <Icon name="savings" size={18} /> {t('dayOff.overtime')}
-            </button>
-          </>
+          <button className="btn primary small" onClick={() => update(startDay)}>
+            <Icon name="login" size={16} /> {t('startDay')}
+          </button>
         ) : (
           <>
             <span className="wd-times">
-              {t('wd.in')} <input className="time-field" type="time" value={inTime} onChange={(e) => setIn(e.target.value)} />
-              {t('wd.out')} <input className="time-field" type="time" value={outTime} onChange={(e) => setOut(e.target.value)} />
+              <input className="time-field" type="time" aria-label={t('tl.in')} value={inTime} onChange={(e) => setIn(e.target.value)} />
+              –
+              <input className="time-field" type="time" aria-label={t('tl.out')} value={outTime} onChange={(e) => setOut(e.target.value)} />
             </span>
-            <button className="btn primary" onClick={() => update((d) => addWorkday(d, day, inTime, outTime))}>
-              <Icon name="add" size={18} /> {t('wd.addWorkday')}
-            </button>
-            <button className="btn" onClick={() => update((d) => markDayOff(d, day))}>
-              <Icon name="event_busy" size={18} /> {t('dayOff')}
-            </button>
-            <button className="btn" onClick={() => update((d) => markDayOff(d, day, 'overtime'))}>
-              <Icon name="savings" size={18} /> {t('dayOff.overtime')}
+            <button className="btn primary small" onClick={() => update((d) => addWorkday(d, day, inTime, outTime))}>
+              <Icon name="add" size={16} /> {t('wd.addWorkday')}
             </button>
           </>
         )}
+        <button className="btn small" onClick={() => update((d) => markDayOff(d, day))}>
+          {t('dayOff')}
+        </button>
+        <button className="btn small" onClick={() => update((d) => markDayOff(d, day, 'overtime'))}>
+          {t('dayOff.overtime')}
+        </button>
       </div>
     );
   }
@@ -340,63 +294,27 @@ export function WorkdayEditor({ day }: { day: string }) {
         <button className="btn ghost small" onClick={() => update((d) => setOffKind(d, day, wd.offKind === 'overtime' ? undefined : 'overtime'))}>
           {t(wd.offKind === 'overtime' ? 'wd.makeDayOff' : 'wd.makeOvertime')}
         </button>
-        <button className="btn" onClick={() => update((d) => deleteWorkday(d, day))}>
+        <button className="btn small" onClick={() => update((d) => deleteWorkday(d, day))}>
           {t('wd.undoDayOff')}
         </button>
       </div>
     );
   }
 
-  const worked = workdayMs(wd, now);
+  // Today's leave time is open because you're still here; a past day's is a question.
+  if (isToday || (wd.end && !wd.autoClosed)) return null;
+  const left = leftAt ?? leaveSuggestion(data, day);
   return (
-    <div className="wd-editor">
-      <div className="wd-line">
-        <span className="wd-times">
-          <Icon name="login" size={18} /> {t('wd.in')} <TimeField value={wd.start} day={day} onChange={(start) => update((d) => updateWorkday(d, day, { start }))} />
-          <Icon name="logout" size={18} /> {t('wd.out')}{' '}
-          {wd.end ? (
-            <TimeField value={wd.end} day={day} onChange={(end) => leaveEdit(day, (d) => updateWorkday(d, day, { end }))} />
-          ) : isToday ? (
-            <span className="muted">{t('wd.stillAtWork')}</span>
-          ) : (
-            <>
-              <input className="time-field" type="time" value={outTime} onChange={(e) => setOut(e.target.value)} />
-              <button className="btn small" onClick={() => leaveEdit(day, (d) => closeWorkday(d, day, atTime(day, outTime)))}>
-                {t('save')}
-              </button>
-            </>
-          )}
-        </span>
-        <span className="spacer" />
-        <span>
-          <strong>{fmtDuration(worked)}</strong>{' '}
-          {wd.end && <span className={worked >= target ? 'pos' : 'neg'}>{worked >= target ? `+${fmtDuration(worked - target)}` : `−${fmtDuration(target - worked)}`}</span>}
-        </span>
-        <button className="icon-btn" title={t('wd.deleteHint')} onClick={() => confirm(t('wd.deleteConfirm')) && update((d) => deleteWorkday(d, day))}>
-          <Icon name="delete" size={18} />
+    <div className="wd-editor empty ask">
+      <span>{t(wd.end ? 'wd.closedLeft' : 'wd.openLeft')}</span>
+      <input className="time-field" type="time" aria-label={t('tl.out')} title={t('stale.suggestHint')} value={left} onChange={(e) => setLeftAt(e.target.value)} />
+      <button className="btn primary small" onClick={() => leaveEdit(day, (d) => closeWorkday(d, day, atTime(day, left)))}>
+        {t('save')}
+      </button>
+      {wd.end && (
+        <button className="btn ghost small" onClick={() => update((d) => confirmAutoClose(d, day))}>
+          {t('stale.keepHint')}
         </button>
-      </div>
-      <div className="breaks">
-        <span className="muted small">
-          <Icon name="coffee" size={16} /> {t('wd.breaks', { duration: fmtDuration(breakMs(wd)) })}
-        </span>
-        {wd.breaks.map((b, i) => (
-          <span key={i} className="break-chip">
-            <TimeField value={b.start} day={day} onChange={(start) => update((d) => updateBreak(d, day, i, { start }))} />–
-            {b.end ? <TimeField value={b.end} day={day} onChange={(end) => update((d) => updateBreak(d, day, i, { end }))} /> : <span className="muted">{t('now')}</span>}
-            <button className="icon-btn" title={t('wd.removeBreak')} onClick={() => update((d) => removeBreak(d, day, i))}>
-              <Icon name="close" size={16} />
-            </button>
-          </span>
-        ))}
-        <button className="btn ghost small" onClick={() => update((d) => addBreak(d, day))}>
-          <Icon name="add" size={16} /> {t('break')}
-        </button>
-      </div>
-      {wd.fromEntries && (
-        <p className="muted small wd-from-entries">
-          <span className="from-bookings">{t('fit.fromEntries')}</span> {t('fit.fromEntriesHint')}
-        </p>
       )}
     </div>
   );

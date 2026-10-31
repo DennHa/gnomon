@@ -6,7 +6,7 @@ import { ActivityChips, ProjectSelect, TrailSummary } from '../components';
 import { EntryFeed, TaskPicker } from '../feed';
 import { Icon } from '../icons';
 import { dayKey, entryMs, fmtClock, fmtDayLong, useNow } from '../time';
-import { CopyAsText, DayReview, ProjectGoals, StaleBanner } from './day';
+import { CopyAsText, DayReview, ProjectGoals } from './day';
 import { t } from '../i18n';
 import { prettyAccel } from '../shortcuts';
 import { useAddHours } from '../notes';
@@ -132,7 +132,7 @@ function TimerHero({ onOpenProjects }: { onOpenProjects: () => void }) {
   );
 }
 
-export default function Today({ onOpenDay, onOpenProjects }: { onOpenDay: (d: string) => void; onOpenProjects: () => void }) {
+export default function Today({ onOpenProjects }: { onOpenProjects: () => void }) {
   const { data } = useStore();
   const addHours = useAddHours();
   const now = useNow(60_000);
@@ -150,7 +150,6 @@ export default function Today({ onOpenDay, onOpenProjects }: { onOpenDay: (d: st
           <span className="muted">{fmtDayLong(today)}</span>
         </div>
       </header>
-      <StaleBanner onOpenDay={onOpenDay} />
       <TimerHero onOpenProjects={onOpenProjects} />
       <ProjectGoals day={today} />
       <section className="card">

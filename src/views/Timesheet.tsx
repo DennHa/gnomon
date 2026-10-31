@@ -5,8 +5,8 @@ import { NewProjectInput, TrailSummary } from '../components';
 import { EntryFeed } from '../feed';
 import { Icon } from '../icons';
 import { useAddHours } from '../notes';
-import { DayTimeline } from './Timeline';
-import { CopyAsText, DayReview, MISSING_LOOKBACK_DAYS, StaleBanner, WorkdayEditor, missingDays, shiftDay } from './day';
+import { DayPanel } from './Timeline';
+import { CopyAsText, DayReview, MISSING_LOOKBACK_DAYS, missingDays, shiftDay } from './day';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
 import { Burst } from '../motion';
@@ -121,21 +121,23 @@ function CellModal({ cell, onClose, readOnly }: { cell: CellRef; onClose: () => 
   );
 }
 
-/** A whole day: attendance, every entry as hours, and the review. */
+/** A whole day: the timeline with its list, and the review. */
 function DayModal({ day, onClose, readOnly }: { day: string; onClose: () => void; readOnly: boolean }) {
   const { data } = useStore();
-  const entries = data.entries.filter((e) => dayKey(e.start) === day).sort((a, b) => a.start.localeCompare(b.start));
+  const any = data.entries.some((e) => dayKey(e.start) === day);
   return (
-    <Modal onClose={onClose} wide title={<strong>{fmtDayLong(day)}</strong>}>
-      <DayTimeline day={day} readOnly={readOnly} />
-      <WorkdayEditor day={day} />
-      <div className="modal-section">
-        <div className="section-head">
-          <h4>{t('entries')}</h4>
-          {entries.length > 0 && <CopyAsText days={[day]} />}
-        </div>
-        <EntryFeed day={day} entries={entries} mode="hours" readOnly={readOnly} />
-      </div>
+    <Modal
+      onClose={onClose}
+      wide
+      title={
+        <>
+          <strong>{fmtDayLong(day)}</strong>
+          <span className="spacer" />
+          {any && <CopyAsText days={[day]} />}
+        </>
+      }
+    >
+      <DayPanel day={day} readOnly={readOnly} />
       <div className="modal-section">
         <DayReview day={day} noStats />
       </div>
@@ -291,7 +293,6 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
         </button>
       )}
     </header>
-    <StaleBanner onOpenDay={openDay} />
     <section className={`card week ${done ? 'done' : ''}`}>
       <div className="week-bar">
         {done ? (

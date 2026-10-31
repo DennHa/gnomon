@@ -2,7 +2,7 @@
 // a choice. The sidebar offers the list until it's gone through; Reports can open it later.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fixLeave } from '../actions';
-import { confirmDay, daysToCheck, leaveSuggestion, type CheckDay, type CheckReason } from '../daycheck';
+import { confirmDay, daysToCheck, leaveSuggestion, sidebarDays, type CheckDay, type CheckReason } from '../daycheck';
 import { Icon } from '../icons';
 import { useLeaveEdit } from '../notes';
 import { useStore } from '../store';
@@ -96,7 +96,7 @@ export function DayCheckList({ onOpenDay, onClose }: { onOpenDay: (d: string) =>
 /** Sidebar, until the list is gone through or put away. */
 export function DayCheckSidebar({ onOpen }: { onOpen: () => void }) {
   const { data, update } = useStore();
-  const days = useDaysToCheck();
+  const days = sidebarDays(data, useDaysToCheck());
   if (data.settings.dayCheckDone || !days.length) return null;
   return (
     <div className="corridor-side">

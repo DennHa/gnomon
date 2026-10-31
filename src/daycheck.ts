@@ -1,7 +1,7 @@
 // "Check these days": past days whose numbers look off, for the one-time list in src/views/DayCheck.tsx. It only reads;
 // nothing changes until the person picks a fix or says it's right. The same overlap calculation drives the day timeline.
 import { awayDays, confirmAutoClose, endsAtMidnight } from './actions';
-import { MAX_DAY } from './corridor';
+import { hoursMode, MAX_DAY } from './corridor';
 import { targetHoursOn } from './schedule';
 import { atTime, dayKey, entryMs, hoursToMs, workdayMs } from './time';
 import type { Data, Entry } from './types';
@@ -72,6 +72,14 @@ export function daysToCheck(d: Data, now = Date.now()): CheckDay[] {
     if (reasons.length) out.push({ date, reasons, fix: timer || Boolean(wd?.autoClosed) });
   }
   return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/**
+ * What the sidebar counts: days it doesn't already ask about one by one. Days closed at midnight have their own item
+ * there, and in corridor mode so do days over 10 hours. The list itself still shows them.
+ */
+export function sidebarDays(d: Data, days: CheckDay[]): CheckDay[] {
+  return days.filter((c) => !d.workdays.find((w) => w.date === c.date)?.autoClosed && !(hoursMode(d) === 'corridor' && c.reasons.every((r) => r.kind === 'long')));
 }
 
 /** "It's right": the day stays as it is and stops being asked about, here and in the target corridor. */

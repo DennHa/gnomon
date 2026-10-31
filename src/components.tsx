@@ -180,7 +180,11 @@ export function TimeField({ value, onChange, day }: { value: string; onChange: (
   const shown = toTimeInput(value);
   const [draft, setDraft] = useState(shown);
   useEffect(() => setDraft(shown), [shown]);
-  const commit = () => draft && draft !== shown && onChange(atTime(day ?? dayKey(value), draft));
+  // Refused changes go back to the stored time; accepted ones arrive through `value`.
+  const commit = () => {
+    if (draft && draft !== shown) onChange(atTime(day ?? dayKey(value), draft));
+    setDraft(shown);
+  };
   return (
     <input
       className="time-field"

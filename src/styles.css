@@ -550,7 +550,7 @@ input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 
 
 /* Modals */
 .modal.wide { width: min(940px, 100%); }
-.modal-title { display: inline-flex; align-items: center; gap: 4px; }
+.modal-title { display: inline-flex; flex: 1; align-items: center; gap: 4px; min-width: 0; margin-right: 8px; }
 .modal-sum { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .modal-section h4 { margin: 4px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .modal-section .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1205,7 +1205,7 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .segmented button:disabled { cursor: default; opacity: 0.55; }
 
 /* A short message with Undo (src/notes.ts): above dialogs, so it also shows over the day and the check list. */
-.note-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 70; max-width: min(560px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow), 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 13px; }
+.note-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 70; width: max-content; max-width: min(560px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow), 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 13px; }
 .feed-noroom { grid-column: 1 / -1; color: var(--muted); }
 
 /* The question after an absence (src/views/Away.tsx) */
@@ -1229,11 +1229,15 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 /* The day as it happened (src/views/Timeline.tsx) */
 .timeline { display: flex; flex-direction: column; gap: 6px; }
 .tl-scroll { overflow-x: auto; }
-.tl-track { position: relative; min-width: 560px; user-select: none; touch-action: pan-y; margin: 0 2px; }
+.tl-track { position: relative; min-width: 560px; user-select: none; touch-action: pan-y; margin: 2px 8px 0; }
 .tl-hour { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--divider); pointer-events: none; }
 .tl-hour span { position: absolute; bottom: 0; left: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; }
-.tl-clocked { position: absolute; top: 0; height: 20px; border-radius: 5px; padding: 0 7px; line-height: 20px; font-size: 11px; overflow: hidden; white-space: nowrap; background: color-mix(in srgb, var(--ok) 16%, var(--surface)); color: color-mix(in srgb, var(--ok) 70%, var(--text)); }
-.tl-break { position: absolute; top: 0; height: 20px; display: grid; place-items: center; overflow: hidden; border-radius: 4px; background: var(--surface); border: 1px dashed var(--muted); color: var(--muted); box-sizing: border-box; }
+.tl-clocked { position: absolute; top: 2px; height: 20px; border-radius: 5px; background: color-mix(in srgb, var(--ok) 16%, var(--surface)); pointer-events: none; }
+.tl-handle { position: absolute; top: 0; width: 12px; height: 24px; margin-left: -6px; border-radius: 4px; background: var(--ok); cursor: ew-resize; z-index: 1; }
+.tl-handle.fixed { cursor: pointer; opacity: 0.6; }
+.tl-handle.sel, .tl-break.sel, .tl-handle:focus-visible, .tl-break:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tl-break { position: absolute; top: 2px; height: 20px; display: grid; place-items: center; overflow: hidden; border-radius: 4px; background: var(--surface); border: 1px dashed var(--muted); color: var(--muted); box-sizing: border-box; cursor: grab; z-index: 1; }
+.tl-break.fixed { cursor: pointer; }
 .tl-overlap { position: absolute; border-radius: 4px; background: var(--danger-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent); pointer-events: none; }
 .tl-now { position: absolute; top: 0; bottom: 18px; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
 .tl-block { position: absolute; height: 36px; box-sizing: border-box; border: 1px solid; border-radius: 7px; padding: 2px 8px; display: flex; flex-direction: column; justify-content: center; line-height: 1.2; font-size: 11px; overflow: hidden; white-space: nowrap; cursor: grab; }
@@ -1241,15 +1245,22 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .tl-block.dragging { cursor: grabbing; z-index: 3; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
 .tl-block.sel, .tl-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 2; }
 .tl-name, .tl-time { overflow: hidden; text-overflow: ellipsis; }
+.tl-name .dot { display: inline-block; width: 7px; height: 7px; margin-right: 2px; }
 .tl-edge { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
 .tl-edge.start { left: 0; }
 .tl-edge.end { right: 0; }
 .tl-edit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border); }
 .tl-edit-name { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tl-totals { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.tl-totals { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tl-sum strong { font-variant-numeric: tabular-nums; }
+.tl-more { position: relative; display: inline-flex; }
+.tl-menu { position: absolute; right: 0; top: 100%; z-index: 5; display: flex; flex-direction: column; min-width: 210px; padding: 4px; border-radius: 10px; background: var(--surface); box-shadow: var(--shadow), 0 8px 24px rgba(0, 0, 0, 0.2); }
+.tl-menu button { border: 0; background: none; padding: 6px 10px; border-radius: 6px; text-align: left; cursor: pointer; }
+.tl-menu button:hover, .tl-menu button:focus-visible { background: var(--bg); outline: none; }
+.feed-row.selected { background: var(--accent-soft); }
+.wd-editor.ask { background: var(--warn-bg); }
 .tl-tag, .check-tag { font-size: 12px; padding: 1px 7px; border-radius: 6px; background: var(--warn-bg); }
 .tl-tag, .check-tag.strong { background: var(--danger-soft); color: var(--danger); }
-.tl-hintline { margin: 0; }
 
 /* Check these days (src/views/DayCheck.tsx) */
 .check-list { display: flex; flex-direction: column; }
@@ -1258,3 +1269,4 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .check-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .check-link { align-self: flex-start; }
 @media (max-width: 720px) { .check-row-day { grid-template-columns: 1fr; gap: 6px; } .check-actions { justify-content: flex-start; } }
+.tl-edit .time-field { background: var(--field) !important; border-radius: 8px; }

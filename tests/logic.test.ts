@@ -9,7 +9,8 @@ import { corridorOf, hoursMode, rulesOf, zoneOf } from '../src/corridor';
 import { daySummary, weekSummary } from '../src/motion';
 import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { fitAll, fitWorkdays } from '../src/fit';
-import { confirmDay, daysToCheck, leaveSuggestion, overlapMs, overlapSpans } from '../src/daycheck';
+import { confirmDay, daysToCheck, leaveSuggestion, overlapMs, overlapSpans, sidebarDays } from '../src/daycheck';
+import { lanes, moveClock, moveSpan } from '../src/timeline';
 import { toAssign, weekReminderDue, weekToAssign } from '../src/reminders';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
@@ -975,6 +976,37 @@ test('check list: nothing changes until you choose, then the day stops being ask
   assert.equal(ok.entries[0].end, stop, "it's right: the time stays");
   assert.deepEqual(daysToCheck(ok, NOW), []);
   assert.ok(ok.settings.longDaysOk!.includes(D), 'the corridor stops asking too');
+});
+
+test('timeline: blocks snap, stay inside the day and keep their length', () => {
+  const s = { start: atTime(D, '09:00'), end: atTime(D, '10:00') };
+  assert.deepEqual(moveSpan(s, 'move', 32 * M, D), { start: atTime(D, '09:30'), end: atTime(D, '10:30') });
+  assert.deepEqual(moveSpan(s, 'end', -2 * H, D), { start: s.start, end: atTime(D, '09:05') }, 'at least five minutes');
+  assert.equal(moveSpan(s, 'start', -20 * H, D).start, atTime(D, '00:00'));
+  assert.equal(moveSpan(s, 'move', 30 * H, D).end, atTime(D, '23:59'));
+  const lo = Date.parse(atTime(D, '08:00')), hi = Date.parse(atTime(D, '10:30'));
+  assert.equal(moveSpan(s, 'move', 3 * H, D, lo, hi).end, atTime(D, '10:30'), 'a break stays inside the clocked time');
+  assert.deepEqual([...lanes([{ id: 'a', a: 0, b: 10 }, { id: 'b', a: 5, b: 15 }, { id: 'c', a: 10, b: 20 }]).values()], [0, 1, 0]);
+});
+test('timeline: clock handles keep in before out, and never move an entry', () => {
+  const wd = { date: D, start: atTime(D, '09:00'), end: atTime(D, '17:00'), breaks: [] };
+  assert.equal(moveClock(wd, 'in', -33 * M, D), atTime(D, '08:25'));
+  assert.equal(moveClock(wd, 'in', 12 * H, D), atTime(D, '16:55'));
+  assert.equal(moveClock(wd, 'out', -12 * H, D), atTime(D, '09:05'));
+  assert.equal(moveClock({ ...wd, end: undefined }, 'in', 12 * H, D, Date.parse(atTime(D, '11:00'))), atTime(D, '10:55'), 'an open day: before now');
+  const d = { ...base(), workdays: [wd], entries: [span('a', '09:00', '12:00'), span('b', '16:00', '18:00')] };
+  const n = A.updateWorkday(A.updateWorkday(d, D, { start: atTime(D, '10:00') }), D, { end: atTime(D, '15:00') });
+  assert.deepEqual(n.entries, d.entries);
+});
+test('reminders: the sidebar count leaves out days it already asks about', () => {
+  const NOW = Date.parse(atTime('2026-10-20', '12:00'));
+  const long = (date: string) => ({ date, start: atTime(date, '08:00'), end: atTime(date, '19:30'), breaks: [] });
+  const d: Data = { ...base(), workdays: [{ ...long('2026-10-05'), autoClosed: true }, long('2026-10-06')], entries: [] };
+  const days = daysToCheck(d, NOW);
+  assert.equal(days.length, 2, 'the list keeps both');
+  assert.deepEqual(sidebarDays(d, days).map((c) => c.date), ['2026-10-06']);
+  const corridor = { ...d, settings: { ...d.settings, hoursView: 'corridor' as const } };
+  assert.deepEqual(sidebarDays(corridor, days), []);
 });
 
 console.log(`\n${passed} passed`);

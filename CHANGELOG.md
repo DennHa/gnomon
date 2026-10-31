@@ -3,6 +3,18 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **The timeline is the one place to change a day:** drag the clock-in and clock-out handles at the ends of the clocked
+  rail, and move or resize breaks like bookings; a click on any of them lets you type the exact time. Clock times still
+  never move bookings. The separate fields below are gone, and a compact row appears only when a day needs it (no
+  workday yet, a day off, a leave time to confirm). One line on top says it all: *Clocked 8:30 · Booked 8:00 · 0:30
+  unbooked*.
+- **Timeline and list stay together:** both follow a drag live, and selecting a block highlights its row, and the other
+  way round. The list shows what the timeline can't: project, description, activity and duration.
+- **Each reminder once:** *When did you actually leave?* now lives in the sidebar only, not as a banner on Track and the
+  Week. The sidebar's *days to check* no longer counts days it already asks about.
+
 ## 0.1.25 · 2026-10-31
 
 - **Fixing a forgotten clock-out now fixes the timer too:** when you correct the leave time of a day closed at midnight,
