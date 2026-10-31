@@ -3,6 +3,11 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **A designed install window:** the `.dmg` now opens on a Gnomon window with the sundial's shadow pointing from the app
+  to Applications, and says what to do if macOS blocks the first start.
+
 ## 0.1.24 · 2026-10-28
 
 - **Calmer Settings:** Settings keeps what most people set once (you, your work schedule, your way of working,
