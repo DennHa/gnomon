@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import {
   addBreak,
   addWorkday,
+  awayDays,
   closeWorkday,
   confirmAutoClose,
   deleteWorkday,
@@ -24,9 +25,11 @@ import { Icon } from '../icons';
 import { goalFor, planItemsOn, timeWindow } from '../plan';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
-import { addDays, atTime, breakMs, dayKey, entryMs, fmtDayLabel, fmtDuration, fmtTime, hoursToMs, useNow, workdayMs } from '../time';
+import { addDays, atTime, breakMs, dayKey, entryMs, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from '../time';
 import { t } from '../i18n';
 import { copyHoursOn, daysText, type CopyText } from '../copytext';
+import { useAddHours, useLeaveEdit } from '../notes';
+import { leaveSuggestion } from '../daycheck';
 
 export const MISSING_LOOKBACK_DAYS = 30;
 
@@ -236,25 +239,13 @@ export function missingDays(data: Data, now: number): { date: string; worked: nu
  * A past workday that's still open, or that the midnight auto-stop closed at 23:59:
  * ask once for the real leave time.
  */
-/**
- * A good guess for when you left on a day you forgot to clock out: the end of your last timer (one cut off at midnight
- * doesn't count), else your arrival plus that day's target and a half-hour break, else 17:00.
- */
-export function leaveSuggestion(data: Data, date: string): string {
-  const hhmm = (ms: number) => new Date(ms).toTimeString().slice(0, 5);
-  const midnightCut = Date.parse(atTime(date, '23:58'));
-  const ends = data.entries.filter((e) => e.end && dayKey(e.start) === date).map((e) => Date.parse(e.end!)).filter((ms) => ms < midnightCut);
-  if (ends.length) return hhmm(Math.max(...ends));
-  const wd = data.workdays.find((w) => w.date === date);
-  const target = hoursToMs(targetHoursOn(data, date));
-  if (wd && target > 0) return hhmm(Math.min(midnightCut - 60_000, Date.parse(wd.start) + target + (target >= 6 * 3_600_000 ? 30 * 60_000 : 0)));
-  return '17:00';
-}
-
 export function StaleBanner({ onOpenDay }: { onOpenDay: (d: string) => void }) {
   const { data, update } = useStore();
+  const leaveEdit = useLeaveEdit();
   const today = dayKey(new Date());
-  const stale = data.workdays.filter((w) => w.date < today && !w.off && (!w.end || w.autoClosed)).sort((a, b) => b.date.localeCompare(a.date))[0];
+  // A day the question after an absence will settle isn't asked about twice.
+  const asking = awayDays(data);
+  const stale = data.workdays.filter((w) => w.date < today && !w.off && (!w.end || w.autoClosed) && !asking.includes(w.date)).sort((a, b) => b.date.localeCompare(a.date))[0];
   const [leftAt, setLeftAt] = useState<string | null>(null);
   if (!stale) return null;
   const suggested = leaveSuggestion(data, stale.date);
@@ -270,7 +261,7 @@ export function StaleBanner({ onOpenDay }: { onOpenDay: (d: string) => void }) {
         {t(stale.end ? 'stale.autoAfter' : 'stale.openAfter', { time: fmtTime(stale.start) })}
       </span>
       <input className="time-field" type="time" value={value} onChange={(e) => setLeftAt(e.target.value)} title={t('stale.suggestHint')} />
-      <button className="btn small primary" onClick={() => update((d) => closeWorkday(d, stale.date, atTime(stale.date, value)))}>
+      <button className="btn small primary" onClick={() => leaveEdit(stale.date, (d) => closeWorkday(d, stale.date, atTime(stale.date, value)))}>
         {t('save')}
       </button>
       {stale.end && (
@@ -285,6 +276,7 @@ export function StaleBanner({ onOpenDay }: { onOpenDay: (d: string) => void }) {
 /** In/out, breaks, day off: the attendance part of a day, editable for any date. */
 export function WorkdayEditor({ day }: { day: string }) {
   const { data, update } = useStore();
+  const leaveEdit = useLeaveEdit();
   const now = useNow(30_000);
   const wd = data.workdays.find((w) => w.date === day);
   const isToday = day === dayKey(now);
@@ -363,13 +355,13 @@ export function WorkdayEditor({ day }: { day: string }) {
           <Icon name="login" size={18} /> {t('wd.in')} <TimeField value={wd.start} day={day} onChange={(start) => update((d) => updateWorkday(d, day, { start }))} />
           <Icon name="logout" size={18} /> {t('wd.out')}{' '}
           {wd.end ? (
-            <TimeField value={wd.end} day={day} onChange={(end) => update((d) => updateWorkday(d, day, { end }))} />
+            <TimeField value={wd.end} day={day} onChange={(end) => leaveEdit(day, (d) => updateWorkday(d, day, { end }))} />
           ) : isToday ? (
             <span className="muted">{t('wd.stillAtWork')}</span>
           ) : (
             <>
               <input className="time-field" type="time" value={outTime} onChange={(e) => setOut(e.target.value)} />
-              <button className="btn small" onClick={() => update((d) => closeWorkday(d, day, atTime(day, outTime)))}>
+              <button className="btn small" onClick={() => leaveEdit(day, (d) => closeWorkday(d, day, atTime(day, outTime)))}>
                 {t('save')}
               </button>
             </>
@@ -411,8 +403,9 @@ export function WorkdayEditor({ day }: { day: string }) {
 }
 
 /** Untracked time, what's left against the plan (one click to add), and the activity trail as a memory aid. */
-export function DayReview({ day, title }: { day: string; title?: string }) {
-  const { data, update } = useStore();
+export function DayReview({ day, title, noStats }: { day: string; title?: string; /** The day timeline shows these already. */ noStats?: boolean }) {
+  const { data } = useStore();
+  const addHours = useAddHours();
   const now = useNow(60_000);
   const wd = data.workdays.find((w) => w.date === day);
   const [skip, setSkip] = useState<Set<string>>(new Set());
@@ -432,7 +425,7 @@ export function DayReview({ day, title }: { day: string; title?: string }) {
     <div className="review">
       {title && <h3>{complete ? t('review.complete') : title}</h3>}
       {/* Work hours and bookings are separate; their difference is only a hint, with where each number comes from. */}
-      <div className="review-stats">
+      {!noStats && <div className="review-stats">
         {wd.fromEntries ? (
           <span>
             {t('review.booked')} <strong>{fmtDuration(tracked)}</strong> <span className="from-bookings">{t('fit.fromEntries')}</span>
@@ -447,14 +440,14 @@ export function DayReview({ day, title }: { day: string; title?: string }) {
             </span>
             <span className="muted">
               {unassigned >= 5 * 60_000
-                ? t('review.notAssigned', { duration: fmtDuration(unassigned) })
+                ? t('review.notAssigned', { duration: fmtHM(unassigned) })
                 : unassigned <= -5 * 60_000
-                  ? t('review.overBooked', { duration: fmtDuration(-unassigned) })
+                  ? t('review.overBooked', { duration: fmtHM(-unassigned) })
                   : t('review.allAssigned')}
             </span>
           </>
         )}
-      </div>
+      </div>}
       <TrailSummary day={day} />
       {gaps.length > 0 && (
         <div className="review-block">
@@ -482,7 +475,7 @@ export function DayReview({ day, title }: { day: string; title?: string }) {
               </label>
             );
           })}
-          <button className="btn primary small" disabled={!chosen.length} onClick={() => update((d) => fillGaps(d, day, chosen))}>
+          <button className="btn primary small" disabled={!chosen.length} onClick={() => addHours(chosen.reduce((s, g) => s + g.ms, 0), (d) => fillGaps(d, day, chosen))}>
             <Icon name="playlist_add" size={18} /> {t('review.add', { duration: fmtDuration(chosen.reduce((s, g) => s + g.ms, 0)) })}
           </button>
         </div>

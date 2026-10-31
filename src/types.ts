@@ -84,6 +84,8 @@ export type Entry = {
   /** ISO timestamps; a missing end means the timer is running. */
   start: string;
   end?: string;
+  /** Stopped by the midnight auto-stop, not by you: correcting the day's leave time cuts it too. */
+  autoStopped?: boolean;
 };
 
 export type Break = { start: string; end?: string };
@@ -105,6 +107,16 @@ export type Workday = {
   autoClosed?: boolean;
   /** Made from the day's entries (no clock-in); follows them until you change it by hand (src/fit.ts). */
   fromEntries?: boolean;
+};
+
+/** An absence Gnomon asks about (src/actions.ts, Time away). Stays on this Mac: idle detection is per device. */
+export type Away = {
+  since: string;
+  /** Missing while you're still away. */
+  back?: string;
+  reason: 'sleep' | 'lock' | 'idle';
+  /** The timer that was running when you left. */
+  entryId?: string;
 };
 
 export type Settings = {
@@ -178,6 +190,10 @@ export type Settings = {
   companyHours?: CompanyHours;
   /** Days over 10 h you confirmed as right, so the target corridor stops asking about them (YYYY-MM-DD, recent ones). */
   longDaysOk?: string[];
+  /** Days you answered "It's right" for in the check list (src/daycheck.ts). */
+  checkedDays?: string[];
+  /** The check list was gone through or closed: the sidebar stops offering it; Reports still opens it. */
+  dayCheckDone?: boolean;
   /** Your name; added to CSV exports so they can be told apart (e.g. when collected by the company). */
   userName?: string;
   /** Close a workday and timer left running from an earlier day at 23:59. */
@@ -210,6 +226,8 @@ export type Data = {
   /** Mondays (YYYY-MM-DD) of weeks you marked as done; their timesheet is read-only. */
   reviewedWeeks: string[];
   settings: Settings;
+  /** Absences still to ask about, oldest first. Not synced, like idle detection itself. */
+  away?: Away[];
 };
 
 /** What the menu bar can start: a project, or a recent entry. */
@@ -248,7 +266,12 @@ export type TrayState = {
   apiEnabled: boolean;
   apiPort: number;
   apiLan: boolean;
-  /** Locale for times in main (idle dialog) and the menu, dialog and notification texts in the UI language. */
+  /** You're away and Gnomon is waiting for you to come back. */
+  awayOpen: boolean;
+  /** An absence is waiting for an answer: when it started (keys the one notification) and the menu item's text. */
+  awayKey?: string;
+  awayLabel?: string;
+  /** Locale for times in main and the menu, dialog and notification texts in the UI language. */
   locale: string;
   strings: Record<string, string>;
 };
@@ -258,7 +281,9 @@ export type TrayAction =
   | ({ type: 'start' } & QuickStart)
   | { type: 'switch-activity'; activityId: string }
   | { type: 'resume' }
-  | { type: 'idle'; since: string; choice: 'keep' | 'discard' | 'break' | 'leave' }
+  | { type: 'away-start'; at: string; reason: Away['reason'] }
+  | { type: 'away-end'; at: string }
+  | { type: 'show-away' }
   | { type: 'show-review' }
   | { type: 'copy-today' }
   | { type: 'show-feedback' };

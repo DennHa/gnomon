@@ -2,6 +2,7 @@ import { Icon } from '../icons';
 import { balanceByMonth, targetFor } from '../balance';
 import { hoursMode } from '../corridor';
 import { CorridorCard } from './Corridor';
+import { useDaysToCheck } from './DayCheck';
 import { targetHoursOn } from '../schedule';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
@@ -155,7 +156,18 @@ function OvertimeBalance({ onOpenSettings }: { onOpenSettings: () => void }) {
   );
 }
 
-export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day: string) => void; onOpenSettings: () => void }) {
+/** The days worth a second look (src/daycheck.ts): always reachable here, also after the sidebar stopped offering them. */
+function DayCheckLink({ onOpen }: { onOpen: () => void }) {
+  const days = useDaysToCheck();
+  if (!days.length) return null;
+  return (
+    <button className="btn ghost small check-link" onClick={onOpen}>
+      <Icon name="warning" size={16} /> {t('check.side', { n: days.length })}
+    </button>
+  );
+}
+
+export default function Reports({ onOpenDay, onOpenCheck, onOpenSettings }: { onOpenDay: (day: string) => void; onOpenCheck: () => void; onOpenSettings: () => void }) {
   const { data } = useStore();
   const now = useNow(30_000);
   const [kind, setKind] = useState<Range>('week');
@@ -289,6 +301,7 @@ export default function Reports({ onOpenDay, onOpenSettings }: { onOpenDay: (day
 
       {/* The company's choice, or the Labs switch: the target corridor replaces the overtime balance. */}
       {corridor ? <CorridorCard info={(text) => <InfoTip text={text} />} /> : <OvertimeBalance onOpenSettings={onOpenSettings} />}
+      <DayCheckLink onOpen={onOpenCheck} />
 
       <section className="card">
         <h3>{t('rep.timeTitle')}</h3>

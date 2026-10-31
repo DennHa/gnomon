@@ -1,6 +1,6 @@
 // Pure state transitions. Every function takes the current Data and returns the next one.
-import type { Activity, ActivityPreset, Break, Data, Entry, Project, Settings, Workday, WorkStyle } from './types';
-import { atTime, dayKey, nowIso, uid } from './time';
+import type { Activity, ActivityPreset, Away, Break, Data, Entry, Project, Settings, Workday, WorkStyle } from './types';
+import { atTime, dayKey, nowIso, toTimeInput, uid, workdayMs } from './time';
 import { goalFor, planItemsOn } from './plan';
 
 export const PROJECT_COLORS = ['#03A9F4', '#8BC34A', '#FF9800', '#E91E63', '#9C27B0', '#009688', '#3F51B5', '#795548', '#F44336', '#607D8B'];
@@ -46,21 +46,84 @@ export function toggleBreak(d: Data): Data {
   return mapToday(stopTimer(d), (w) => ({ ...w, breaks: [...w.breaks, { start: at }] }));
 }
 
+/** Whether a finished entry ends in the last minute of its day: how an entry the midnight close stopped looks. */
+export const endsAtMidnight = (e: Entry) => Boolean(e.end) && dayKey(e.end!) === dayKey(e.start) && toTimeInput(e.end!) === '23:59';
+
+/** Whether the midnight close stopped this entry: it carries the mark, or (from before the mark) ends 23:59:xx on an autoClosed day. */
+const autoStopped = (e: Entry, wd?: Workday) => Boolean(e.autoStopped || (wd?.autoClosed && endsAtMidnight(e)));
+
+/** End the entries `which` picks at `end`; one that started later than that has no time left and goes. */
+function cutEntries(d: Data, date: string, end: string, which: (e: Entry) => boolean): Data {
+  const cut = d.entries.filter((e) => e.end && dayKey(e.start) === date && e.end > end && which(e));
+  if (!cut.length) return d;
+  const ids = new Set(cut.map((e) => e.id));
+  return { ...d, entries: d.entries.flatMap((e) => (!ids.has(e.id) ? [e] : e.start >= end ? [] : [{ ...e, end, autoStopped: undefined }])) };
+}
+
 export function updateWorkday(d: Data, date: string, patch: Partial<Workday>): Data {
-  // Editing the leave time confirms it, so an auto-closed day stops asking.
+  const wd = d.workdays.find((w) => w.date === date);
+  // Editing the leave time confirms it, so an auto-closed day stops asking, and a timer midnight stopped ends there too.
   const confirm = patch.end ? { autoClosed: undefined } : {};
+  const next = patch.end ? cutEntries(d, date, patch.end, (e) => autoStopped(e, wd)) : d;
   // Changed by hand: it no longer follows the entries.
-  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, ...patch, ...confirm, fromEntries: undefined } : w)) };
+  return { ...next, workdays: d.workdays.map((w) => (w.date === date ? { ...w, ...patch, ...confirm, fromEntries: undefined } : w)) };
 }
 
-/** Close a day you forgot to clock out of. */
+/** Close a day you forgot to clock out of; a timer midnight stopped is cut to the same time. */
 export function closeWorkday(d: Data, date: string, end: string): Data {
-  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...closeBreaks(w, end), end, autoClosed: undefined, fromEntries: undefined } : w)) };
+  const wd = d.workdays.find((w) => w.date === date);
+  if (wd && end <= wd.start) return d;
+  const next = cutEntries(d, date, end, (e) => autoStopped(e, wd));
+  return { ...next, workdays: d.workdays.map((w) => (w.date === date ? { ...closeBreaks(w, end), end, autoClosed: undefined, fromEntries: undefined } : w)) };
 }
 
-/** Accept an auto-closed day's 23:59 as it is. */
+/**
+ * The check list's fix: the same as closeWorkday, but it also cuts unmarked entries ending at 23:59. Those are days
+ * corrected before the mark existed (the workday no longer says autoClosed), and here the person points at them.
+ */
+export function fixLeave(d: Data, date: string, end: string): Data {
+  const wd = d.workdays.find((w) => w.date === date && !w.off);
+  if (wd && end <= wd.start) return d;
+  const next = cutEntries(d, date, end, endsAtMidnight);
+  return wd ? closeWorkday(next, date, end) : next;
+}
+
+/** Accept an auto-closed day's 23:59 as it is; its timer then counts as set by you and is never cut. */
 export function confirmAutoClose(d: Data, date: string): Data {
-  return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, autoClosed: undefined } : w)) };
+  return {
+    ...d,
+    entries: d.entries.map((e) => (e.autoStopped && dayKey(e.start) === date ? { ...e, autoStopped: undefined } : e)),
+    workdays: d.workdays.map((w) => (w.date === date ? { ...w, autoClosed: undefined } : w)),
+  };
+}
+
+export type CutNote = { date: string; end?: string; ms: number; entries: Entry[]; workday?: Workday };
+
+/** What a leave-time correction cut (for the note with Undo), or null when no entry changed. */
+export function cutNote(before: Data, after: Data, date: string): CutNote | null {
+  const now = new Map(after.entries.map((e) => [e.id, e]));
+  const entries = before.entries.filter((e) => e.end && dayKey(e.start) === date && now.get(e.id) !== e);
+  const ms = entries.reduce((s, e) => {
+    const x = now.get(e.id);
+    return s + Date.parse(e.end!) - (x?.end ? Date.parse(x.end) : Date.parse(e.start));
+  }, 0);
+  if (ms <= 0) return null;
+  return { date, end: after.workdays.find((w) => w.date === date)?.end, ms, entries, workday: before.workdays.find((w) => w.date === date) };
+}
+
+/** Undo a cut: the entries and the workday as they were. */
+export function undoCut(d: Data, note: CutNote): Data {
+  const back = new Map(note.entries.map((e) => [e.id, e]));
+  const kept = d.entries.map((e) => {
+    const old = back.get(e.id);
+    back.delete(e.id);
+    return old ?? e;
+  });
+  return {
+    ...d,
+    entries: [...kept, ...back.values()],
+    workdays: note.workday ? d.workdays.map((w) => (w.date === note.date ? note.workday! : w)) : d.workdays,
+  };
 }
 
 /** True when a workday or timer from an earlier calendar day is still open. */
@@ -70,14 +133,14 @@ export function hasOvernight(d: Data, today = dayKey(new Date())): boolean {
 
 /**
  * Midnight auto-stop: close workdays and the timer left open on an earlier day at 23:59 of that day.
- * The workday is marked autoClosed so the UI asks for the real leave time.
+ * The workday is marked autoClosed so the UI asks for the real leave time, the timer autoStopped so it can be cut to it.
  */
 export function closeOvernight(d: Data, today = dayKey(new Date())): Data {
   if (!hasOvernight(d, today)) return d;
   const endOf = (day: string) => new Date(Date.parse(atTime(day, '23:59')) + 59_000).toISOString();
   return {
     ...d,
-    entries: d.entries.map((e) => (!e.end && dayKey(e.start) < today ? { ...e, end: endOf(dayKey(e.start)) } : e)),
+    entries: d.entries.map((e) => (!e.end && dayKey(e.start) < today ? { ...e, end: endOf(dayKey(e.start)), autoStopped: true } : e)),
     workdays: d.workdays.map((w) => (!w.end && w.date < today ? { ...closeBreaks(w, endOf(w.date)), end: endOf(w.date), autoClosed: true } : w)),
   };
 }
@@ -171,42 +234,78 @@ export function startTimer(d: Data, input: TimerInput): Data {
   return { ...next, entries: [...next.entries, entry] };
 }
 
-/**
- * Where a new entry of `ms` goes on a day: the first free stretch inside the time you were clocked in (between your
- * arrival, breaks and existing entries) that fits it; otherwise right after the last entry or break. Without a
- * clock-in, after the day's last entry, or at 09:00. So typing hours in later never moves your arrival.
- */
-export function freeStart(d: Data, day: string, ms: number): string {
+type Span = [number, number];
+
+/** A day as ms; it ends at 23:59, so nothing placed in it crosses midnight. */
+const dayBounds = (day: string): Span => [Date.parse(atTime(day, '00:00')), Date.parse(atTime(day, '23:59'))];
+
+/** What's taken on a day, merged and oldest first: entries (also ones reaching in from the day before) and breaks. */
+function busySpans(d: Data, day: string, now: number, skip?: string): Span[] {
+  const [from, to] = dayBounds(day);
   const wd = d.workdays.find((w) => w.date === day && !w.off);
-  const taken = [
-    ...d.entries.filter((e) => e.end && dayKey(e.start) === day).map((e) => [Date.parse(e.start), Date.parse(e.end!)]),
-    ...(wd?.breaks ?? []).filter((b) => b.end).map((b) => [Date.parse(b.start), Date.parse(b.end!)]),
-  ].sort((a, b) => a[0] - b[0]);
-  if (!wd) {
-    const lastEnd = d.entries.filter((e) => e.end && dayKey(e.start) === day).map((e) => Date.parse(e.end!));
-    return lastEnd.length ? new Date(Math.max(...lastEnd)).toISOString() : atTime(day, '09:00');
+  const list = [...d.entries.filter((e) => e.id !== skip), ...(wd?.breaks ?? [])]
+    .map((x): Span => [Math.max(from, Date.parse(x.start)), Math.min(to, x.end ? Date.parse(x.end) : now)])
+    .filter(([a, b]) => b > a)
+    .sort((a, b) => a[0] - b[0]);
+  const out: Span[] = [];
+  for (const s of list) {
+    const last = out[out.length - 1];
+    if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1]);
+    else out.push([...s]);
   }
-  const until = wd.end ? Date.parse(wd.end) : Infinity;
-  let at = Date.parse(wd.start);
-  for (const [a, b] of taken) {
-    if (b <= at) continue;
-    if (a - at >= ms && at + ms <= until) return new Date(at).toISOString();
-    at = Math.max(at, b);
-  }
-  return new Date(at).toISOString();
+  return out;
 }
 
-/** Add a finished one-hour entry on any day, right after that day's last entry. */
+/**
+ * Where an entry of `ms` goes on a day: never over another entry or a break, never past midnight. First the first free
+ * stretch inside the time you were clocked in; if it doesn't fit there, the free time outside it (later that day, or
+ * right before you arrived; a day still open has no "later" yet, so before comes first). Without a clock-in, after the
+ * day's last entry, or at 09:00. Null when the day has no stretch that long. Typing hours in never moves your arrival.
+ */
+export function freeStart(d: Data, day: string, ms: number, now = Date.now(), skip?: string): string | null {
+  const [from, to] = dayBounds(day);
+  const free: Span[] = [];
+  let at = from;
+  for (const [a, b] of busySpans(d, day, now, skip)) {
+    if (a > at) free.push([at, a]);
+    at = Math.max(at, b);
+  }
+  if (at < to) free.push([at, to]);
+
+  const wd = d.workdays.find((w) => w.date === day && !w.off);
+  const ends = d.entries.filter((e) => e.end && e.id !== skip && dayKey(e.start) === day).map((e) => Date.parse(e.end!));
+  const open = Boolean(wd && !wd.end && day === dayKey(now));
+  const lo = wd ? Date.parse(wd.start) : ends.length ? Math.max(...ends) : Date.parse(atTime(day, '09:00'));
+  const hi = wd?.end ? Date.parse(wd.end) : open ? now : to;
+  const iso = (v: number) => new Date(v).toISOString();
+
+  for (const [a, b] of free) if (Math.min(b, hi) - Math.max(a, lo) >= ms) return iso(Math.max(a, lo));
+  const after = () => {
+    for (const [a, b] of free) if (b - Math.max(a, hi) >= ms) return iso(Math.max(a, hi));
+    return null;
+  };
+  const before = () => {
+    for (const [a, b] of [...free].reverse()) if (Math.min(b, lo) - a >= ms) return iso(Math.min(b, lo) - ms);
+    return null;
+  };
+  // Longer than either side alone: a free stretch reaching over your arrival or leaving.
+  const across = () => free.find(([a, b]) => b - a >= ms)?.[0];
+  const spot = open ? (before() ?? after()) : (after() ?? before());
+  return spot ?? (across() !== undefined ? iso(across()!) : null);
+}
+
+/** Add a finished one-hour entry on any day, in that day's free time (see freeStart); nothing when there's none. */
 export function addEntry(d: Data, date: string): Data {
   const last = d.entries.filter((e) => e.end && dayKey(e.start) === date).sort((a, b) => b.end!.localeCompare(a.end!))[0];
   const start = freeStart(d, date, 3_600_000);
+  if (!start) return d;
   const end = new Date(Date.parse(start) + 3_600_000).toISOString();
   return { ...d, entries: [...d.entries, { id: uid(), description: '', projectId: last?.projectId, start, end }] };
 }
 
 /**
  * Timesheet editing: make a project's finished entries on a day add up to `targetMs`.
- * More time is appended as one entry after the day's last entry; less time trims the latest entries.
+ * More time is added as one entry where it fits (see freeStart); less time trims the latest entries.
  */
 export function setDayTotal(d: Data, projectId: string | undefined, day: string, targetMs: number): Data {
   const mine = d.entries
@@ -243,10 +342,29 @@ export function stopTimer(d: Data): Data {
 }
 
 export function updateEntry(d: Data, id: string, patch: Partial<Entry>): Data {
+  // A new end is yours: the entry no longer counts as stopped by the midnight close.
+  const mine = patch.end ? { autoStopped: undefined } : {};
   return {
     ...d,
-    entries: d.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+    entries: d.entries.map((e) => (e.id === id ? { ...e, ...patch, ...mine } : e)),
   };
+}
+
+/**
+ * Type a finished entry's hours: it stays where it starts when that's free, otherwise it moves to where the hours fit
+ * (see freeStart). Unchanged when the day has no room.
+ */
+export function setEntryHours(d: Data, id: string, ms: number, now = Date.now()): Data {
+  const e = d.entries.find((x) => x.id === id);
+  if (!e?.end || ms < 60_000) return d;
+  const start = Date.parse(e.start);
+  const day = dayKey(e.start);
+  const end = start + ms;
+  const iso = (v: number) => new Date(v).toISOString();
+  const fits = end <= Date.parse(e.end) || (end <= dayBounds(day)[1] && !busySpans(d, day, now, e.id).some(([a, b]) => a < end && b > start));
+  if (fits) return updateEntry(d, id, { end: iso(end) });
+  const at = freeStart(d, day, ms, now, id);
+  return at ? updateEntry(d, id, { start: at, end: iso(Date.parse(at) + ms) }) : d;
 }
 
 export function deleteEntry(d: Data, id: string): Data {
@@ -329,40 +447,117 @@ export function resumeLast(d: Data): Data {
   return startTimer(d, { description, projectId, activityId, billable, taskId, taskName });
 }
 
-/**
- * You came back after being idle since `since`. "discard" cuts the idle time out of the running timer
- * and restarts it now; "break" does the same and records the time as a break; "leave" clocks you out at `since`.
- */
-export function resolveIdle(d: Data, since: string, choice: 'keep' | 'discard' | 'break' | 'leave'): Data {
-  if (choice === 'keep') return d;
-  const running = runningEntry(d);
-  // "leave": you went home at `since`. Stop the timer and end the open workday there.
-  if (choice === 'leave') {
-    const entries = d.entries.map((e) => (e.end ? e : { ...e, end: since > e.start ? since : e.start }));
-    const workdays = d.workdays.map((w) => (w.end || w.off ? w : { ...closeBreaks(w, since > w.start ? since : w.start), end: since > w.start ? since : w.start }));
-    return { ...d, entries, workdays };
-  }
-  if (!running || since <= running.start) {
-    if (choice === 'break') return mapToday(d, (w) => (w.end ? w : { ...w, breaks: [...w.breaks, { start: since, end: nowIso() }] }));
-    return d;
-  }
-  const now = nowIso();
-  const { description, projectId, activityId, billable, taskId, taskName } = running;
-  let next: Data = {
-    ...d,
-    entries: [
-      ...d.entries.map((e) => (e.id === running.id ? { ...e, end: since } : e)),
-      { id: uid(), description, projectId, activityId, billable, taskId, taskName, start: now },
-    ],
-  };
-  if (choice === 'break') next = mapToday(next, (w) => (w.end ? w : { ...w, breaks: [...w.breaks, { start: since, end: now }] }));
-  return next;
+// ---- Time away ------------------------------------------------------------------------------------------------
+// The question after an absence (src/views/Away.tsx). Its facts live in Data.away, so it survives a restart and the
+// midnight close, which may run first. The Mac's main process reports when you left and came back.
+
+/** You left (the laptop closed, the screen locked, no input). Remembers what was running, if anything was. */
+export function noteAway(d: Data, since: string, reason: Away['reason']): Data {
+  const list = d.away ?? [];
+  if (list.some((a) => !a.back)) return d;
+  const run = runningEntry(d);
+  const entryId = run && run.start < since ? run.id : undefined;
+  const wd = d.workdays.find((w) => !w.end && !w.off && w.date === dayKey(since));
+  if (!entryId && !wd) return d;
+  return { ...d, away: [...list, { since, reason, entryId }] };
 }
 
-/** Append a finished entry of `ms` on a day, in the first free stretch of the clocked-in time (see freeStart). */
+/** You're back: the open absence gets its end; one shorter than the idle setting isn't worth a question and goes. */
+export function markBack(d: Data, back: string): Data {
+  const open = d.away?.find((a) => !a.back);
+  if (!open) return d;
+  const tooShort = Date.parse(back) - Date.parse(open.since) < d.settings.idleMinutes * 60_000;
+  const away = tooShort ? d.away!.filter((a) => a !== open) : d.away!.map((a) => (a === open ? { ...a, back } : a));
+  return { ...d, away: away.length ? away : undefined };
+}
+
+/** The timer of an absence, and the workday it fell on. */
+const awayFacts = (d: Data, a: Away) => ({
+  entry: d.entries.find((e) => e.id === a.entryId),
+  wd: d.workdays.find((w) => w.date === dayKey(a.since) && !w.off),
+});
+
+/** Nothing left to decide: the time already ended when you left (you fixed it another way), or its records are gone. */
+function settled(d: Data, a: Away): boolean {
+  const { entry, wd } = awayFacts(d, a);
+  const after = (x?: { end?: string }) => Boolean(x && (!x.end || x.end > a.since));
+  return !after(entry) && !after(wd);
+}
+
+/** The absence to ask about now: the oldest one that has ended and still has time to decide on. */
+export const pendingAway = (d: Data): Away | undefined => d.away?.find((a) => a.back && !settled(d, a));
+
+/** Days a pending absence will settle: nothing else asks about them, so an absence over midnight asks once. */
+export const awayDays = (d: Data): string[] => (d.away ?? []).filter((a) => !settled(d, a)).map((a) => dayKey(a.since));
+
+export const awayOverMidnight = (a: Away) => dayKey(a.since) !== dayKey(a.back ?? a.since);
+
+export type AwayChoice = 'working' | 'break' | 'stop' | 'remove';
+
+/** The choices an absence offers. A break can't span midnight; removing is for a timer without a workday of its own. */
+export function awayChoices(d: Data, a: Away): AwayChoice[] {
+  const { entry, wd } = awayFacts(d, a);
+  if (awayOverMidnight(a)) return ['stop', 'working'];
+  if (!wd || wd.fromEntries) return entry ? ['working', 'remove', 'stop'] : ['working', 'stop'];
+  return ['working', 'break', 'stop'];
+}
+
+/** Take [since, back] out of an entry: it ends at `since`, and what came after `back` goes on as a new entry. */
+function cutHole(d: Data, e: Entry, since: string, back: string): { data: Data; rest?: Entry } {
+  const { description, projectId, activityId, billable, taskId, taskName } = e;
+  const rest: Entry | undefined = !e.end || e.end > back ? { id: uid(), description, projectId, activityId, billable, taskId, taskName, start: back, ...(e.end && { end: e.end }) } : undefined;
+  const entries = d.entries.map((x) => (x.id === e.id ? { ...x, end: since, autoStopped: undefined } : x));
+  return { data: { ...d, entries: rest ? [...entries, rest] : entries }, rest };
+}
+
+/**
+ * Answer the question about `a`. working: the time stays (over midnight: until midnight, as the auto-stop left it).
+ * break: the time comes out of the timer and becomes a break; the timer goes on from when you came back. remove: the
+ * same without a break. stop: you stopped at `at` (default: when you left), so the timer ends there and the day closes.
+ */
+export function resolveAway(d: Data, a: Away, choice: AwayChoice, at?: string): Data {
+  const back = a.back ?? a.since;
+  const { entry, wd } = awayFacts(d, a);
+  const date = dayKey(a.since);
+  const rest = (d.away ?? []).filter((x) => x.since !== a.since);
+  const done = (next: Data, list = rest): Data => ({ ...next, away: list.length ? list : undefined });
+
+  if (choice === 'working') return done(wd?.autoClosed || entry?.autoStopped ? confirmAutoClose(d, date) : d);
+
+  if (choice === 'stop') {
+    const low = Math.max(...[entry?.start, wd?.start].map((x) => (x ? Date.parse(x) + 60_000 : 0)));
+    const high = Math.min(Date.parse(back), dayBounds(date)[1]);
+    const stop = new Date(Math.max(low, Math.min(Date.parse(at ?? a.since), high))).toISOString();
+    const stopped = entry && (!entry.end || entry.end > stop) ? { ...d, entries: d.entries.map((e) => (e.id === entry.id ? { ...e, end: stop, autoStopped: undefined } : e)) } : d;
+    const closed = wd ? closeWorkday(stopped, date, stop) : stopped;
+    // Later absences of a day that has now ended have nothing left to ask.
+    return done(closed, rest.filter((x) => dayKey(x.since) !== date || x.since < stop));
+  }
+
+  const cut = entry && a.since > entry.start ? cutHole(d, entry, a.since, back) : { data: d, rest: undefined };
+  // Later absences of this timer belong to the part that goes on.
+  const list = rest.map((x) => (cut.rest && x.entryId === entry?.id ? { ...x, entryId: cut.rest.id } : x));
+  if (choice === 'remove' || !wd) return done(cut.data, list);
+  const addPause = (w: Workday) => ({ ...w, fromEntries: undefined, breaks: [...w.breaks, { start: a.since, end: back }].sort((x, y) => x.start.localeCompare(y.start)) });
+  return done({ ...cut.data, workdays: cut.data.workdays.map((w) => (w.date === date ? addPause(w) : w)) }, list);
+}
+
+export type AwayResult = { timer?: number; day?: number };
+
+/** What a choice leads to, shown next to it: counted as of when you came back. */
+export function awayResult(d: Data, a: Away, choice: AwayChoice, at?: string): AwayResult {
+  const next = resolveAway(d, a, choice, at);
+  const count = Date.parse(a.back ?? a.since);
+  const e = next.entries.find((x) => x.id === a.entryId);
+  const wd = next.workdays.find((w) => w.date === dayKey(a.since) && !w.off);
+  return { timer: e && (e.end ? Date.parse(e.end) : count) - Date.parse(e.start), day: wd && workdayMs(wd, count) };
+}
+
+/** Append a finished entry of `ms` on a day where it fits (see freeStart); unchanged when the day has no room. */
 export function appendEntry(d: Data, day: string, ms: number, fields: Partial<Entry>): Data {
   if (ms < 60_000) return d;
   const start = freeStart(d, day, ms);
+  if (!start) return d;
   const end = new Date(Date.parse(start) + ms).toISOString();
   return { ...d, entries: [...d.entries, { id: uid(), description: '', ...fields, start, end }] };
 }

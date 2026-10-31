@@ -3,6 +3,23 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Fixing a forgotten clock-out now fixes the timer too:** when you correct the leave time of a day closed at midnight,
+  a timer midnight stopped ends there as well, with a short note and Undo. Before, it stayed at 23:59 and the extra
+  hours stayed booked.
+- **A clear question after you were away:** the old dialog is gone. A panel in the window shows what ran, when you
+  left, when you came back and what each answer does to your hours. Nothing is preselected, Esc only postpones, and
+  the question survives a restart. An absence over midnight asks once and also sets the leave time. The menu bar or
+  a notification brings it forward when the window is hidden.
+- **Typed hours land in free time:** they never overlap another entry and never cross midnight. If they don't fit in
+  the clocked time they go next to it, and the day says *Booked 1:30 more than clocked*. A day without room says so.
+- **The day as a timeline:** opening a day shows the clocked time, breaks and bookings at their real times, with gaps,
+  overlaps and both totals. Drag a block or its edge to change it, or click it for exact times, in the Mac app and
+  the web app.
+- **Check these days:** a one-time list of days that look off (timers ending at 23:59, overlaps, over 10 hours, booked
+  far above clocked, days never confirmed), each with its fix or *It's right*. Nothing changes without your choice.
+
 ## 0.1.24 · 2026-10-28
 
 - **Calmer Settings:** Settings keeps what most people set once (you, your work schedule, your way of working,

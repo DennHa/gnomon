@@ -13,6 +13,9 @@ type SyncState = { busy: boolean; error?: string; message?: string };
 /** Sync with the Gnomon server: `at` is the last successful sync. */
 type ServerSyncState = SyncState & { connected: boolean; at?: string };
 
+/** A short message at the bottom of the window, with Undo when the change can be taken back (src/notes.ts). */
+export type Note = { text: string; undo?: () => void };
+
 type Store = {
   data: Data;
   update: (fn: (d: Data) => Data) => void;
@@ -32,6 +35,8 @@ type Store = {
   /** What the last change moved or created to keep the workday around the entries. */
   fitNotices: FitNotice[];
   dismissFitNotices: () => void;
+  note: Note | null;
+  showNote: (n: Note | null) => void;
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -94,6 +99,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     pendingNotices.current.clear();
   }, [data]);
   const dismissFitNotices = useCallback(() => setFitNotices([]), []);
+  const [note, showNote] = useState<Note | null>(null);
 
   const update = useCallback((fn: (d: Data) => Data) => setData((d) => (d ? fit(d, fn(d)) : d)), []);
 
@@ -252,7 +258,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (!data) return <div className="loading">{t('loading')}</div>;
-  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, serverSync, runServerSync, refreshServer, getData, commit, profile, fitNotices, dismissFitNotices }}>{children}</StoreContext.Provider>;
+  return <StoreContext.Provider value={{ data, update, floatSync, runFloatSync, personioSync, runPersonioSync, serverSync, runServerSync, refreshServer, getData, commit, profile, fitNotices, dismissFitNotices, note, showNote }}>{children}</StoreContext.Provider>;
 }
 
 /** The company's hours setting as the last sync brought it; the same object when nothing changed (no extra save). */

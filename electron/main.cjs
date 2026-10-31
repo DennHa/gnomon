@@ -578,6 +578,8 @@ function buildTrayMenu(state) {
   const acc = (a) => (state.shortcutsEnabled && a ? a : undefined);
   const items = [];
 
+  if (state.awayLabel) items.push({ label: state.awayLabel, click: openAway }, { type: 'separator' });
+
   // Now
   items.push(header(tr('now')));
   if (state.running) {
@@ -657,6 +659,7 @@ function updateTray(state) {
   syncShortcuts(state);
   syncApiServer(state);
   trackNudges(state);
+  trackAway(state);
 }
 
 // ---- Global shortcuts --------------------------------------------------------
@@ -986,7 +989,6 @@ function syncApiServer(s) {
 
 // ---- Idle detection & nudges ------------------------------------------------
 
-let idleSince = null;
 let notifiedNothingRunning = false;
 let notifiedLongEntry = null;
 let nothingRunningSince = null;
@@ -994,43 +996,42 @@ let nothingRunningSince = null;
 // Watch for absence whenever you're clocked in (with or without a timer).
 const tracking = (s) => Boolean(s && s.idleMinutes && (s.running || (s.dayActive && !s.onBreak)));
 
-function checkIdle() {
-  const s = lastState;
-  if (!tracking(s)) {
-    idleSince = null;
-    return;
-  }
-  const idle = powerMonitor.getSystemIdleTime();
-  if (!idleSince && idle >= s.idleMinutes * 60) idleSince = new Date(Date.now() - idle * 1000);
-  if (idleSince && idle < 15) askAboutIdle();
+// You left: the window stores the absence (Data.away, src/actions.ts), so the question outlives this process and the
+// midnight close. Main only reports when you left and when you're back.
+let awayReported = false;
+
+function startAway(at, reason) {
+  if (awayReported || lastState?.awayOpen || !tracking(lastState)) return;
+  awayReported = true;
+  sendAction({ type: 'away-start', at: at.toISOString(), reason });
 }
 
-let asking = false;
-async function askAboutIdle() {
-  const since = idleSince;
-  idleSince = null;
-  if (asking || !since || !tracking(lastState)) return;
-  asking = true;
-  const minutes = Math.round((Date.now() - since.getTime()) / 60_000);
-  const at = since.toLocaleTimeString(lastState?.locale || [], { hour: '2-digit', minute: '2-digit' });
-  const away = minutes >= 120 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
-  const running = lastState?.running;
-  const options = running
-    ? [['keep', tr('idleKeep')], ['discard', tr('idleDiscard')], ['break', tr('idleBreak')], ['leave', tr('idleLeave', { time: at })]]
-    : [['keep', tr('idleKeep')], ['break', tr('idleBreak')], ['leave', tr('idleLeave', { time: at })]];
-  // After a long absence (e.g. overnight) you most likely went home.
-  const longAway = minutes >= 180;
-  const { response } = await dialog.showMessageBox({
-    type: 'question',
-    message: tr('idleMessage', { away, time: at }),
-    detail: running ? tr('idleDetailRunning', { name: running }) : tr('idleDetail'),
-    buttons: options.map((o) => o[1]),
-    defaultId: longAway ? options.length - 1 : 0,
-    cancelId: 0,
-  });
-  asking = false;
-  const choice = options[response][0];
-  if (choice !== 'keep') sendAction({ type: 'idle', since: since.toISOString(), choice });
+function checkIdle() {
+  const s = lastState;
+  if (!s) return;
+  // While you're away it doesn't matter whether anything still runs: the midnight close may have stopped it.
+  if (awayReported || s.awayOpen) {
+    if (powerMonitor.getSystemIdleState(15) !== 'active') return;
+    awayReported = false;
+    sendAction({ type: 'away-end', at: new Date().toISOString() });
+    return;
+  }
+  if (!tracking(s)) return;
+  const idle = powerMonitor.getSystemIdleTime();
+  if (idle >= s.idleMinutes * 60) startAway(new Date(Date.now() - idle * 1000), 'idle');
+}
+
+/** The answer is in the window: bring it forward with the question on top. */
+function openAway() {
+  showWindow();
+  sendAction({ type: 'show-away' });
+}
+
+let notifiedAway = null;
+function trackAway(s) {
+  if (!s.awayKey || s.awayKey === notifiedAway) return;
+  notifiedAway = s.awayKey;
+  if (!win?.isVisible() || !win.isFocused()) notify(tr('awayTitle'), s.awayLabel, openAway);
 }
 
 function notify(title, body, onClick) {
@@ -1071,16 +1072,10 @@ function trackNudges(s) {
   }
 }
 
-powerMonitor.on('suspend', () => {
-  if (tracking(lastState) && !idleSince) idleSince = new Date();
-});
-powerMonitor.on('lock-screen', () => {
-  if (tracking(lastState) && !idleSince) idleSince = new Date();
-});
-powerMonitor.on('unlock-screen', () => {
-  if (idleSince && Date.now() - idleSince.getTime() >= (lastState?.idleMinutes ?? 0) * 60_000) askAboutIdle();
-  else idleSince = null;
-});
+powerMonitor.on('suspend', () => startAway(new Date(), 'sleep'));
+powerMonitor.on('lock-screen', () => startAway(new Date(), 'lock'));
+powerMonitor.on('resume', () => setTimeout(checkIdle, 1000));
+powerMonitor.on('unlock-screen', () => setTimeout(checkIdle, 1000));
 
 ipcMain.handle('data:load', (e) => readData(e.sender === win?.webContents));
 ipcMain.handle('data:save', (_e, data) => saveData(data));

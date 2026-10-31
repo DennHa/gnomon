@@ -259,6 +259,9 @@ describe('sync', () => {
 
   test('push validates records', async () => {
     assert.equal((await api('POST', '/sync', { changes: [{ kind: 'entries', id: 'a', updatedAt: '2026-10-16T08:00:00Z', data: { id: 'b', start: 'x' } }] })).status, 422);
+    const stopped = { id: 'auto-stopped', description: '', start: '2026-10-16T14:00:00.000Z', end: '2026-10-16T21:59:59.000Z', autoStopped: true };
+    assert.equal((await api('POST', '/sync', { changes: [{ kind: 'entries', id: stopped.id, updatedAt: '2026-10-16T22:00:00Z', data: stopped }] })).status, 200);
+    assert.equal((await api('POST', '/sync', { changes: [{ kind: 'entries', id: 'odd', updatedAt: '2026-10-16T22:00:00Z', data: { ...stopped, id: 'odd', autoStopped: 'yes' } }] })).status, 422);
     assert.equal((await api('POST', '/sync', { changes: [{ kind: 'plans', id: 'a', updatedAt: '2026-10-16T08:00:00Z', data: {} }] })).status, 422);
     assert.equal((await api('POST', '/sync', { changes: [{ kind: 'projects', id: 'p', updatedAt: '2099-01-01T00:00:00Z', data: { id: 'p', name: 'Future', color: '#000000' } }] })).status, 422);
   });

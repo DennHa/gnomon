@@ -102,7 +102,7 @@ Send **either** exact times **or** a day plus a duration:
 | Field | |
 |---|---|
 | `start`, `end` | ISO date-times. At most 24 h, and `end` after `start`. |
-| `date`, `minutes` | The day and 1–1440 minutes. Gnomon places the entry after that day's last entry (or at 09:00). |
+| `date`, `minutes` | The day and 1–1440 minutes. Gnomon places the entry in that day's free time, never over another entry and never past midnight; a day without a free stretch this long answers 422. |
 | `description` | Text, optional |
 | `projectId` / `projectExternalId` / `project` | Pick the project by Gnomon id, by your id, or by name. A **new name creates the project**. |
 | `activityId` / `activity` | By id or by name (must exist) |

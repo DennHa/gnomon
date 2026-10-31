@@ -1,7 +1,7 @@
 // Entry rows shared by Today (exact times) and the Timesheet modals (hours).
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from './store';
-import { activitiesOn, appendEntry, deleteEntry, startTimer, updateEntry } from './actions';
+import { activitiesOn, appendEntry, deleteEntry, freeStart, setEntryHours, startTimer, updateEntry } from './actions';
 import { ProjectSelect, TimeField } from './components';
 import { Icon } from './icons';
 import { planItemsOn } from './plan';
@@ -60,7 +60,7 @@ export function ActivityPicker({ value, onChange }: { value?: string; onChange: 
 }
 
 /** Hours as a small number field: type 2, 2,5 or 1:30; saved on Enter or when leaving the field. */
-export function HoursInput({ ms, onCommit, disabled, autoFocus, inputRef }: { ms: number; onCommit: (ms: number) => void; disabled?: boolean; autoFocus?: boolean; inputRef?: React.Ref<HTMLInputElement> }) {
+export function HoursInput({ ms, onCommit, disabled, autoFocus, inputRef }: { ms: number; /** false: not taken, the field goes back. */ onCommit: (ms: number) => void | false; disabled?: boolean; autoFocus?: boolean; inputRef?: React.Ref<HTMLInputElement> }) {
   const shown = ms ? fmtHM(ms) : '';
   const [text, setText] = useState(shown);
   const [bad, setBad] = useState(false);
@@ -70,7 +70,7 @@ export function HoursInput({ ms, onCommit, disabled, autoFocus, inputRef }: { ms
     const v = parseDuration(text);
     if (v === null) return setBad(true);
     setBad(false);
-    onCommit(v);
+    if (onCommit(v) === false) setText(shown);
   };
   return (
     <input
@@ -93,7 +93,7 @@ export function HoursInput({ ms, onCommit, disabled, autoFocus, inputRef }: { ms
 }
 
 function FeedRow({ entry, mode, showProject, readOnly, tasks, added }: { entry: Entry; mode: 'hours' | 'times'; showProject: boolean; readOnly?: boolean; tasks: boolean; added?: boolean }) {
-  const { update } = useStore();
+  const { update, getData, commit, showNote } = useStore();
   const rowRef = useRef<HTMLDivElement>(null);
   // A typed-in entry goes into the first free stretch of the day, often mid-list: show where it landed.
   useEffect(() => {
@@ -125,7 +125,12 @@ function FeedRow({ entry, mode, showProject, readOnly, tasks, added }: { entry: 
         <HoursInput
           ms={entryMs(entry, now)}
           disabled={running || readOnly}
-          onCommit={(ms) => ms > 0 && set({ end: new Date(Date.parse(entry.start) + ms).toISOString() })}
+          onCommit={(ms) => {
+            if (ms <= 0) return false;
+            const next = setEntryHours(getData(), entry.id, ms);
+            if (next === getData()) return (showNote({ text: t('place.noRoom', { duration: fmtHM(ms) }) }), false);
+            commit(next);
+          }}
         />
       )}
       <span className="feed-actions">
@@ -165,7 +170,8 @@ function NewRow({
   prefill?: { ms: number; taskId?: number; taskName?: string } | null;
   onAdded: (id: string) => void;
 }) {
-  const { update } = useStore();
+  const { update, getData } = useStore();
+  const [noRoom, setNoRoom] = useState(false);
   const [description, setDescription] = useState('');
   const [project, setProject] = useState<string | undefined>(projectId);
   const [task, setTask] = useState<{ id?: number; name?: string }>({});
@@ -188,6 +194,8 @@ function NewRow({
       hoursRef.current?.focus();
       return;
     }
+    // The hours stay in the field: a smaller number may still fit.
+    if (!freeStart(getData(), day, parsed!)) return setNoRoom(true);
     const id = uid();
     update((d) => appendEntry(d, day, parsed!, { id, projectId: project, description: description.trim(), taskId: task.id, taskName: task.name, activityId }));
     onAdded(id);
@@ -218,7 +226,7 @@ function NewRow({
         value={hours}
         placeholder="0:00"
         inputMode="decimal"
-        onChange={(e) => setHours(e.target.value)}
+        onChange={(e) => (setHours(e.target.value), setNoRoom(false))}
         onFocus={(e) => e.target.select()}
         onKeyDown={(e) => e.key === 'Enter' && add()}
       />
@@ -227,6 +235,7 @@ function NewRow({
           <Icon name="add" size={20} />
         </button>
       </span>
+      {noRoom && <span className="feed-noroom small">{t('place.dayFull', { duration: fmtHM(parsed ?? 0) })}</span>}
     </div>
   );
 }

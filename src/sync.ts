@@ -46,7 +46,7 @@ export function validRecord(kind: Kind, id: string, data: unknown): boolean {
   const s = (v: unknown, max = 2000) => typeof v === 'string' && v.length <= max;
   if (kind === 'workdays') return r.date === id && /^\d{4}-\d{2}-\d{2}$/.test(id) && iso(r.start) && (r.end === undefined || iso(r.end)) && Array.isArray(r.breaks);
   if (r.id !== id || id.length > 200) return false;
-  if (kind === 'entries') return iso(r.start) && (r.end === undefined || iso(r.end)) && (r.description === undefined || s(r.description));
+  if (kind === 'entries') return iso(r.start) && (r.end === undefined || iso(r.end)) && (r.description === undefined || s(r.description)) && (r.autoStopped === undefined || typeof r.autoStopped === 'boolean');
   return s(r.name, 200) && (r.color === undefined || (typeof r.color === 'string' && /^#([0-9a-fA-F]{3}){1,2}$/.test(r.color)));
 }
 
@@ -253,6 +253,8 @@ export const ACCOUNT_SETTINGS = [
   'balanceStartDate',
   'hoursView',
   'longDaysOk',
+  'checkedDays',
+  'dayCheckDone',
   'userName',
   'workStyle',
   'reminders',

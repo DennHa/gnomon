@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store';
-import { activitiesOn, addBreakBetween, breakBeforeRunning, closeOvernight, hasOvernight, isOnBreak, leave, resolveIdle, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
+import { activitiesOn, addBreakBetween, awayDays, breakBeforeRunning, closeOvernight, hasOvernight, isOnBreak, leave, markBack, noteAway, pendingAway, resumeLast, runningEntry, startDay, startTimer, stopTimer, switchActivity, todayWorkday, toggleBreak } from './actions';
 import { planItemsOn } from './plan';
 import { dayKey, entryMs, fmtClock, fmtDayLabel, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from './time';
 import { targetHoursOn } from './schedule';
@@ -22,6 +22,8 @@ import Morning, { morningDue } from './views/Morning';
 import PhoneTile from './views/PhoneTile';
 import Tour from './views/Tour';
 import About from './views/About';
+import AwayPanel, { showAway } from './views/Away';
+import { DayCheckList, DayCheckSidebar } from './views/DayCheck';
 import { isWeb } from './platform';
 import { copyDays } from './views/day';
 import { corridorOf, hoursMode } from './corridor';
@@ -88,10 +90,11 @@ function dayStatus(data: Data, now: number): string {
 function useTrayBridge(onShowReview: () => void) {
   const showReviewRef = useRef(onShowReview);
   showReviewRef.current = onShowReview;
-  const { data, update, getData } = useStore();
+  const { data, update, getData, commit } = useStore();
   const now = useNow();
   const running = runningEntry(data);
   const wd = todayWorkday(data);
+  const away = pendingAway(data);
   const recent = useMemo(() => recentStarts(data), [data]);
   const todayPlan = useMemo(() => {
     const today = dayKey(new Date());
@@ -156,6 +159,9 @@ function useTrayBridge(onShowReview: () => void) {
       shortcutsEnabled: data.settings.shortcutsEnabled,
       shortcuts: data.settings.shortcuts,
       idleMinutes: data.settings.idleMinutes,
+      awayOpen: Boolean(data.away?.some((a) => !a.back)),
+      awayKey: away?.since,
+      awayLabel: away && t('away.menu', { time: fmtTime(away.since) }),
       reviewOnLeave: data.settings.reviewOnLeave,
       trailEnabled: data.settings.activityTrail,
       apiEnabled: data.settings.apiEnabled,
@@ -179,14 +185,17 @@ function useTrayBridge(onShowReview: () => void) {
           update((d) => startTimer(d, { description, projectId, activityId, billable, taskId, taskName }));
         }
         if (action.type === 'resume') update(resumeLast);
-        if (action.type === 'idle') update((d) => resolveIdle(d, action.since, action.choice));
+        // Saved right away: the Mac may be about to sleep, and the question must survive whatever comes next.
+        if (action.type === 'away-start') (commit(noteAway(getData(), action.at, action.reason)), window.api.saveSync(getData()));
+        if (action.type === 'away-end') commit(markBack(getData(), action.at));
+        if (action.type === 'show-away') showAway();
         if (action.type === 'show-review') showReviewRef.current();
         if (action.type === 'copy-today')
           void copyDays(getData(), [dayKey(Date.now())]).then((r) => window.api.notify(r.lines ? t('copy.done', { n: r.lines }) : t('copy.nothing'), r.text.split('\n')[0]));
         if (action.type === 'show-feedback') window.dispatchEvent(new Event('gnomon:show-feedback'));
         if (action.type === 'switch-activity') update((d) => switchActivity(d, action.activityId));
       }),
-    [update, getData],
+    [update, getData, commit],
   );
 }
 
@@ -210,6 +219,27 @@ function useDaylight(on: boolean, previewAt: number | null) {
     root.style.setProperty('--daylight-shadow', look.shadow);
     root.style.setProperty('--daylight-text-shadow', look.textShadow);
   }, [on, now, dark, previewAt]);
+}
+
+/** What a change cut or couldn't place, with Undo when it can be taken back (src/notes.ts). */
+function NoteToast() {
+  const { note, showNote } = useStore();
+  useEffect(() => {
+    if (!note) return;
+    const t = setTimeout(() => showNote(null), note.undo ? 15_000 : 8000);
+    return () => clearTimeout(t);
+  }, [note]);
+  if (!note) return null;
+  return (
+    <div className="note-toast" role="status">
+      <span>{note.text}</span>
+      {note.undo && (
+        <button className="btn ghost small" onClick={() => (note.undo!(), showNote(null))}>
+          {t('undo')}
+        </button>
+      )}
+    </div>
+  );
 }
 
 /** Says when Gnomon made a workday from your entries (src/fit.ts). */
@@ -238,8 +268,10 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
   const wd = todayWorkday(data);
   const today = dayKey(now);
   // A workday from an earlier day that's still open or was closed automatically at midnight.
+  const asking = awayDays(data);
+  const away = pendingAway(data);
   const needsFix = data.workdays
-    .filter((w) => w.date < today && (!w.end || w.autoClosed))
+    .filter((w) => w.date < today && (!w.end || w.autoClosed) && !asking.includes(w.date))
     .sort((a, b) => b.date.localeCompare(a.date))[0];
   const onBreak = isOnBreak(wd);
   const state = !wd ? 'off' : wd.off ? 'dayoff' : wd.end ? 'done' : onBreak ? 'break' : 'on';
@@ -298,6 +330,13 @@ function Attendance({ onOpenDay }: { onOpenDay: (day: string) => void }) {
 
   return (
     <div className={`attendance ${state}`}>
+      {away && (
+        <button className="att-fix" onClick={showAway}>
+          <Icon name="schedule" size={16} />
+          <span>{t('away.side', { time: fmtTime(away.since) })}</span>
+          <strong>{t('away.answer')}</strong>
+        </button>
+      )}
       {needsFix && (
         <button className="att-fix" onClick={() => onOpenDay(needsFix.date)} title={t('att.fixHint')}>
           <Icon name="warning" size={16} />
@@ -441,6 +480,7 @@ export default function App() {
     window.addEventListener('gnomon:morning-preview', show);
     return () => window.removeEventListener('gnomon:morning-preview', show);
   }, []);
+  const [checkOpen, setCheckOpen] = useState(false);
   const started = useRef(false);
   const now = useNow(60_000);
   const lastToday = useRef(dayKey(now));
@@ -548,6 +588,7 @@ export default function App() {
         <span className="spacer" />
         <Attendance onOpenDay={openDay} />
         {hoursMode(data) === 'corridor' && <CorridorSidebar onOpenDay={openDay} />}
+        <DayCheckSidebar onOpen={() => setCheckOpen(true)} />
         {/* In the browser you're signed in already; the phone signs in with the same account. */}
         {!isWeb() && <PhoneTile />}
         <nav className="nav-bottom">
@@ -561,6 +602,7 @@ export default function App() {
         {view === 'reports' && (
           <Reports
             onOpenDay={openDay}
+            onOpenCheck={() => setCheckOpen(true)}
             onOpenSettings={() => {
               // The starting balance lives on the General tab.
               try {
@@ -588,6 +630,10 @@ export default function App() {
         )}
       </main>
       <FitToast />
+      {/* Over the day that "Open day" shows; closing the day comes back to the list. */}
+      {checkOpen && !dayModal && <DayCheckList onOpenDay={openDay} onClose={() => setCheckOpen(false)} />}
+      <AwayPanel />
+      <NoteToast />
       {/* First launch: the feature tour. The integrations guide opens only on request (tour's last step or Settings). */}
       {!data.settings.tourDone ? (
         <Tour />
@@ -596,7 +642,7 @@ export default function App() {
       ) : morningPreview ? (
         <Morning preview onClose={() => setMorningPreview(false)} />
       ) : (
-        morningDue(data) && <Morning />
+        morningDue(data) && !pendingAway(data) && <Morning />
       )}
     </div>
   );

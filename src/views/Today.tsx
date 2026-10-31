@@ -9,6 +9,7 @@ import { dayKey, entryMs, fmtClock, fmtDayLong, useNow } from '../time';
 import { CopyAsText, DayReview, ProjectGoals, StaleBanner } from './day';
 import { t } from '../i18n';
 import { prettyAccel } from '../shortcuts';
+import { useAddHours } from '../notes';
 import { isWeb } from '../platform';
 
 function greeting(now: number) {
@@ -132,7 +133,8 @@ function TimerHero({ onOpenProjects }: { onOpenProjects: () => void }) {
 }
 
 export default function Today({ onOpenDay, onOpenProjects }: { onOpenDay: (d: string) => void; onOpenProjects: () => void }) {
-  const { data, update } = useStore();
+  const { data } = useStore();
+  const addHours = useAddHours();
   const now = useNow(60_000);
   const today = dayKey(now);
   const wd = todayWorkday(data);
@@ -161,7 +163,7 @@ export default function Today({ onOpenDay, onOpenProjects }: { onOpenDay: (d: st
         </div>
         {entries.length === 0 && <p className="muted empty-state">{isWeb() ? t('today.emptyWeb') : t('today.empty', { key: prettyAccel(data.settings.shortcuts.quick) || '—' })}</p>}
         <EntryFeed day={today} entries={entries} mode="times" />
-        <button className="link-add" onClick={() => update((d) => addEntry(d, today))}>
+        <button className="link-add" onClick={() => addHours(3_600_000, (d) => addEntry(d, today))}>
           + {t('today.addEntry')}
         </button>
       </section>

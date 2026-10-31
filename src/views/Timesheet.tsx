@@ -4,6 +4,8 @@ import { copyEntriesTo, fillGaps, lastDayEntries, planGaps, toggleWeekDone, week
 import { NewProjectInput, TrailSummary } from '../components';
 import { EntryFeed } from '../feed';
 import { Icon } from '../icons';
+import { useAddHours } from '../notes';
+import { DayTimeline } from './Timeline';
 import { CopyAsText, DayReview, MISSING_LOOKBACK_DAYS, StaleBanner, WorkdayEditor, missingDays, shiftDay } from './day';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
@@ -37,7 +39,7 @@ export function weekDays(day: string): string[] {
 
 type CellRef = { projectId: string; day: string };
 
-function Modal({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -68,7 +70,7 @@ function CellModal({ cell, onClose, readOnly }: { cell: CellRef; onClose: () => 
   const planned = projectId ? goalFor(data, projectId, day) : 0;
   const tracked = entries.reduce((s, e) => s + entryMs(e), 0);
   const [prefill, setPrefill] = useState<{ ms: number; taskId?: number; taskName?: string } | null>(null);
-  const { update } = useStore();
+  const addHours = useAddHours();
   const repeat = lastDayEntries(data, projectId || undefined, day);
 
   return (
@@ -100,13 +102,13 @@ function CellModal({ cell, onClose, readOnly }: { cell: CellRef; onClose: () => 
             <Icon name="history" size={16} /> {t('ts.repeatFrom', { day: fmtDayLabel(repeat.day) })}
           </span>
           {repeat.entries.map((e) => (
-            <button key={e.id} className="repeat-chip" onClick={() => update((d) => copyEntriesTo(d, day, [e]))} title={t('ts.repeatHint')}>
+            <button key={e.id} className="repeat-chip" onClick={() => addHours(entryMs(e), (d) => copyEntriesTo(d, day, [e]))} title={t('ts.repeatHint')}>
               <Icon name="content_copy" size={14} />
               {e.description || e.taskName || t('untitled')} · {fmtHM(entryMs(e))}
             </button>
           ))}
           {repeat.entries.length > 1 && (
-            <button className="btn ghost small" onClick={() => update((d) => copyEntriesTo(d, day, repeat.entries))}>
+            <button className="btn ghost small" onClick={() => addHours(repeat.entries.reduce((s, e) => s + entryMs(e), 0), (d) => copyEntriesTo(d, day, repeat.entries))}>
               {t('ts.repeatAll', { time: fmtHM(repeat.entries.reduce((s, e) => s + entryMs(e), 0)) })}
             </button>
           )}
@@ -125,6 +127,7 @@ function DayModal({ day, onClose, readOnly }: { day: string; onClose: () => void
   const entries = data.entries.filter((e) => dayKey(e.start) === day).sort((a, b) => a.start.localeCompare(b.start));
   return (
     <Modal onClose={onClose} wide title={<strong>{fmtDayLong(day)}</strong>}>
+      <DayTimeline day={day} readOnly={readOnly} />
       <WorkdayEditor day={day} />
       <div className="modal-section">
         <div className="section-head">
@@ -134,7 +137,7 @@ function DayModal({ day, onClose, readOnly }: { day: string; onClose: () => void
         <EntryFeed day={day} entries={entries} mode="hours" readOnly={readOnly} />
       </div>
       <div className="modal-section">
-        <DayReview day={day} />
+        <DayReview day={day} noStats />
       </div>
     </Modal>
   );
@@ -200,6 +203,7 @@ type TimesheetProps = { day: string; setDay: (d: string) => void; dayModal: stri
 export default function Timesheet({ day, setDay, dayModal, setDayModal }: TimesheetProps) {
   const openDay = (d: string) => setDayModal(d);
   const { data, update } = useStore();
+  const addHours = useAddHours();
   const now = useNow(30_000);
   const today = dayKey(now);
   const days = useMemo(() => weekDays(day), [day]);
@@ -221,11 +225,11 @@ export default function Timesheet({ day, setDay, dayModal, setDayModal }: Timesh
   const copyLastWeek = () => {
     const n = lastWeek.reduce((s, x) => s + x.entries.length, 0);
     if (!confirm(t('ts.copyConfirm', { entries: t('count.entries', { n }), duration: fmtDuration(lastWeekMs) }))) return;
-    update((d) => lastWeek.reduce((acc, x) => copyEntriesTo(acc, x.day, x.entries), d));
+    addHours(lastWeekMs, (d) => lastWeek.reduce((acc, x) => copyEntriesTo(acc, x.day, x.entries), d));
   };
   const fillWeek = () => {
     if (!confirm(t('ts.fillConfirm', { duration: fmtDuration(fillableMs) }))) return;
-    update((d) => days.reduce((acc, day) => fillGaps(acc, day, fillable.filter((g) => g.day === day)), d));
+    addHours(fillableMs, (d) => days.reduce((acc, day) => fillGaps(acc, day, fillable.filter((g) => g.day === day)), d));
   };
 
   const sheet = useMemo(() => {

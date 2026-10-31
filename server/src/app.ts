@@ -291,7 +291,7 @@ export function createApp({ store, webDir, releasesDir, company, demoDir, siteDi
     const s = (v: unknown, max = 2000) => typeof v === 'string' && v.length <= max;
     if (kind === 'workdays') return data.date === id && /^\d{4}-\d{2}-\d{2}$/.test(id) && iso(data.start) && (data.end === undefined || iso(data.end)) && Array.isArray(data.breaks);
     if (data.id !== id) return false;
-    if (kind === 'entries') return iso(data.start) && (data.end === undefined || iso(data.end)) && (data.description === undefined || s(data.description));
+    if (kind === 'entries') return iso(data.start) && (data.end === undefined || iso(data.end)) && (data.description === undefined || s(data.description)) && (data.autoStopped === undefined || typeof data.autoStopped === 'boolean');
     return s(data.name, 200) && (data.color === undefined || (typeof data.color === 'string' && /^#([0-9a-fA-F]{3}){1,2}$/.test(data.color)));
   }
 

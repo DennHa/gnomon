@@ -9,6 +9,7 @@ import { corridorOf, hoursMode, rulesOf, zoneOf } from '../src/corridor';
 import { daySummary, weekSummary } from '../src/motion';
 import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { fitAll, fitWorkdays } from '../src/fit';
+import { confirmDay, daysToCheck, leaveSuggestion, overlapMs, overlapSpans } from '../src/daycheck';
 import { toAssign, weekReminderDue, weekToAssign } from '../src/reminders';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
@@ -87,17 +88,6 @@ test('resumeLast continues the last entry', () => {
   assert.equal(d.entries.length, 2);
   assert.deepEqual([A.runningEntry(d)!.projectId, A.runningEntry(d)!.taskId], ['p2', 7]);
 });
-test('resolveIdle discard/break cut the idle time', () => {
-  const d0 = A.startDay({ ...base(), workdays: [] });
-  let d = A.startTimer(d0, { description: 'x', projectId: 'p1' });
-  d.entries[0].start = new Date(Date.now() - 60 * M).toISOString();
-  const since = new Date(Date.now() - 20 * M).toISOString();
-  const disc = A.resolveIdle(d, since, 'discard');
-  assert.equal(disc.entries[0].end, since); assert.ok(A.runningEntry(disc));
-  const brk = A.resolveIdle(d, since, 'break');
-  assert.equal(A.todayWorkday(brk)!.breaks.at(-1)!.start, since);
-  assert.equal(A.resolveIdle(d, since, 'keep'), d);
-});
 test('Float import twice: no duplicate projects or days off, name-linking works', () => {
   const imp: FloatImport = { projects: [{ floatId: 900, name: 'xyz', color: '#8E44AD' }, { floatId: 901, name: 'New One', color: '#000000' }],
     plan: [{ floatId: 1, floatProjectId: 900, name: 'T', startDate: today, endDate: today, hoursPerDay: 2, days: [today] }],
@@ -173,17 +163,6 @@ test('closeOvernight closes yesterday at 23:59 and flags it; today stays untouch
   const fixed = A.closeWorkday(n, y, atTime(y, '18:30'));
   assert.equal(fixed.workdays.find((w) => w.date === y)!.autoClosed, undefined, 'setting the real time confirms it');
 });
-test('resolveIdle "leave" clocks out at the moment you left (timer and workday)', () => {
-  let d = A.startTimer(A.startDay(base()), { description: 'x', projectId: 'p1' });
-  d.entries[0].start = new Date(Date.now() - 8 * H).toISOString();
-  d.workdays[0].start = new Date(Date.now() - 9 * H).toISOString();
-  const since = new Date(Date.now() - 7 * H).toISOString();
-  const n = A.resolveIdle(d, since, 'leave');
-  assert.equal(n.entries[0].end, since);
-  assert.equal(n.workdays[0].end, since);
-  assert.equal(A.runningEntry(n), undefined);
-});
-
 test('lastDayEntries + copyEntriesTo repeat the last day of a project', () => {
   let d = A.appendEntry(base(), '2026-10-13', 1 * H, { projectId: 'p1', description: 'Old' });
   d = A.appendEntry(d, '2026-10-15', 45 * M, { projectId: 'p1', description: 'Sync', activityId: 'a1' });
@@ -211,7 +190,7 @@ test('i18n: German plurals, variables and tray templates follow the language set
   assert.equal(t('count.entries', { n: 1 }), '1 Eintrag');
   assert.equal(t('count.entries', { n: 2 }), '2 Einträge');
   assert.equal(t('day.daysUnder', { n: 3 }), '3 Tage unter Soll');
-  assert.equal(trayStrings().idleLeave, 'Feierabend um {time}');
+  assert.equal(trayStrings().awayTitle, 'Was war das für Zeit?');
   setLanguage('en');
   assert.equal(t('count.entries', { n: 1 }), '1 entry');
   assert.equal(t('ts.weekNo', { n: 42 }), 'Week 42');
@@ -734,6 +713,268 @@ test('an older settings file loads with the same values after the Settings clean
   const fresh = normalize({ version: 1, settings: { language: 'en' } });
   assert.equal(fresh.settings.autoStopMidnight, true); assert.equal(fresh.settings.startDayWithTimer, true); assert.equal(fresh.settings.apiEnabled, false);
   assert.ok(!('billableEnabled' in fresh.settings), 'new files no longer get a billable switch');
+});
+
+// ---- Hours that are really worked ------------------------------------------------------------------------------
+const D = '2026-10-13';
+const end2359 = () => new Date(Date.parse(atTime(D, '23:59')) + 59_000).toISOString();
+const span = (id: string, a: string, b: string, day = D) => ({ id, description: '', start: atTime(day, a), end: atTime(day, b) });
+const yesterdayData = (): { y: string; d: Data } => {
+  const y = dayKey(new Date(Date.now() - 86_400_000));
+  return { y, d: { ...base(), workdays: [{ date: y, start: atTime(y, '08:00'), breaks: [] }], entries: [{ id: 'r', description: 'x', projectId: 'p1', start: atTime(y, '14:00') }] } };
+};
+
+test('cause 1: correcting the leave time cuts the timer midnight stopped (with the mark)', () => {
+  const { y, d } = yesterdayData();
+  const n = A.closeOvernight(d);
+  assert.equal(n.entries[0].autoStopped, true);
+  const at = atTime(y, '18:20');
+  const fixed = A.closeWorkday(n, y, at);
+  assert.equal(fixed.entries[0].end, at);
+  assert.equal(fixed.entries[0].autoStopped, undefined);
+  const edited = A.updateWorkday(n, y, { end: at });
+  assert.equal(edited.entries[0].end, at, 'the day editor cuts too');
+  const note = A.cutNote(n, fixed, y)!;
+  assert.equal(note.ms, Date.parse(n.entries[0].end!) - Date.parse(at));
+  const undone = A.undoCut(fixed, note);
+  assert.equal(undone.entries[0].end, n.entries[0].end);
+  assert.equal(undone.workdays[0].autoClosed, true, 'undo asks again');
+});
+test('cause 1: an old entry without the mark counts when it ends at 23:59:xx on an autoClosed day', () => {
+  const d: Data = { ...base(), workdays: [{ date: D, start: atTime(D, '08:00'), end: end2359(), breaks: [], autoClosed: true }], entries: [{ id: 'old', description: '', start: atTime(D, '14:00'), end: end2359() }, span('mine', '09:00', '10:00')] };
+  const n = A.closeWorkday(d, D, atTime(D, '17:00'));
+  assert.equal(n.entries[0].end, atTime(D, '17:00'));
+  assert.equal(n.entries[1], d.entries[1], 'your own entry stays');
+});
+test('cause 1: entries you set are never cut', () => {
+  // The same end, but the day isn't autoClosed: not stopped by midnight as far as Gnomon can tell.
+  const d: Data = { ...base(), workdays: [{ date: D, start: atTime(D, '08:00'), end: end2359(), breaks: [] }], entries: [{ id: 'late', description: '', start: atTime(D, '22:00'), end: end2359() }] };
+  assert.equal(A.closeWorkday(d, D, atTime(D, '23:00')).entries[0].end, end2359());
+  // Editing the end by hand takes the mark away; so does "It's right".
+  const { y, d: open } = yesterdayData();
+  const n = A.closeOvernight(open);
+  const byHand = A.updateEntry(n, 'r', { end: new Date(Date.parse(atTime(y, '23:59')) + 59_000).toISOString() });
+  assert.equal(byHand.entries[0].autoStopped, undefined);
+  const kept = A.confirmAutoClose(n, y);
+  assert.equal(kept.entries[0].autoStopped, undefined);
+  assert.equal(A.updateWorkday(kept, y, { end: atTime(y, '18:00') }).entries[0].end, n.entries[0].end);
+  assert.equal(A.closeWorkday(n, y, atTime(y, '07:00')), n, 'a leave time before arrival is refused');
+});
+test('cause 1: a marked entry that started after the leave time goes', () => {
+  const { y, d } = yesterdayData();
+  const n = A.closeWorkday(A.closeOvernight(d), y, atTime(y, '13:00'));
+  assert.equal(n.entries.length, 0);
+});
+test('cause 1: the suggested leave time never takes the whole timer away', () => {
+  const d: Data = { ...base(), workdays: [{ date: D, start: atTime(D, '09:00'), end: end2359(), breaks: [], autoClosed: true }], entries: [span('a', '09:00', '12:00'), { id: 't', description: '', start: atTime(D, '14:30'), end: end2359() }] };
+  assert.equal(leaveSuggestion(d, D), '17:30', 'arrival + target + break, after the timer started');
+  const late = { ...d, entries: [span('a', '09:00', '12:00'), { id: 't', description: '', start: atTime(D, '20:00'), end: end2359() }] };
+  assert.equal(leaveSuggestion(late, D), '20:30');
+  const earlier = { ...d, entries: [{ id: 't', description: '', start: atTime(D, '09:00'), end: end2359() }, span('a', '10:00', '16:10')] };
+  assert.equal(leaveSuggestion(earlier, D), '16:10', 'a timer ending after the cut one started still leads');
+});
+test('cause 1: an auto-closed day made from entries still asks for the leave time', () => {
+  const y = dayKey(new Date(Date.now() - 86_400_000));
+  const d = fitAll({ ...base(), entries: [{ id: 'r', description: '', start: atTime(y, '14:00') }] });
+  const r = fitWorkdays(d, A.closeOvernight(d));
+  assert.equal(r.data.workdays[0].autoClosed, true);
+});
+test('sync: the new fields pass the checks and the account settings travel', () => {
+  assert.ok(Sync.validRecord('entries', 'a', { id: 'a', start: atTime(D, '09:00'), autoStopped: true }));
+  assert.ok(!Sync.validRecord('entries', 'a', { id: 'a', start: atTime(D, '09:00'), autoStopped: 'yes' }));
+  const d = { ...base(), settings: { ...base().settings, checkedDays: [D], dayCheckDone: true } };
+  assert.deepEqual(JSON.parse(Sync.accountJson(d)).checkedDays, [D]);
+  assert.equal(JSON.parse(Sync.accountJson(d)).dayCheckDone, true);
+  assert.ok(!Sync.recordsOf({ ...d, away: [{ since: atTime(D, '12:00'), reason: 'idle' }] }).has('away:0'), 'an absence stays on this Mac');
+});
+
+// Today at fixed times, with a timer: in 08:55, timer from 09:10, away 12:02–13:14.
+const awayDay = (timer = true) => {
+  const d = { ...base(), workdays: [{ date: D, start: atTime(D, '08:55'), breaks: [] }], entries: timer ? [{ id: 't', description: 'x', projectId: 'p1', start: atTime(D, '09:10') }] : [] };
+  return { d: { ...d, away: [{ since: atTime(D, '12:02'), back: atTime(D, '13:14'), reason: 'sleep' as const, ...(timer && { entryId: 't' }) }] }, a: { since: atTime(D, '12:02'), back: atTime(D, '13:14'), reason: 'sleep' as const, ...(timer && { entryId: 't' }) } };
+};
+test('cause 2: an absence is stored, and a short one is not asked about', () => {
+  const now = Date.now();
+  const running = A.startTimer(A.startDay(base()), { description: 'x', projectId: 'p1' });
+  running.entries[0].start = new Date(now - H).toISOString();
+  const since = new Date(now - 30 * M).toISOString();
+  const noted = A.noteAway(running, since, 'sleep');
+  assert.equal(noted.away![0].entryId, running.entries[0].id);
+  assert.equal(A.noteAway(noted, since, 'lock'), noted, 'one open absence at a time');
+  assert.equal(A.pendingAway(noted), undefined, 'still away: nothing to ask yet');
+  const short = A.markBack(noted, new Date(Date.parse(since) + 3 * M).toISOString());
+  assert.equal(short.away, undefined);
+  const long = A.markBack(noted, new Date().toISOString());
+  assert.equal(A.pendingAway(long)!.since, since);
+  assert.equal(A.noteAway(base(), since, 'idle').away, undefined, 'not clocked in, no timer: nothing to ask');
+});
+test('cause 2: a pending question survives a restart', () => {
+  const { d, a } = awayDay();
+  const restarted = normalize(JSON.parse(JSON.stringify(d)));
+  assert.deepEqual(A.pendingAway(restarted), a);
+  assert.equal(A.resolveAway(restarted, a, 'working').away, undefined, 'answered, it is gone');
+});
+test('cause 2: each answer does what it says, and the result next to it matches', () => {
+  const { d, a } = awayDay();
+  assert.deepEqual(A.awayChoices(d, a), ['working', 'break', 'stop']);
+  const working = A.resolveAway(d, a, 'working');
+  assert.ok(A.runningEntry(working)); assert.equal(working.entries.length, 1);
+  assert.deepEqual(A.awayResult(d, a, 'working'), { timer: 4 * H + 4 * M, day: 4 * H + 19 * M });
+  const brk = A.resolveAway(d, a, 'break');
+  assert.equal(brk.entries[0].end, a.since);
+  assert.equal(A.runningEntry(brk)!.start, a.back, 'the timer goes on from when you came back');
+  assert.deepEqual(brk.workdays[0].breaks, [{ start: a.since, end: a.back }]);
+  assert.deepEqual(A.awayResult(d, a, 'break'), { timer: 2 * H + 52 * M, day: 3 * H + 7 * M });
+  const stop = A.resolveAway(d, a, 'stop');
+  assert.equal(stop.entries[0].end, a.since); assert.equal(stop.workdays[0].end, a.since);
+  const earlier = A.resolveAway(d, a, 'stop', atTime(D, '11:30'));
+  assert.equal(earlier.entries[0].end, atTime(D, '11:30'));
+  assert.equal(A.resolveAway(d, a, 'stop', atTime(D, '07:00')).entries[0].end, new Date(Date.parse(atTime(D, '09:10')) + M).toISOString(), 'never before the timer started');
+});
+test('cause 2: a timer without a workday can drop the time; without a timer there is nothing to remove', () => {
+  const { d, a } = awayDay();
+  const noDay = { ...d, workdays: [] };
+  assert.deepEqual(A.awayChoices(noDay, a), ['working', 'remove', 'stop']);
+  const removed = A.resolveAway(noDay, a, 'remove');
+  assert.equal(removed.entries[0].end, a.since);
+  assert.equal(A.runningEntry(removed)!.start, a.back);
+  assert.deepEqual(removed.workdays, []);
+  const clock = awayDay(false);
+  assert.deepEqual(A.awayChoices(clock.d, clock.a), ['working', 'break', 'stop']);
+  assert.deepEqual(A.resolveAway(clock.d, clock.a, 'break').workdays[0].breaks, [{ start: clock.a.since, end: clock.a.back }]);
+});
+test('cause 2: postponed past a stopped timer, the time after you came back stays', () => {
+  const { d, a } = awayDay();
+  const stopped = { ...d, entries: [{ ...d.entries[0], end: atTime(D, '15:00') }] };
+  const r = A.resolveAway(stopped, a, 'break');
+  assert.equal(r.entries.length, 2);
+  assert.deepEqual([r.entries[0].end, r.entries[1].start, r.entries[1].end], [a.since, a.back, atTime(D, '15:00')]);
+});
+test('cause 2: a second absence waits its turn and follows the timer', () => {
+  const { d, a } = awayDay();
+  const second = { since: atTime(D, '15:00'), back: atTime(D, '16:00'), reason: 'lock' as const, entryId: 't' };
+  const two = { ...d, away: [a, second] };
+  const r = A.resolveAway(two, a, 'break');
+  const next = A.pendingAway(r)!;
+  assert.equal(next.since, second.since);
+  assert.equal(next.entryId, A.runningEntry(r)!.id, 'it belongs to the part that went on');
+  assert.equal(A.resolveAway(two, a, 'stop').away, undefined, 'the day ended: nothing later to ask');
+});
+test('cause 2: an absence over midnight asks once and sets the leave time and the timer', () => {
+  const { y, d } = yesterdayData();
+  const since = atTime(y, '18:20');
+  const left = { ...d, away: [{ since, reason: 'sleep' as const, entryId: 'r' }] };
+  // The midnight close runs first; only then do you come back.
+  const closed = A.closeOvernight(left);
+  const back = A.markBack(closed, new Date().toISOString());
+  const a = A.pendingAway(back)!;
+  assert.ok(A.awayOverMidnight(a));
+  assert.deepEqual(A.awayChoices(back, a), ['stop', 'working']);
+  assert.deepEqual(A.awayDays(back), [y], 'the stale banner keeps quiet about that day');
+  const stop = A.resolveAway(back, a, 'stop');
+  assert.equal(stop.entries[0].end, since);
+  const wd = stop.workdays.find((w) => w.date === y)!;
+  assert.equal(wd.end, since); assert.equal(wd.autoClosed, undefined);
+  assert.equal(A.pendingAway(stop), undefined);
+  assert.ok(A.cutNote(back, stop, y)!.ms > 0, 'there is a note with Undo');
+  const kept = A.resolveAway(back, a, 'working');
+  assert.equal(kept.entries[0].end, closed.entries[0].end, 'worked until midnight: 23:59 stays');
+  assert.equal(kept.workdays[0].autoClosed, undefined);
+});
+test('cause 2: fixing the day another way settles the question', () => {
+  const { y, d } = yesterdayData();
+  const since = atTime(y, '18:20');
+  const closed = A.closeOvernight({ ...d, away: [{ since, back: atTime(today, '00:30'), reason: 'sleep', entryId: 'r' }] });
+  assert.ok(A.pendingAway(closed));
+  assert.equal(A.pendingAway(A.closeWorkday(closed, y, atTime(y, '18:00'))), undefined);
+});
+
+test('cause 3: typed hours fill free time and go outside the clocked time when they must', () => {
+  const clocked = { ...base(), workdays: [{ date: D, start: atTime(D, '09:00'), end: atTime(D, '17:00'), breaks: [{ start: atTime(D, '12:00'), end: atTime(D, '13:00') }] }], entries: [span('a', '09:00', '12:00'), span('b', '13:00', '16:00')] };
+  assert.equal(A.freeStart(clocked, D, 30 * M), atTime(D, '16:00'), 'inside');
+  assert.equal(A.freeStart(clocked, D, 2 * H), atTime(D, '17:00'), 'after leaving when the clocked time is full');
+  const late = { ...clocked, entries: [...clocked.entries, span('c', '17:00', '23:30')] };
+  assert.equal(A.freeStart(late, D, 2 * H), atTime(D, '07:00'), 'else right before arrival');
+  assert.equal(A.freeStart(late, D, 10 * H), null, 'no room: nothing');
+  assert.equal(A.appendEntry(late, D, 10 * H, {}), late);
+});
+test('cause 3: placement never overlaps and never crosses midnight', () => {
+  const entries = [span('a', '01:00', '10:00'), span('b', '10:30', '18:00'), span('c', '20:00', '23:30')];
+  for (const wd of [[], [{ date: D, start: atTime(D, '09:00'), end: atTime(D, '17:00'), breaks: [] }]]) {
+    for (const ms of [15 * M, H, 90 * M, 2 * H, 3 * H, 5 * H]) {
+      const d = { ...base(), workdays: wd, entries };
+      const n = A.appendEntry(d, D, ms, { id: 'new' });
+      const e = n.entries.find((x) => x.id === 'new');
+      if (!e) continue;
+      assert.equal(overlapMs(n.entries), 0, `${ms / M} min overlaps`);
+      assert.equal(dayKey(e.end!), D, `${ms / M} min crosses midnight`);
+    }
+  }
+  const prior = { ...base(), entries: [span('n', '20:00', '23:59', '2026-10-12'), { id: 'cross', description: '', start: atTime('2026-10-12', '23:00'), end: atTime(D, '01:00') }] };
+  assert.equal(A.freeStart(prior, D, 20 * H, Date.now()), atTime(D, '01:00'), 'an entry reaching in from the day before counts');
+});
+test('cause 3: today, an open day has no later yet, and a running timer counts', () => {
+  const now = Date.parse(atTime(D, '11:00'));
+  const d = { ...base(), workdays: [{ date: D, start: atTime(D, '09:00'), breaks: [] }], entries: [{ id: 'r', description: '', start: atTime(D, '09:00') }] };
+  const open = A.freeStart(d, D, H, now);
+  assert.equal(open, atTime(D, '08:00'), 'before you arrived, not in the future');
+});
+test('cause 3: typing a longer time into an entry keeps it free too', () => {
+  const d = { ...base(), workdays: [{ date: D, start: atTime(D, '09:00'), end: atTime(D, '17:00'), breaks: [] }], entries: [span('a', '09:00', '10:00'), span('b', '10:00', '11:00')] };
+  assert.equal(A.setEntryHours(d, 'b', 2 * H).entries[1].end, atTime(D, '12:00'), 'grows in place');
+  const moved = A.setEntryHours(d, 'a', 2 * H);
+  assert.equal(moved.entries[0].start, atTime(D, '11:00'), 'moves when it would overlap');
+  assert.equal(overlapMs(moved.entries), 0);
+  const shrunk = A.setEntryHours(d, 'a', 30 * M);
+  assert.equal(shrunk.entries[0].end, atTime(D, '09:30'));
+  const full = { ...d, entries: [span('a', '00:30', '12:00'), span('b', '12:00', '23:50')] };
+  assert.equal(A.setEntryHours(full, 'a', 13 * H), full, 'no room: unchanged');
+});
+
+test('check list: overlaps are counted once and in the right place', () => {
+  const list = [span('a', '09:00', '12:00'), span('b', '11:00', '13:00'), span('c', '11:30', '12:30')];
+  assert.deepEqual(overlapSpans(list), [[Date.parse(atTime(D, '11:00')), Date.parse(atTime(D, '12:30'))]]);
+  assert.equal(overlapMs([span('a', '09:00', '10:00'), span('b', '10:00', '11:00')]), 0, 'touching is fine');
+});
+test('check list: each rule finds its day, and only past days', () => {
+  const NOW = Date.parse(atTime('2026-10-20', '12:00'));
+  const day = (date: string, a = '09:00', b = '17:00') => ({ date, start: atTime(date, a), end: atTime(date, b), breaks: [] });
+  const d: Data = {
+    ...base(),
+    workdays: [day('2026-10-01'), { ...day('2026-10-02', '09:00', '23:59'), autoClosed: true }, day('2026-10-05'), day('2026-10-06', '08:00', '19:00'), day('2026-10-07'), day('2026-10-08'), day('2026-10-20')],
+    entries: [
+      { id: 'n', description: '', start: atTime('2026-10-01', '14:00'), end: new Date(Date.parse(atTime('2026-10-01', '23:59')) + 59_000).toISOString() },
+      span('o1', '09:00', '13:00', '2026-10-05'), span('o2', '10:00', '12:00', '2026-10-05'),
+      span('b1', '08:00', '19:00', '2026-10-07'),
+      { id: 'x', description: '', start: atTime('2026-10-08', '20:00'), end: atTime('2026-10-09', '00:24') },
+      span('t', '09:00', '23:00', '2026-10-20'),
+    ],
+  };
+  const found = Object.fromEntries(daysToCheck(d, NOW).map((c) => [c.date, c.reasons.map((r) => r.kind)]));
+  assert.deepEqual(found['2026-10-01'], ['timer', 'overbooked']);
+  assert.deepEqual(found['2026-10-02'], ['closed', 'long']);
+  assert.deepEqual(found['2026-10-05'], ['overlap']);
+  assert.deepEqual(found['2026-10-06'], ['long']);
+  assert.deepEqual(found['2026-10-07'], ['overbooked']);
+  assert.ok(found['2026-10-08'].includes('crossing'));
+  assert.equal(found['2026-10-20'], undefined, 'today is not checked');
+  assert.deepEqual(daysToCheck(d, NOW).map((c) => c.date).slice(0, 2), ['2026-10-08', '2026-10-07'], 'newest first');
+});
+test('check list: nothing changes until you choose, then the day stops being asked about', () => {
+  const NOW = Date.parse(atTime('2026-10-20', '12:00'));
+  const stop = new Date(Date.parse(atTime(D, '23:59')) + 59_000).toISOString();
+  const d: Data = { ...base(), workdays: [{ date: D, start: atTime(D, '08:00'), end: atTime(D, '17:00'), breaks: [] }], entries: [{ id: 't', description: '', start: atTime(D, '14:00'), end: stop }] };
+  const before = JSON.stringify(d);
+  const [row] = daysToCheck(d, NOW);
+  assert.equal(JSON.stringify(d), before);
+  assert.ok(row.fix, 'a day corrected before the fix can still cut its timer');
+  const fixed = A.fixLeave(d, D, atTime(D, '17:00'));
+  assert.equal(fixed.entries[0].end, atTime(D, '17:00'));
+  assert.deepEqual(daysToCheck(fixed, NOW), []);
+  const ok = confirmDay(d, D);
+  assert.equal(ok.entries[0].end, stop, "it's right: the time stays");
+  assert.deepEqual(daysToCheck(ok, NOW), []);
+  assert.ok(ok.settings.longDaysOk!.includes(D), 'the corridor stops asking too');
 });
 
 console.log(`\n${passed} passed`);

@@ -167,6 +167,7 @@ function createOrUpdateEntry(ctx: Ctx, raw: unknown): ApiResponse {
       end = new Date(Date.parse(start) + mins * 60_000).toISOString();
     } else {
       const next = appendEntry(d, date, mins * 60_000, fields);
+      if (next === d) throw bad('That day has no free stretch this long');
       ctx.commit(next);
       return { status: 201, body: entryOut(next, next.entries[next.entries.length - 1]) };
     }

@@ -1203,3 +1203,58 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
   .corridor-tiles { grid-template-columns: 1fr; }
 }
 .segmented button:disabled { cursor: default; opacity: 0.55; }
+
+/* A short message with Undo (src/notes.ts): above dialogs, so it also shows over the day and the check list. */
+.note-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 70; max-width: min(560px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow), 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 13px; }
+.feed-noroom { grid-column: 1 / -1; color: var(--muted); }
+
+/* The question after an absence (src/views/Away.tsx) */
+.away-backdrop { z-index: 60; }
+.modal.away { width: min(620px, 100%); padding: 18px 20px 14px; gap: 10px; outline: none; }
+.away h3 { margin: 0; font-size: 17px; }
+.away p { margin: 0; }
+.away-facts { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--field); }
+.away-facts > div { display: flex; flex-direction: column; }
+.away-facts > div:last-child { text-align: right; }
+.away-facts strong { font-size: 19px; font-variant-numeric: tabular-nums; }
+.away-ask { font-weight: 600; font-size: 13px; margin-top: 2px !important; }
+.away-choices { display: flex; flex-direction: column; gap: 6px; }
+.away-choice { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: none; text-align: left; cursor: pointer; }
+.away-choice:hover, .away-choice:focus-visible { background: var(--accent-soft); border-color: var(--accent); outline: none; }
+.away-choice .time-field { margin: 0 6px; }
+.away-result { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.away-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 2px; }
+@media (max-width: 560px) { .away-choice { grid-template-columns: 1fr; } .away-result { text-align: left; } }
+
+/* The day as it happened (src/views/Timeline.tsx) */
+.timeline { display: flex; flex-direction: column; gap: 6px; }
+.tl-scroll { overflow-x: auto; }
+.tl-track { position: relative; min-width: 560px; user-select: none; touch-action: pan-y; margin: 0 2px; }
+.tl-hour { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--divider); pointer-events: none; }
+.tl-hour span { position: absolute; bottom: 0; left: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.tl-clocked { position: absolute; top: 0; height: 20px; border-radius: 5px; padding: 0 7px; line-height: 20px; font-size: 11px; overflow: hidden; white-space: nowrap; background: color-mix(in srgb, var(--ok) 16%, var(--surface)); color: color-mix(in srgb, var(--ok) 70%, var(--text)); }
+.tl-break { position: absolute; top: 0; height: 20px; display: grid; place-items: center; overflow: hidden; border-radius: 4px; background: var(--surface); border: 1px dashed var(--muted); color: var(--muted); box-sizing: border-box; }
+.tl-overlap { position: absolute; border-radius: 4px; background: var(--danger-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent); pointer-events: none; }
+.tl-now { position: absolute; top: 0; bottom: 18px; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
+.tl-block { position: absolute; height: 36px; box-sizing: border-box; border: 1px solid; border-radius: 7px; padding: 2px 8px; display: flex; flex-direction: column; justify-content: center; line-height: 1.2; font-size: 11px; overflow: hidden; white-space: nowrap; cursor: grab; }
+.tl-block.fixed { cursor: pointer; }
+.tl-block.dragging { cursor: grabbing; z-index: 3; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
+.tl-block.sel, .tl-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 2; }
+.tl-name, .tl-time { overflow: hidden; text-overflow: ellipsis; }
+.tl-edge { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.tl-edge.start { left: 0; }
+.tl-edge.end { right: 0; }
+.tl-edit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border); }
+.tl-edit-name { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-totals { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.tl-tag, .check-tag { font-size: 12px; padding: 1px 7px; border-radius: 6px; background: var(--warn-bg); }
+.tl-tag, .check-tag.strong { background: var(--danger-soft); color: var(--danger); }
+.tl-hintline { margin: 0; }
+
+/* Check these days (src/views/DayCheck.tsx) */
+.check-list { display: flex; flex-direction: column; }
+.check-row-day { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--divider); }
+.check-reasons { display: flex; flex-direction: column; gap: 3px; }
+.check-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.check-link { align-self: flex-start; }
+@media (max-width: 720px) { .check-row-day { grid-template-columns: 1fr; gap: 6px; } .check-actions { justify-content: flex-start; } }

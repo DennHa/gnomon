@@ -58,7 +58,7 @@ export function fitDay(d: Data, date: string, now = Date.now()): { data: Data; n
   const breaks: Break[] = s.slice(1).map(([a], i) => ({ start: iso(s[i][1]), end: iso(a) }));
   // Today stays open (you may still be at work; Leave closes it); other days end with their last entry.
   const open = running || date === dayKey(now);
-  const made: Workday = { date, start: iso(s[0][0]), ...(!open && { end: iso(s[s.length - 1][1]) }), breaks, fromEntries: true };
+  const made: Workday = { date, start: iso(s[0][0]), ...(!open && { end: iso(s[s.length - 1][1]) }), breaks, fromEntries: true, ...(wd?.autoClosed && { autoClosed: true }) };
   if (wd && JSON.stringify(wd) === JSON.stringify(made)) return { data: d, notices: [] };
   const workdays = wd ? d.workdays.map((w) => (w === wd ? made : w)) : [...d.workdays, made];
   return { data: { ...d, workdays }, notices: wd ? [] : [{ kind: 'created', date, at: made.start }] };
