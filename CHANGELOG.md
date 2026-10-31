@@ -19,6 +19,8 @@ Gnomon server shows the newest entry.
   the web app.
 - **Check these days:** a one-time list of days that look off (timers ending at 23:59, overlaps, over 10 hours, booked
   far above clocked, days never confirmed), each with its fix or *It's right*. Nothing changes without your choice.
+- **A designed install window:** the `.dmg` now opens on a Gnomon window with the sundial's shadow pointing from the app
+  to Applications, and says what to do if macOS blocks the first start.
 
 ## 0.1.24 · 2026-10-28
 
