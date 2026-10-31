@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.27 · 2026-10-31
 
 - **Your typical day on the timeline:** faint bands show when you usually start, pause and stop, worked out from your
   work schedule and the last eight weeks, so a part-time day gets its own. Without history they sit at 8–9, 12–13 and

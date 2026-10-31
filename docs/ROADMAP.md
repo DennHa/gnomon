@@ -7,7 +7,7 @@ aren't lost.
 -->
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-31 (0.1.26).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-31 (0.1.27).
 
 ## Now
 
@@ -66,6 +66,7 @@ Nothing in progress right now; the next step is chosen from the list below.
 - **Hours you can trust.** A clear question after time away, a forgotten clock-out corrects the timer too, and typed
   hours never overlap or cross midnight.
 - **Hours and times together.** The Week stays quick with hours; opening a day shows a timeline of when things happened.
+- **A typical day.** The timeline shows when you usually start, break and stop, and an empty day offers it in one click.
 - **Public roadmap.** This page, at `/roadmap` on your Gnomon server and linked from Info & feedback.
 
 ## Left out on purpose
