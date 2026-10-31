@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.25 · 2026-10-31
 
 - **Fixing a forgotten clock-out now fixes the timer too:** when you correct the leave time of a day closed at midnight,
   a timer midnight stopped ends there as well, with a short note and Undo. Before, it stayed at 23:59 and the extra

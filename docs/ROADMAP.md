@@ -7,7 +7,7 @@ aren't lost.
 -->
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-28 (0.1.24).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-31 (0.1.25).
 
 ## Now
 
@@ -63,6 +63,9 @@ Nothing in progress right now; the next step is chosen from the list below.
   with zones, as an alternative to the overtime balance. A company can switch it on for everyone.
 - **Vote and suggest on the roadmap.** In the app under Info & feedback: vote, comment and suggest ideas, with an
   account on a Gnomon server.
+- **Hours you can trust.** A clear question after time away, a forgotten clock-out corrects the timer too, and typed
+  hours never overlap or cross midnight.
+- **Hours and times together.** The Week stays quick with hours; opening a day shows a timeline of when things happened.
 - **Public roadmap.** This page, at `/roadmap` on your Gnomon server and linked from Info & feedback.
 
 ## Left out on purpose
