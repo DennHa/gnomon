@@ -28,6 +28,41 @@ export function moveSpan(s: Span, mode: DragMode, ms: number, day: string, lo = 
   return { start: iso(at), end: iso(at + b - a) };
 }
 
+/** Where a time label beside a clock handle sits, in px from the track's left: `end` means its text ends there. */
+export type ClockSpot = { x: number; end: boolean };
+
+const BESIDE = 9; // half a handle, plus air
+const BETWEEN = 6;
+const charPx = 6;
+
+/**
+ * The labels of the clock handles: outside the rail, so a short day can't make them collide; at an edge of the track they
+ * turn inside it; and where the rail is too short for that they line up in reading order past the other handle.
+ * `fits` is false when they'd leave the track or run into each other. `inX`/`outX` are px; no `out` while the day is running.
+ */
+export function clockSpots(width: number, inX: number, inText: string, outX?: number, outText?: string): { in: ClockSpot; out?: ClockSpot; fits: boolean } {
+  const inW = inText.length * charPx;
+  const fitsLeft = inX - BESIDE - inW >= 0;
+  if (outX === undefined || outText === undefined) {
+    return { in: fitsLeft ? { x: inX - BESIDE, end: true } : { x: inX + BESIDE, end: false }, fits: true };
+  }
+  const outW = outText.length * charPx;
+  const fitsRight = outX + BESIDE + outW <= width;
+  const rail = outX - inX - 2 * BESIDE;
+  if (fitsLeft && fitsRight) return { in: { x: inX - BESIDE, end: true }, out: { x: outX + BESIDE, end: false }, fits: true };
+  if (fitsLeft) {
+    if (outW <= rail) return { in: { x: inX - BESIDE, end: true }, out: { x: outX - BESIDE, end: true }, fits: true };
+    const x = inX - BESIDE - outW - BETWEEN;
+    return { in: { x, end: true }, out: { x: inX - BESIDE, end: true }, fits: x - inW >= 0 };
+  }
+  if (fitsRight) {
+    if (inW <= rail) return { in: { x: inX + BESIDE, end: false }, out: { x: outX + BESIDE, end: false }, fits: true };
+    const x = outX + BESIDE + inW + BETWEEN;
+    return { in: { x: outX + BESIDE, end: false }, out: { x, end: false }, fits: x + outW <= width };
+  }
+  return { in: { x: inX + BESIDE, end: false }, out: { x: outX - BESIDE, end: true }, fits: inW + outW + BETWEEN <= rail };
+}
+
 /**
  * A clock handle moved by `ms`: arrival stays before leaving and leaving after arrival, and it leans toward `usual`.
  * Bookings never move with it.

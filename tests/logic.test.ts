@@ -10,7 +10,7 @@ import { daySummary, weekSummary } from '../src/motion';
 import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { fitAll, fitWorkdays } from '../src/fit';
 import { confirmDay, daysToCheck, leaveSuggestion, overlapMs, overlapSpans, sidebarDays } from '../src/daycheck';
-import { lanes, moveClock, moveSpan } from '../src/timeline';
+import { clockSpots, lanes, moveClock, moveSpan } from '../src/timeline';
 import { typicalDay } from '../src/typical';
 import { toAssign, weekReminderDue, weekToAssign } from '../src/reminders';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
@@ -1067,6 +1067,22 @@ test('typical day: it replaces the old defaults, and handles lean toward it', ()
   assert.equal(moveClock(w, 'in', -24 * M, day, undefined, usual), atTime(day, '09:00'), 'a near miss settles on the usual time');
   assert.equal(moveClock(w, 'in', -15 * M, day, undefined, usual), atTime(day, '09:15'), 'further away the snap decides');
   assert.equal(moveClock(w, 'in', -24 * M, day), atTime(day, '09:05'), 'arrow keys stay exact');
+});
+
+test('clockSpots keeps the labels beside the handles, on the track and apart', () => {
+  const normal = clockSpots(800, 100, '08:42', 500, '17:10');
+  assert.deepEqual([normal.in, normal.out, normal.fits], [{ x: 91, end: true }, { x: 509, end: false }, true], 'outside the rail');
+  const short = clockSpots(800, 300, '09:00', 320, '09:30');
+  assert.equal(short.in.end && !short.out!.end, true, 'a short day can\'t collide: they point away from each other');
+  const full = clockSpots(800, 0, '07:00', 800, '19:00');
+  assert.deepEqual([full.in, full.out], [{ x: 9, end: false }, { x: 791, end: true }], 'at the edges of the track they turn inside the rail');
+  const early = clockSpots(800, 0, '07:00', 10, '07:20');
+  assert.ok(!early.in.end && early.in.x === 19 && early.out!.x > 19 + 30 && early.fits, 'too short for inside: in reading order past the other handle');
+  const late = clockSpots(800, 790, '18:40', 800, '19:00');
+  assert.ok(late.in.end && late.in.x < late.out!.x - 30 && late.out!.x === 781 && late.fits, 'and the same at the other end');
+  assert.deepEqual([clockSpots(800, 100, '08:42').in, clockSpots(800, 100, '08:42').out], [{ x: 91, end: true }, undefined], 'a running day has only the one label');
+  assert.deepEqual(clockSpots(800, 10, '08:42').in, { x: 19, end: false }, 'and turns inside at the edge');
+  assert.equal(clockSpots(40, 0, 'In 07:00', 40, 'Out 09:00').fits, false, 'no room for the words: the caller shows only times');
 });
 
 console.log(`\n${passed} passed`);

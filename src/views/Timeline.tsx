@@ -2,7 +2,7 @@
 // (src/typical.ts), and the bookings as blocks at their real times, above the list of what the timeline can't show (project,
 // description, activity, duration). Both read the same state, including a drag in progress, and share the selection. Clock times stay apart from bookings: moving a handle never
 // moves an entry (src/fit.ts), except that correcting a midnight-closed day cuts the timer midnight stopped (src/actions.ts).
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { addBreak, addTypicalDay, closeWorkday, confirmAutoClose, deleteWorkday, markDayOff, removeBreak, setOffKind, startDay, updateBreak, updateEntry, updateWorkday } from '../actions';
 import { TimeField } from '../components';
 import { leaveSuggestion, overlapMs, overlapSpans } from '../daycheck';
@@ -10,7 +10,7 @@ import { EntryFeed } from '../feed';
 import { Icon } from '../icons';
 import { useLeaveEdit } from '../notes';
 import { useStore } from '../store';
-import { lanes, moveClock, moveSpan, SNAP, type DragMode, type Span } from '../timeline';
+import { clockSpots, lanes, moveClock, moveSpan, SNAP, type DragMode, type Span } from '../timeline';
 import { atMinutes, typicalDay } from '../typical';
 import { atTime, dayKey, entryMs, fmtDuration, fmtHM, fmtTime, hoursToMs, useNow, workdayMs } from '../time';
 import { targetHoursOn } from '../schedule';
@@ -21,6 +21,10 @@ const MIN = 60_000;
 const HOUR = 60 * MIN;
 const LANE = 42;
 const TOP = 30;
+/** Below this track width the labels at the clock handles are only the times. */
+const WORDS_FROM = 640;
+/** A break's length shows on its gap from this width (px), next to the coffee cup. */
+const BREAK_LENGTH_FROM = 44;
 
 /** What's being dragged, shown everywhere before it's saved. Keys: "in", "out", "ask", "b:<break index>", "e:<entry id>". */
 type Drag = { key: string; start?: string; end?: string };
@@ -29,6 +33,8 @@ type Drag = { key: string; start?: string; end?: string };
 type Item = { key: string; fixed: boolean; preview: (mode: DragMode, ms: number, lean: boolean) => Drag; save: (d: Drag) => void };
 
 const nameOf = (e: Entry, project?: string) => [e.description || e.taskName, project].filter(Boolean).join(' · ') || t('untitled');
+
+const fmtBreak = (ms: number) => (ms < HOUR ? `${Math.round(ms / MIN)}m` : fmtDuration(ms));
 
 const fmtInput = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
 
@@ -44,6 +50,7 @@ export function DayPanel({ day, readOnly }: { day: string; readOnly: boolean }) 
   const trackRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState(false);
   const [leftAt, setLeftAt] = useState<string | null>(null);
+  const [trackWidth, setTrackWidth] = useState(0);
   useEffect(() => (setSelected(null), setDrag(null), setLeftAt(null)), [day]);
 
   const storedDay = data.workdays.find((w) => w.date === day);
@@ -91,6 +98,39 @@ export function DayPanel({ day, readOnly }: { day: string; readOnly: boolean }) 
   const laneCount = Math.max(1, ...[...laneOf.values()].map((l) => l + 1));
   const overlaps = overlapSpans(entries, now);
   const height = TOP + laneCount * LANE + 20;
+
+    useLayoutEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const seen = new ResizeObserver(() => setTrackWidth(el.clientWidth));
+    seen.observe(el);
+    setTrackWidth(el.clientWidth);
+    return () => seen.disconnect();
+  }, [hasTimeline]);
+  const px = (ms: number) => (x(ms) / 100) * trackWidth;
+
+  // The times at the handles, with In and Out where there's room. A day made from bookings wasn't clocked, so it gets only times.
+  const clockOut = ask ? (left ? askAt : undefined) : clocked?.end ? Date.parse(clocked.end) : undefined;
+  const clockLabels = () => {
+    if (!clocked || !trackWidth) return null;
+    const a = Date.parse(clocked.start);
+    const place = (inText: string, outText?: string) => ({ inText, outText, spots: clockSpots(trackWidth, px(a), inText, clockOut === undefined ? undefined : px(clockOut), outText) });
+    const time = (ms: number | undefined) => (ms === undefined ? undefined : fmtTime(ms));
+    const words = !clocked.fromEntries && trackWidth >= WORDS_FROM ? place(t('tl.inAt', { time: fmtTime(a) }), clockOut === undefined ? undefined : t('tl.outAt', { time: fmtTime(clockOut) })) : null;
+    const { inText, outText, spots } = words?.spots.fits ? words : place(fmtTime(a), time(clockOut));
+    return (
+      <>
+        <span className={`tl-clock ${spots.in.end ? 'end' : ''}`} style={{ left: spots.in.x }} aria-hidden>
+          {inText}
+        </span>
+        {spots.out && (
+          <span className={`tl-clock ${spots.out.end ? 'end' : ''} ${ask ? 'ask' : ''}`} style={{ left: spots.out.x }} aria-hidden>
+            {outText}
+          </span>
+        )}
+      </>
+    );
+  };
 
   const booked = entries.reduce((s, e) => s + entryMs(e, now), 0);
   const worked = clocked ? workdayMs(ask && !clocked.end ? { ...clocked, end: new Date(askAt).toISOString() } : clocked, now) : 0;
@@ -278,7 +318,7 @@ export function DayPanel({ day, readOnly }: { day: string; readOnly: boolean }) 
           <span className="tl-sum">
             {clocked && !clocked.fromEntries && (
               <>
-                {t('tl.clocked')} <strong>{clocked.end || !isPast ? fmtHM(worked) : '–'}</strong>
+                <span className="dot tl-clocked-dot" /> {t('tl.clocked')} <strong>{clocked.end || !isPast ? fmtHM(worked) : '–'}</strong>
                 {' · '}
               </>
             )}
@@ -369,6 +409,7 @@ export function DayPanel({ day, readOnly }: { day: string; readOnly: boolean }) 
             {clocked?.breaks.map((b, i) => {
               const a = Date.parse(b.start);
               const item = breakItem(clocked, i);
+              const length = (b.end ? Date.parse(b.end) : now) - a;
               return (
                 <div
                   key={i}
@@ -379,6 +420,7 @@ export function DayPanel({ day, readOnly }: { day: string; readOnly: boolean }) 
                 >
                   {!item.fixed && <i className="tl-edge start" onPointerDown={(ev) => begin(ev, item, 'start')} />}
                   <Icon name="coffee" size={13} />
+                  {px(a + length) - px(a) >= BREAK_LENGTH_FROM && length >= MIN && <span className="tl-break-length">{fmtBreak(length)}</span>}
                   {!item.fixed && <i className="tl-edge end" onPointerDown={(ev) => begin(ev, item, 'end')} />}
                 </div>
               );
@@ -407,6 +449,7 @@ export function DayPanel({ day, readOnly }: { day: string; readOnly: boolean }) 
                 title={`${t('tl.out')} ${fmtTime(clocked.end)}`}
               />
             )}
+            {clockLabels()}
             {overlaps.map(([a, b]) => (
               <div key={a} className="tl-overlap" style={{ left: `${x(a)}%`, width: `${x(b) - x(a)}%`, top: TOP, height: laneCount * LANE }} title={t('tl.overlap', { time: fmtHM(b - a) })} />
             ))}
