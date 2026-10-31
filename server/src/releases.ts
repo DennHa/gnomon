@@ -121,7 +121,7 @@ const TEXT = {
     install: 'Install',
     steps: [
       'Open the downloaded .dmg and drag <strong>Gnomon</strong> into <strong>Applications</strong>.',
-      'First start: <strong>right-click Gnomon → Open</strong> and confirm. The app isn’t signed with an Apple Developer ID yet, so macOS asks once.',
+      'First start: open Gnomon. If macOS blocks it, go to <strong>System Settings → Privacy &amp; Security</strong> and click <strong>Open Anyway</strong>. The app isn’t signed with an Apple Developer ID yet, so macOS asks once.',
       'Updating later: download the new version and drag it over the old one. Your data stays where it is.',
     ],
     phone: 'On your phone? Open the web app',
@@ -137,7 +137,7 @@ const TEXT = {
     install: 'Installieren',
     steps: [
       'Öffne die geladene .dmg und zieh <strong>Gnomon</strong> in <strong>Programme</strong>.',
-      'Erster Start: <strong>Rechtsklick auf Gnomon → Öffnen</strong> und bestätigen. Die App ist noch nicht mit einer Apple-Developer-ID signiert, deshalb fragt macOS einmal nach.',
+      'Erster Start: Öffne Gnomon. Blockiert macOS die App, geh zu <strong>Systemeinstellungen → Datenschutz &amp; Sicherheit</strong> und klick auf <strong>Trotzdem öffnen</strong>. Die App ist noch nicht mit einer Apple-Developer-ID signiert, deshalb fragt macOS einmal nach.',
       'Später aktualisieren: neue Version laden und über die alte ziehen. Deine Daten bleiben, wo sie sind.',
     ],
     phone: 'Am Handy? Zur Web-App',

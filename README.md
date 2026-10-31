@@ -101,8 +101,8 @@ The first time you open Gnomon on a workday, a short sunrise greets you, with on
 1. Download the latest **Gnomon-…-arm64.dmg** from [Releases](https://github.com/DennHa/gnomon/releases/latest).
    It runs on **Apple silicon Macs** (M1 and newer) only.
 2. Open it and drag **Gnomon** into **Applications**.
-3. First start: **right-click Gnomon → Open**, then confirm. The app isn't signed with an Apple Developer ID yet, so
-   macOS asks once.
+3. First start: open Gnomon. If macOS blocks it, go to **System Settings → Privacy & Security** and click
+   **Open Anyway**. The app isn't signed with an Apple Developer ID yet, so macOS asks once.
 4. Choose *On this Mac only*, or sign in to your company's Gnomon server. A short intro asks how you like to work;
    connect Float or Personio afterwards under Settings → Connections.
 
