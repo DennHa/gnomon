@@ -256,8 +256,8 @@ tool, use the *Roll-out* step instead: add the `.dmg` as a custom app and the se
 it on one Mac, then assign it to everyone. The profile connects the app to your server, so nobody types the address.
 
 macOS only opens apps from outside the App Store without questions when they're signed with an Apple Developer ID and
-notarized. Until the official build is, each person allows it once (right-click → Open); for a company roll-out, use a
-signed build.
+notarized. Until the official build is, each person allows it once (System Settings → Privacy & Security → Open
+Anyway); for a company roll-out, use a signed build.
 
 ## Phone and web app
 

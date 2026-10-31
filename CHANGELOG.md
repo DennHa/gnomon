@@ -33,6 +33,8 @@ Gnomon server shows the newest entry.
   far above clocked, days never confirmed), each with its fix or *It's right*. Nothing changes without your choice.
 - **A designed install window:** the `.dmg` now opens on a Gnomon window with the sundial's shadow pointing from the app
   to Applications, and says what to do if macOS blocks the first start.
+- **First start, corrected:** recent macOS versions no longer let you right-click and Open an unsigned app. The README,
+  the admin guide and a server's download page now point to *Privacy & Security → Open Anyway*.
 
 ## 0.1.24 · 2026-10-28
 

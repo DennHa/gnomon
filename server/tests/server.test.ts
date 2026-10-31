@@ -341,7 +341,7 @@ describe('download page (/latest)', () => {
       const html = await page.text();
       assert.match(html, /Version 9\.9\.9/);
       assert.match(html, /Faster &lt;b&gt;timers&lt;\/b&gt;/, 'notes are escaped');
-      assert.match(html, /Rechtsklick/, 'German for a German browser');
+      assert.match(html, /Trotzdem öffnen/, 'German for a German browser');
       assert.ok(page.headers.get('content-security-policy'));
 
       const dl = await fetch(`${url}/latest/download`);
