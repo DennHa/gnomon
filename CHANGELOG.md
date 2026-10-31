@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.26 · 2026-10-31
 
 - **The timeline is the one place to change a day:** drag the clock-in and clock-out handles at the ends of the clocked
   rail, and move or resize breaks like bookings; a click on any of them lets you type the exact time. Clock times still

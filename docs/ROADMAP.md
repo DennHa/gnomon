@@ -7,7 +7,7 @@ aren't lost.
 -->
 # Roadmap
 
-What's coming to Gnomon, and what it already does well. Updated 2026-10-31 (0.1.25).
+What's coming to Gnomon, and what it already does well. Updated 2026-10-31 (0.1.26).
 
 ## Now
 
