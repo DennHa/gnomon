@@ -3,6 +3,18 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **Your typical day on the timeline:** faint bands show when you usually start, pause and stop, worked out from your
+  work schedule and the last eight weeks, so a part-time day gets its own. Without history they sit at 8–9, 12–13 and
+  17–18. Dragged handles lean toward your usual time, and the 5-minute snap stays.
+- **No more made-up times:** an empty day shows a ghost of your typical day, with one click to use it, and a new break
+  starts at your usual break. Clock-in and clock-out live on the timeline only; *When did you leave?* is now a small
+  prompt on the clock-out handle, and days off live in the summary line and the ⋮ menu.
+- **A tidier project overlay in the Week:** the total is on the title line, the sessions are one block, and everything
+  you can add sits below: *Add from Tuesday* with *Add all*, and *Add from plan*. A long list stays folded, so it never
+  fills the overlay.
+
 ## 0.1.26 · 2026-10-31
 
 - **The timeline is the one place to change a day:** drag the clock-in and clock-out handles at the ends of the clocked

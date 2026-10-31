@@ -3,16 +3,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import {
-  addWorkday,
-  closeWorkday,
-  confirmAutoClose,
-  deleteWorkday,
   fillGaps,
-  markDayOff,
-  setOffKind,
   planGaps,
   runningEntry,
-  startDay,
   startTimer,
 } from '../actions';
 import { TrailSummary } from '../components';
@@ -20,11 +13,10 @@ import { Icon } from '../icons';
 import { goalFor, planItemsOn, timeWindow } from '../plan';
 import type { Data } from '../types';
 import { targetHoursOn } from '../schedule';
-import { addDays, atTime, dayKey, entryMs, fmtDuration, fmtHM, hoursToMs, useNow, workdayMs } from '../time';
+import { addDays, dayKey, entryMs, fmtDuration, fmtHM, hoursToMs, useNow, workdayMs } from '../time';
 import { t } from '../i18n';
 import { copyHoursOn, daysText, type CopyText } from '../copytext';
-import { useAddHours, useLeaveEdit } from '../notes';
-import { leaveSuggestion } from '../daycheck';
+import { useAddHours } from '../notes';
 
 export const MISSING_LOOKBACK_DAYS = 30;
 
@@ -228,96 +220,6 @@ export function missingDays(data: Data, now: number): { date: string; worked: nu
     if (worked < target) out.push({ date, worked, missing: target - worked });
   }
   return out;
-}
-
-/**
- * What a day's timeline can't show, in one compact row: no workday yet, a day off, or a past day whose leave time is
- * still open or was set by the midnight close. A normal day has none: its times are changed on the timeline.
- */
-export function DayStatus({ day }: { day: string }) {
-  const { data, update } = useStore();
-  const leaveEdit = useLeaveEdit();
-  const now = useNow(30_000);
-  const wd = data.workdays.find((w) => w.date === day);
-  const isToday = day === dayKey(now);
-  const target = hoursToMs(targetHoursOn(data, day));
-  const [inTime, setIn] = useState('08:00');
-  const [outTime, setOut] = useState('16:30');
-  const [leftAt, setLeftAt] = useState<string | null>(null);
-
-  if (!wd) {
-    return (
-      <div className="wd-editor empty">
-        <span className="muted">{t(isToday ? 'wd.notClockedInYet' : 'wd.noWorkday')}</span>
-        {isToday ? (
-          <button className="btn primary small" onClick={() => update(startDay)}>
-            <Icon name="login" size={16} /> {t('startDay')}
-          </button>
-        ) : (
-          <>
-            <span className="wd-times">
-              <input className="time-field" type="time" aria-label={t('tl.in')} value={inTime} onChange={(e) => setIn(e.target.value)} />
-              –
-              <input className="time-field" type="time" aria-label={t('tl.out')} value={outTime} onChange={(e) => setOut(e.target.value)} />
-            </span>
-            <button className="btn primary small" onClick={() => update((d) => addWorkday(d, day, inTime, outTime))}>
-              <Icon name="add" size={16} /> {t('wd.addWorkday')}
-            </button>
-          </>
-        )}
-        <button className="btn small" onClick={() => update((d) => markDayOff(d, day))}>
-          {t('dayOff')}
-        </button>
-        <button className="btn small" onClick={() => update((d) => markDayOff(d, day, 'overtime'))}>
-          {t('dayOff.overtime')}
-        </button>
-      </div>
-    );
-  }
-
-  if (wd.off) {
-    return (
-      <div className="wd-editor off">
-        <Icon name={wd.offKind === 'overtime' ? 'savings' : 'event_busy'} size={20} />
-        <span>
-          <strong>{t(wd.offKind === 'overtime' ? 'dayOff.overtime' : 'dayOff')}</strong>
-          <span className="muted">
-            {' · '}
-            {wd.offKind === 'overtime'
-              ? t('wd.overtimeHint', { duration: fmtDuration(target) })
-              : wd.offReason
-                ? `${wd.offReason}${wd.offSource === 'float' ? ' (Float)' : wd.offSource === 'personio' && !wd.offReason.includes('Personio') ? ' (Personio)' : ''}`
-                : t('wd.notMissing')}
-          </span>
-        </span>
-        <span className="spacer" />
-        <button className="btn ghost small" onClick={() => update((d) => setOffKind(d, day, wd.offKind === 'overtime' ? undefined : 'overtime'))}>
-          {t(wd.offKind === 'overtime' ? 'wd.makeDayOff' : 'wd.makeOvertime')}
-        </button>
-        <button className="btn small" onClick={() => update((d) => deleteWorkday(d, day))}>
-          {t('wd.undoDayOff')}
-        </button>
-      </div>
-    );
-  }
-
-  // Today's leave time is open because you're still here; a past day's is a question.
-  if (isToday || (wd.end && !wd.autoClosed)) return null;
-  const left = leftAt ?? leaveSuggestion(data, day);
-  return (
-    <div className="wd-editor empty ask">
-      <span>{t(wd.end ? 'wd.closedLeft' : 'wd.openLeft')}</span>
-      <input className="time-field" type="time" aria-label={t('tl.out')} title={t('stale.suggestHint')} value={left} onChange={(e) => setLeftAt(e.target.value)} />
-      <button className="btn primary small" onClick={() => leaveEdit(day, (d) => closeWorkday(d, day, atTime(day, left)))}>
-        {t('save')}
-      </button>
-      {wd.end && (
-        <button className="btn ghost small" onClick={() => update((d) => confirmAutoClose(d, day))}>
-          {t('stale.keepHint')}
-        </button>
-      )}
-    </div>
-  );
 }
 
 /** Untracked time, what's left against the plan (one click to add), and the activity trail as a memory aid. */

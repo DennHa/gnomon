@@ -7,6 +7,10 @@ export const SNAP = 5 * 60_000;
 export type Span = { start: string; end: string };
 export type DragMode = 'move' | 'start' | 'end';
 
+/** Within this of the usual time, a dragged handle or break settles on it. Arrow keys and typed times stay exact. */
+const LEAN = 7 * 60_000;
+const leaned = (ms: number, usual?: number) => (usual !== undefined && Math.abs(ms - usual) <= LEAN ? usual : ms);
+
 const iso = (ms: number) => new Date(ms).toISOString();
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const dayFrom = (day: string) => Date.parse(atTime(day, '00:00'));
@@ -14,22 +18,25 @@ const dayLast = (day: string) => Date.parse(atTime(day, '23:59'));
 const snapper = (day: string) => (ms: number) => dayFrom(day) + Math.round((ms - dayFrom(day)) / SNAP) * SNAP;
 
 /** A block moved by `ms`, or one of its edges, snapped to 5 minutes, inside lo..hi (default: the day), at least 5 minutes long. */
-export function moveSpan(s: Span, mode: DragMode, ms: number, day: string, lo = dayFrom(day), hi = dayLast(day)): Span {
+export function moveSpan(s: Span, mode: DragMode, ms: number, day: string, lo = dayFrom(day), hi = dayLast(day), usual?: number): Span {
   const snap = snapper(day);
   const a = Date.parse(s.start);
   const b = Date.parse(s.end);
   if (mode === 'start') return { start: iso(clamp(snap(a + ms), lo, b - SNAP)), end: s.end };
   if (mode === 'end') return { start: s.start, end: iso(clamp(snap(b + ms), a + SNAP, hi)) };
-  const at = clamp(snap(a + ms), lo, hi - (b - a));
+  const at = clamp(leaned(snap(a + ms), usual), lo, hi - (b - a));
   return { start: iso(at), end: iso(at + b - a) };
 }
 
-/** A clock handle moved by `ms`: arrival stays before leaving and leaving after arrival. Bookings never move with it. */
-export function moveClock(wd: Workday, edge: 'in' | 'out', ms: number, day: string, now = Date.now()): string {
+/**
+ * A clock handle moved by `ms`: arrival stays before leaving and leaving after arrival, and it leans toward `usual`.
+ * Bookings never move with it.
+ */
+export function moveClock(wd: Workday, edge: 'in' | 'out', ms: number, day: string, now = Date.now(), usual?: number): string {
   const snap = snapper(day);
   const a = Date.parse(wd.start);
-  if (edge === 'in') return iso(clamp(snap(a + ms), dayFrom(day), (wd.end ? Date.parse(wd.end) : now) - SNAP));
-  return iso(clamp(snap(Date.parse(wd.end!) + ms), a + SNAP, dayLast(day)));
+  if (edge === 'in') return iso(clamp(leaned(snap(a + ms), usual), dayFrom(day), (wd.end ? Date.parse(wd.end) : now) - SNAP));
+  return iso(clamp(leaned(snap(Date.parse(wd.end!) + ms), usual), a + SNAP, dayLast(day)));
 }
 
 /** Each block on the first lane where it doesn't touch another, so overlaps sit visibly below each other. */

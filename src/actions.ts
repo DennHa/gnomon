@@ -2,6 +2,7 @@
 import type { Activity, ActivityPreset, Away, Break, Data, Entry, Project, Settings, Workday, WorkStyle } from './types';
 import { atTime, dayKey, nowIso, toTimeInput, uid, workdayMs } from './time';
 import { goalFor, planItemsOn } from './plan';
+import { atMinutes, typicalDay } from './typical';
 
 export const PROJECT_COLORS = ['#03A9F4', '#8BC34A', '#FF9800', '#E91E63', '#9C27B0', '#009688', '#3F51B5', '#795548', '#F44336', '#607D8B'];
 
@@ -10,6 +11,8 @@ export const runningEntry = (d: Data) => d.entries.find((e) => !e.end);
 export const activitiesOn = (d: Data) => d.settings.activitiesEnabled !== false && d.activities.length > 0;
 export const todayWorkday = (d: Data) => d.workdays.find((w) => w.date === dayKey(new Date()));
 export const isOnBreak = (w?: Workday) => Boolean(w && !w.end && w.breaks.some((b) => !b.end));
+
+type Span = [number, number];
 
 const mapToday = (d: Data, fn: (w: Workday) => Workday): Data => {
   const today = dayKey(new Date());
@@ -145,12 +148,11 @@ export function closeOvernight(d: Data, today = dayKey(new Date())): Data {
   };
 }
 
-/** Record a day after the fact, e.g. one you forgot to clock in for. */
-export function addWorkday(d: Data, date: string, inTime: string, outTime: string, breakMinutes = 30): Data {
-  const start = atTime(date, inTime);
-  const end = atTime(date, outTime);
-  const breaks = breakMinutes > 0 ? [{ start: atTime(date, '12:00'), end: new Date(Date.parse(atTime(date, '12:00')) + breakMinutes * 60_000).toISOString() }] : [];
-  return { ...d, workdays: [...d.workdays.filter((w) => w.date !== date), { date, start, end, breaks }] };
+/** Record a day after the fact as your typical day (src/typical.ts), to adjust on the timeline. */
+export function addTypicalDay(d: Data, date: string): Data {
+  const ty = typicalDay(d, date);
+  const breaks = ty.breakStart !== undefined ? [{ start: atMinutes(date, ty.breakStart), end: atMinutes(date, ty.breakEnd!) }] : [];
+  return { ...d, workdays: [...d.workdays.filter((w) => w.date !== date), { date, start: atMinutes(date, ty.in), end: atMinutes(date, ty.out), breaks }] };
 }
 
 export function markDayOff(d: Data, date: string, kind?: 'overtime'): Data {
@@ -171,15 +173,20 @@ export function updateBreak(d: Data, date: string, index: number, patch: Partial
   return { ...d, workdays: d.workdays.map((w) => (w.date === date ? { ...w, fromEntries: undefined, breaks: w.breaks.map((b, i) => (i === index ? { ...b, ...patch } : b)) } : w)) };
 }
 
-export function addBreak(d: Data, date: string): Data {
-  return {
-    ...d,
-    workdays: d.workdays.map((w) => {
-      if (w.date !== date) return w;
-      const start = atTime(date, '12:00');
-      return { ...w, fromEntries: undefined, breaks: [...w.breaks, { start, end: new Date(Date.parse(start) + 30 * 60_000).toISOString() }] };
-    }),
-  };
+/** A new break: your usual one, else half an hour in the middle of the clocked time, else after the last break; never over another. */
+export function addBreak(d: Data, date: string, now = Date.now()): Data {
+  const wd = d.workdays.find((w) => w.date === date);
+  if (!wd) return d;
+  const ty = typicalDay(d, date, now);
+  const from = Date.parse(wd.start);
+  const to = wd.end ? Date.parse(wd.end) : Math.max(now, from + 3_600_000);
+  const halfHour = (at: number): Span => [at, at + 30 * 60_000];
+  const lastEnd = Math.max(from, ...wd.breaks.map((b) => Date.parse(b.end ?? b.start)));
+  const spots: Span[] = [halfHour((from + to) / 2 - 15 * 60_000), halfHour(lastEnd + 60 * 60_000)];
+  if (ty.breakStart !== undefined) spots.unshift([Date.parse(atMinutes(date, ty.breakStart)), Date.parse(atMinutes(date, ty.breakEnd!))]);
+  const free = ([a, b]: Span) => a >= from && b <= to && !wd.breaks.some((x) => Date.parse(x.start) < b && (x.end ? Date.parse(x.end) : now) > a);
+  const [a, b] = spots.find(free) ?? spots[spots.length - 1];
+  return { ...d, workdays: d.workdays.map((w) => (w === wd ? { ...w, fromEntries: undefined, breaks: [...w.breaks, { start: new Date(a).toISOString(), end: new Date(b).toISOString() }] } : w)) };
 }
 
 /** Add a finished break with given times (e.g. the gap between two timers, confirmed as lunch). */
@@ -234,8 +241,6 @@ export function startTimer(d: Data, input: TimerInput): Data {
   return { ...next, entries: [...next.entries, entry] };
 }
 
-type Span = [number, number];
-
 /** A day as ms; it ends at 23:59, so nothing placed in it crosses midnight. */
 const dayBounds = (day: string): Span => [Date.parse(atTime(day, '00:00')), Date.parse(atTime(day, '23:59'))];
 
@@ -260,7 +265,7 @@ function busySpans(d: Data, day: string, now: number, skip?: string): Span[] {
  * Where an entry of `ms` goes on a day: never over another entry or a break, never past midnight. First the first free
  * stretch inside the time you were clocked in; if it doesn't fit there, the free time outside it (later that day, or
  * right before you arrived; a day still open has no "later" yet, so before comes first). Without a clock-in, after the
- * day's last entry, or at 09:00. Null when the day has no stretch that long. Typing hours in never moves your arrival.
+ * day's last entry, or at your usual start. Null when the day has no stretch that long. Typing hours in never moves your arrival.
  */
 export function freeStart(d: Data, day: string, ms: number, now = Date.now(), skip?: string): string | null {
   const [from, to] = dayBounds(day);
@@ -275,7 +280,7 @@ export function freeStart(d: Data, day: string, ms: number, now = Date.now(), sk
   const wd = d.workdays.find((w) => w.date === day && !w.off);
   const ends = d.entries.filter((e) => e.end && e.id !== skip && dayKey(e.start) === day).map((e) => Date.parse(e.end!));
   const open = Boolean(wd && !wd.end && day === dayKey(now));
-  const lo = wd ? Date.parse(wd.start) : ends.length ? Math.max(...ends) : Date.parse(atTime(day, '09:00'));
+  const lo = wd ? Date.parse(wd.start) : ends.length ? Math.max(...ends) : Date.parse(atMinutes(day, typicalDay(d, day, now).in));
   const hi = wd?.end ? Date.parse(wd.end) : open ? now : to;
   const iso = (v: number) => new Date(v).toISOString();
 

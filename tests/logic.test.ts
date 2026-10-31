@@ -11,6 +11,7 @@ import { daylight, moonPhase, sunMoon } from '../src/daylight';
 import { fitAll, fitWorkdays } from '../src/fit';
 import { confirmDay, daysToCheck, leaveSuggestion, overlapMs, overlapSpans, sidebarDays } from '../src/daycheck';
 import { lanes, moveClock, moveSpan } from '../src/timeline';
+import { typicalDay } from '../src/typical';
 import { toAssign, weekReminderDue, weekToAssign } from '../src/reminders';
 import { removeSchedule, setSchedule, targetHoursOn, weekTotal, schedulesOf } from '../src/schedule';
 import { accelFromEvent, prettyAccel, projectAccel } from '../src/shortcuts';
@@ -37,7 +38,7 @@ test('appendEntry places time after the day\'s last entry', () => {
   let d = A.appendEntry(base(), '2026-10-12', 2 * H, { projectId: 'p1' });
   d = A.appendEntry(d, '2026-10-12', 30 * M, { projectId: 'p2' });
   assert.equal(d.entries[1].start, d.entries[0].end);
-  assert.equal(d.entries[0].start, atTime('2026-10-12', '09:00'));
+  assert.equal(d.entries[0].start, atTime('2026-10-12', '08:30'));
   assert.equal(A.appendEntry(d, '2026-10-12', 30_000, {}).entries.length, 2, 'under a minute is ignored');
 });
 test('setDayTotal grows and shrinks a project\'s day', () => {
@@ -467,7 +468,7 @@ test('flows: typed hours go inside clocked-in time, a pause before the next time
   d = { ...d, entries: [{ id: 'x', description: '', start: atTime('2026-10-16', '10:00'), end: atTime('2026-10-16', '12:00') }] };
   assert.equal(A.freeStart(d, '2026-10-16', 2 * H), atTime('2026-10-16', '12:30'));
   assert.equal(A.freeStart({ ...d, entries: [] }, '2026-10-16', H), atTime('2026-10-16', '10:00'), 'empty day: from arrival, not 09:00');
-  assert.equal(A.freeStart(base(), '2026-10-16', H), atTime('2026-10-16', '09:00'), 'no clock-in: 09:00 as before');
+  assert.equal(A.freeStart(base(), '2026-10-16', H), atTime('2026-10-16', '08:30'), 'no clock-in: the usual start');
   // Live tracking: timer 09:00–12:05, next one started 12:50 → offer 12:05–12:50 as a break; once added, not again.
   const today = dayKey(new Date());
   let live = { ...base(), workdays: [{ date: today, start: atTime(today, '09:00'), breaks: [] }] };
@@ -1007,6 +1008,65 @@ test('reminders: the sidebar count leaves out days it already asks about', () =>
   assert.deepEqual(sidebarDays(d, days).map((c) => c.date), ['2026-10-06']);
   const corridor = { ...d, settings: { ...d.settings, hoursView: 'corridor' as const } };
   assert.deepEqual(sidebarDays(corridor, days), []);
+});
+
+const hm = (h: number, m = 0) => h * 60 + m;
+test('typical day: without history it follows the schedule', () => {
+  const full = typicalDay(base(), '2026-10-14');
+  assert.deepEqual(full.bands, { in: [hm(8), hm(9)], break: [hm(12), hm(13)], out: [hm(17), hm(18)] });
+  assert.deepEqual([full.in, full.breakStart, full.breakEnd, full.out], [hm(8, 30), hm(12), hm(13), hm(17, 30)]);
+  const part = setSchedule(base(), '2026-01-01', [4, 4, 4, 4, 4, 0, 0]);
+  const short = typicalDay(part, '2026-10-14');
+  assert.equal(short.out, hm(12, 30));
+  assert.equal(short.breakStart, undefined); assert.equal(short.bands.break, undefined, 'a short day has no break band');
+});
+const clockedDays = (dates: string[], a = '08:00', b = '16:30', pause: [string, string] | null = ['12:00', '12:30']) => dates.map((date) => ({ date, start: atTime(date, a), end: atTime(date, b), breaks: pause ? [{ start: atTime(date, pause[0]), end: atTime(date, pause[1]) }] : [] }));
+const OCT = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09'];
+const NOWISH = Date.parse(atTime('2026-10-14', '12:00'));
+test('typical day: recent weeks set the times', () => {
+  const d = { ...base(), workdays: clockedDays(OCT) };
+  const ty = typicalDay(d, '2026-10-14', NOWISH);
+  assert.deepEqual([ty.in, ty.out, ty.breakStart, ty.breakEnd], [hm(8), hm(16, 30), hm(12), hm(12, 30)]);
+  assert.deepEqual(ty.bands.in, [hm(7, 45), hm(8, 15)], 'at least half an hour wide');
+  const lateOld = { ...d, workdays: [...d.workdays, ...clockedDays(['2026-06-01', '2026-06-02', '2026-06-03'], '11:00', '19:00')] };
+  assert.equal(typicalDay(lateOld, '2026-10-14', NOWISH).in, hm(8), 'more than eight weeks ago does not count');
+  const noBreaks = { ...base(), workdays: clockedDays(OCT, '08:00', '16:00', null) };
+  assert.equal(typicalDay(noBreaks, '2026-10-14', NOWISH).bands.break, undefined, 'no recorded breaks, no break band');
+});
+test('typical day: days off and days midnight closed are ignored', () => {
+  const off = OCT.map((date) => ({ date, start: atTime(date, '00:00'), end: atTime(date, '00:00'), breaks: [], off: true }));
+  assert.equal(typicalDay({ ...base(), workdays: off }, '2026-10-14', NOWISH).in, hm(8, 30), 'days off are no history');
+  const closed = OCT.map((date) => ({ date, start: atTime(date, '10:00'), end: new Date(Date.parse(atTime(date, '23:59')) + 59_000).toISOString(), breaks: [], autoClosed: true }));
+  assert.equal(typicalDay({ ...base(), workdays: closed }, '2026-10-14', NOWISH).in, hm(8, 30));
+  const mixed = { ...base(), workdays: [...clockedDays(OCT), ...off.map((w) => ({ ...w, date: w.date.replace('-10-0', '-09-2') }))] };
+  assert.equal(typicalDay(mixed, '2026-10-14', NOWISH).in, hm(8));
+});
+test('typical day: a part-timer gets a band for each kind of day', () => {
+  const d = setSchedule(base(), '2026-01-01', [8, 8, 8, 8, 4, 0, 0]);
+  const fridays = ['2026-09-18', '2026-09-25', '2026-10-02', '2026-10-09'];
+  const long = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-05', '2026-10-06'];
+  const data = { ...d, workdays: [...clockedDays(fridays, '09:00', '13:00', null), ...clockedDays(long, '08:00', '16:30')] };
+  assert.equal(typicalDay(data, '2026-10-16', NOWISH).out, hm(13), 'Friday looks at Fridays');
+  assert.equal(typicalDay(data, '2026-10-14', NOWISH).out, hm(16, 30), 'Wednesday looks at the long days');
+  assert.equal(typicalDay(data, '2026-10-16', NOWISH).bands.break, undefined);
+});
+test('typical day: it replaces the old defaults, and handles lean toward it', () => {
+  const d = { ...base(), workdays: clockedDays(OCT) };
+  const day = '2026-10-13';
+  const made = A.addTypicalDay({ ...base() }, day).workdays[0];
+  assert.deepEqual([made.start, made.end, made.breaks[0].start], [atTime(day, '08:30'), atTime(day, '17:30'), atTime(day, '12:00')]);
+  assert.equal(A.freeStart(base(), day, H), atTime(day, '08:30'), 'typed hours start at the usual start');
+  const wd = { date: day, start: atTime(day, '07:00'), end: atTime(day, '11:00'), breaks: [] };
+  assert.equal(A.addBreak({ ...d, workdays: [...d.workdays, wd] }, day).workdays.at(-1)!.breaks[0].start, atTime(day, '08:45'), 'outside the clocked time: the middle of it');
+  const taken = A.addBreak({ ...d, workdays: [...d.workdays, { date: day, start: atTime(day, '08:00'), end: atTime(day, '16:30'), breaks: [] }] }, day);
+  const second = A.addBreak(taken, day).workdays.at(-1)!.breaks;
+  assert.equal(second[0].start, atTime(day, '12:00'), 'the first break is the usual one');
+  assert.ok(second[1].start >= second[0].end! || second[1].end! <= second[0].start, 'the next never lands on it');
+  const usual = Date.parse(atTime(day, '09:00'));
+  const w = { date: day, start: atTime(day, '09:30'), end: atTime(day, '17:00'), breaks: [] };
+  assert.equal(moveClock(w, 'in', -24 * M, day, undefined, usual), atTime(day, '09:00'), 'a near miss settles on the usual time');
+  assert.equal(moveClock(w, 'in', -15 * M, day, undefined, usual), atTime(day, '09:15'), 'further away the snap decides');
+  assert.equal(moveClock(w, 'in', -24 * M, day), atTime(day, '09:05'), 'arrow keys stay exact');
 });
 
 console.log(`\n${passed} passed`);

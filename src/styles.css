@@ -247,9 +247,6 @@ input[type='color'] { width: 30px; height: 30px; padding: 0; border: 0; backgrou
 
 /* Workday extras */
 .inline-times { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.breaks { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.break-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 2px 0 4px; border: 1px solid var(--border); border-radius: 8px; }
-.break-chip .time-field { border-color: transparent !important; background: none !important; width: 84px; }
 .add-day { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .day-group-foot { padding: 6px 12px; border-top: 1px solid var(--border); }
 .day-group .empty-state { padding: 18px 0; margin: 0; }
@@ -474,7 +471,6 @@ kbd { font: 11px ui-monospace, SFMono-Regular, monospace; padding: 1px 5px; bord
 input:not([type='checkbox']):not([type='color']), select { border: 0; background: var(--field); }
 input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 0; }
 .activity-chip { border: 0; }
-.break-chip { border: 0; background: var(--field); }
 .trail { background: var(--bg); }
 .plan-item { background: var(--bg); }
 .list-row, .project-block, .table td, .missing-list, .plan-days { border-color: var(--divider); }
@@ -551,7 +547,6 @@ input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 
 /* Modals */
 .modal.wide { width: min(940px, 100%); }
 .modal-title { display: inline-flex; flex: 1; align-items: center; gap: 4px; min-width: 0; margin-right: 8px; }
-.modal-sum { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .modal-section h4 { margin: 4px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .modal-section .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 /* Copy day: the button and its hours switch, side by side. */
@@ -576,11 +571,6 @@ input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 
 .card-head-end { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; }
 
 /* Workday editor */
-.wd-editor { background: var(--bg); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-.wd-editor.empty, .wd-editor.off { flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap; }
-.wd-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.wd-times { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.wd-editor .breaks { margin-top: 0; }
 .banner { gap: 10px; }
 
 /* Layout fixes: aligned feed columns, banner icon */
@@ -607,10 +597,6 @@ code { font: 12px ui-monospace, SFMono-Regular, monospace; }
 .att-fix strong { color: var(--accent-strong); }
 
 /* Repeat from last time */
-.repeat { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.repeat .muted { display: inline-flex; align-items: center; gap: 4px; }
-.repeat-chip { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 999px; padding: 4px 10px; background: var(--field); color: var(--text); cursor: pointer; font-size: 13px; }
-.repeat-chip:hover { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* Week header: everything top-aligned so rows don't jump */
 .timesheet thead th { vertical-align: top; }
@@ -828,7 +814,6 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .daylight-ruler .scrub em { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); white-space: nowrap; }
 /* Workday follows the entries (src/fit.ts) */
 .fit-toast { position: fixed; right: 20px; bottom: 20px; z-index: 50; max-width: 380px; display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow), 0 8px 24px rgba(0, 0, 0, 0.18); font-size: 13px; cursor: pointer; animation: m-toast 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.wd-from-entries { margin: 8px 0 0; }
 .from-bookings { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-weight: 600; }
 .ts-open { display: block; margin: 2px auto 0; border: 0; padding: 0 4px; border-radius: 6px; background: none; color: var(--accent-strong); font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .ts-open:hover { background: var(--accent-soft); }
@@ -1258,7 +1243,6 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .tl-menu button { border: 0; background: none; padding: 6px 10px; border-radius: 6px; text-align: left; cursor: pointer; }
 .tl-menu button:hover, .tl-menu button:focus-visible { background: var(--bg); outline: none; }
 .feed-row.selected { background: var(--accent-soft); }
-.wd-editor.ask { background: var(--warn-bg); }
 .tl-tag, .check-tag { font-size: 12px; padding: 1px 7px; border-radius: 6px; background: var(--warn-bg); }
 .tl-tag, .check-tag.strong { background: var(--danger-soft); color: var(--danger); }
 
@@ -1270,3 +1254,30 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .check-link { align-self: flex-start; }
 @media (max-width: 720px) { .check-row-day { grid-template-columns: 1fr; gap: 6px; } .check-actions { justify-content: flex-start; } }
 .tl-edit .time-field { background: var(--field) !important; border-radius: 8px; }
+
+/* The typical day on the timeline (src/typical.ts) */
+.tl-band { position: absolute; top: 0; bottom: 18px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 13%, transparent); pointer-events: none; }
+.tl-clocked.ghost { background: none; border: 1px dashed var(--border); box-sizing: border-box; }
+.tl-break.ghost { background: none; border-color: var(--border); pointer-events: none; }
+.tl-handle.ghost { background: none; border: 1.5px dashed var(--muted); box-sizing: border-box; pointer-events: none; }
+.tl-handle.ask { background: var(--accent); }
+.tl-ask { position: relative; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; margin-top: 2px; border-radius: 10px; background: var(--warn-bg); }
+.tl-ask::before { content: ''; position: absolute; top: -5px; left: var(--x); width: 10px; height: 10px; background: var(--warn-bg); transform: rotate(45deg); }
+
+/* A project's day in the Week (CellModal) */
+.cell-total { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.cell-sessions { border: 1px solid var(--border); border-radius: 10px; padding: 2px 4px; }
+.cell-add { display: flex; flex-direction: column; gap: 8px; }
+.cell-add-group { display: flex; flex-direction: column; gap: 2px; }
+.cell-add-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.cell-fold { display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; padding: 0; cursor: pointer; }
+.cell-add-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; width: 100%; padding: 4px 8px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; }
+.cell-add-item span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-add-item:hover, .cell-add-item:focus-visible { background: var(--bg); outline: none; }
+
+/* Narrow: the hours and their button stay in view, what they belong to wraps below. */
+@media (max-width: 640px) {
+  .feed.mode-hours .feed-row, .feed.mode-hours.with-project .feed-row { grid-template-columns: minmax(0, 1fr) 96px 36px; row-gap: 2px; }
+  .feed.mode-hours .feed-row .feed-meta { grid-column: 1 / -1; grid-row: 2; min-width: 0; overflow: hidden; }
+  .cell-total { font-size: 13px; }
+}

@@ -167,13 +167,11 @@ function NewRow({
   day,
   projectId,
   showProject,
-  prefill,
   onAdded,
 }: {
   day: string;
   projectId?: string;
   showProject: boolean;
-  prefill?: { ms: number; taskId?: number; taskName?: string } | null;
   onAdded: (id: string) => void;
 }) {
   const { update, getData } = useStore();
@@ -187,13 +185,6 @@ function NewRow({
   const hoursRef = useRef<HTMLInputElement>(null);
   const parsed = parseDuration(hours);
   const valid = parsed !== null && parsed >= 60_000;
-
-  useEffect(() => {
-    if (!prefill) return;
-    setHours(fmtHM(prefill.ms));
-    setTask({ id: prefill.taskId, name: prefill.taskName });
-    hoursRef.current?.focus();
-  }, [prefill]);
 
   const add = () => {
     if (!valid) {
@@ -252,7 +243,6 @@ export function EntryFeed({
   mode,
   projectId,
   readOnly,
-  prefill,
   selected,
   onSelect,
 }: {
@@ -262,7 +252,6 @@ export function EntryFeed({
   /** Set when the feed belongs to one project (timesheet cell); otherwise each row picks its project. */
   projectId?: string | null;
   readOnly?: boolean;
-  prefill?: { ms: number; taskId?: number; taskName?: string } | null;
   /** The entry selected on the day timeline, and picking one here. */
   selected?: string | null;
   onSelect?: (id: string) => void;
@@ -277,7 +266,7 @@ export function EntryFeed({
       {entries.map((e) => (
         <FeedRow key={e.id} entry={e} mode={mode} showProject={showProject} readOnly={readOnly} tasks={tasks} added={e.id === added} selected={e.id === selected} onSelect={onSelect} />
       ))}
-      {!readOnly && mode === 'hours' && <NewRow day={day} projectId={projectId ?? undefined} showProject={showProject} prefill={prefill} onAdded={setAdded} />}
+      {!readOnly && mode === 'hours' && <NewRow day={day} projectId={projectId ?? undefined} showProject={showProject} onAdded={setAdded} />}
     </div>
   );
 }

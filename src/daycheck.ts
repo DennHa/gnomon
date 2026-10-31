@@ -4,6 +4,7 @@ import { awayDays, confirmAutoClose, endsAtMidnight } from './actions';
 import { hoursMode, MAX_DAY } from './corridor';
 import { targetHoursOn } from './schedule';
 import { atTime, dayKey, entryMs, hoursToMs, workdayMs } from './time';
+import { atMinutes, typicalDay } from './typical';
 import type { Data, Entry } from './types';
 
 /** Booked this much above clocked counts as far above; the day view already mentions smaller differences. */
@@ -91,7 +92,7 @@ export function confirmDay(d: Data, date: string): Data {
 
 /**
  * A good guess for when you left on a day you forgot to clock out: the end of your last timer (one cut off at midnight
- * doesn't count), else your arrival plus that day's target and a half-hour break, else 17:00. Never before a timer cut
+ * doesn't count), else your arrival plus that day's target and a half-hour break, else your usual stop. Never before a timer cut
  * off at midnight started: you were there then, and that time would take the whole timer away.
  */
 export function leaveSuggestion(data: Data, date: string): string {
@@ -103,6 +104,6 @@ export function leaveSuggestion(data: Data, date: string): string {
   if (ends.length && Math.max(...ends) > cutFrom) return hhmm(Math.max(...ends));
   const wd = data.workdays.find((w) => w.date === date);
   const target = hoursToMs(targetHoursOn(data, date));
-  const guess = wd && target > 0 ? Math.min(midnightCut - 60_000, Date.parse(wd.start) + target + (target >= 6 * 3_600_000 ? 30 * 60_000 : 0)) : Date.parse(atTime(date, '17:00'));
+  const guess = wd && target > 0 ? Math.min(midnightCut - 60_000, Date.parse(wd.start) + target + (target >= 6 * 3_600_000 ? 30 * 60_000 : 0)) : Date.parse(atMinutes(date, typicalDay(data, date).out));
   return hhmm(Math.max(guess, Math.min(midnightCut - 60_000, cutFrom + 30 * 60_000)));
 }

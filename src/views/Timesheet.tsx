@@ -60,18 +60,31 @@ export function Modal({ title, onClose, children, wide }: { title: ReactNode; on
   );
 }
 
-/** One project on one day: its entries as hours, plus a row to add more. */
+/** With more than this many, "Add from…" stays folded, so it can never fill the overlay. */
+const OPEN_REPEATS = 4;
+
+/** "Tuesday" within the last week, else a date. */
+function dayName(from: string, day: string): string {
+  const days = (Date.parse(`${day}T12:00`) - Date.parse(`${from}T12:00`)) / 86_400_000;
+  return fmtDate(from, days < 7 ? { weekday: 'long' } : { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** One project on one day: the title with its total, the sessions, then everything that can be added. */
 function CellModal({ cell, onClose, readOnly }: { cell: CellRef; onClose: () => void; readOnly: boolean }) {
   const { data } = useStore();
   const { projectId, day } = cell;
   const project = data.projects.find((p) => p.id === projectId);
   const entries = data.entries.filter((e) => (e.projectId || '') === projectId && dayKey(e.start) === day).sort((a, b) => a.start.localeCompare(b.start));
-  const gap = planGaps(data, day).find((g) => g.projectId === projectId);
+  const gaps = planGaps(data, day).filter((g) => g.projectId === projectId);
+  const gapMs = gaps.reduce((s, g) => s + g.ms, 0);
   const planned = projectId ? goalFor(data, projectId, day) : 0;
   const tracked = entries.reduce((s, e) => s + entryMs(e), 0);
-  const [prefill, setPrefill] = useState<{ ms: number; taskId?: number; taskName?: string } | null>(null);
   const addHours = useAddHours();
   const repeat = lastDayEntries(data, projectId || undefined, day);
+  const repeatMs = repeat ? repeat.entries.reduce((s, e) => s + entryMs(e), 0) : 0;
+  const foldable = Boolean(repeat && repeat.entries.length > OPEN_REPEATS);
+  const [unfolded, setUnfolded] = useState(false);
+  const fromLabel = repeat && t('ts.addFrom', { day: dayName(repeat.day, day), n: repeat.entries.length });
 
   return (
     <Modal
@@ -79,43 +92,60 @@ function CellModal({ cell, onClose, readOnly }: { cell: CellRef; onClose: () => 
       title={
         <>
           <span className="dot" style={{ background: project?.color ?? '#B0BEC5' }} /> <strong>{project?.name ?? t('noProject')}</strong>
-          <span className="muted"> · {fmtDayLong(day)}</span>
+          <span className="muted"> · {fmtDate(day, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          <span className="spacer" />
+          <span className="cell-total">
+            <strong>{fmtHM(tracked)}</strong>
+            {planned > 0 ? <span className="muted">{t('ts.ofPlanned', { time: fmtHM(planned) })}</span> : <span className="muted">{t('ts.tracked')}</span>}
+          </span>
         </>
       }
     >
-      <div className="modal-sum">
-        <span>
-          <strong>{fmtHM(tracked)}</strong>
-          {t('ts.tracked')}
-          {planned > 0 && <span className="muted">{t('ts.ofPlanned', { time: fmtHM(planned) })}</span>}
-        </span>
-        {gap && !readOnly && (
-          <button className="btn ghost small" onClick={() => setPrefill({ ms: gap.ms, taskId: gap.taskId, taskName: gap.taskName })}>
-            <Icon name="playlist_add" size={18} /> {t('ts.usePlan', { time: fmtHM(gap.ms) })}
-            {gap.taskName ? ` ${gap.taskName}` : ''}
-          </button>
-        )}
+      <div className="cell-sessions">
+        <EntryFeed day={day} entries={entries} mode="hours" projectId={projectId || null} readOnly={readOnly} />
       </div>
-      {repeat && !readOnly && (
-        <div className="repeat">
-          <span className="muted small">
-            <Icon name="history" size={16} /> {t('ts.repeatFrom', { day: fmtDayLabel(repeat.day) })}
-          </span>
-          {repeat.entries.map((e) => (
-            <button key={e.id} className="repeat-chip" onClick={() => addHours(entryMs(e), (d) => copyEntriesTo(d, day, [e]))} title={t('ts.repeatHint')}>
-              <Icon name="content_copy" size={14} />
-              {e.description || e.taskName || t('untitled')} · {fmtHM(entryMs(e))}
-            </button>
-          ))}
-          {repeat.entries.length > 1 && (
-            <button className="btn ghost small" onClick={() => addHours(repeat.entries.reduce((s, e) => s + entryMs(e), 0), (d) => copyEntriesTo(d, day, repeat.entries))}>
-              {t('ts.repeatAll', { time: fmtHM(repeat.entries.reduce((s, e) => s + entryMs(e), 0)) })}
-            </button>
-          )}
-        </div>
+      {readOnly ? (
+        <p className="muted small">{t('ts.readOnly')}</p>
+      ) : (
+        (repeat || gapMs >= 60_000) && (
+          <div className="cell-add">
+            {repeat && (
+              <div className="cell-add-group">
+                <div className="cell-add-head">
+                  {foldable ? (
+                    <button className="cell-fold" aria-expanded={unfolded} onClick={() => setUnfolded(!unfolded)}>
+                      <Icon name={unfolded ? 'arrow_drop_down' : 'chevron_right'} size={18} /> {fromLabel}
+                    </button>
+                  ) : (
+                    <span>{fromLabel}</span>
+                  )}
+                  {repeat.entries.length > 1 && (
+                    <button className="btn ghost small" onClick={() => addHours(repeatMs, (d) => copyEntriesTo(d, day, repeat.entries))}>
+                      {t('ts.addAll', { time: fmtHM(repeatMs) })}
+                    </button>
+                  )}
+                </div>
+                {(!foldable || unfolded) &&
+                  repeat.entries.map((e) => (
+                    <button key={e.id} className="cell-add-item" onClick={() => addHours(entryMs(e), (d) => copyEntriesTo(d, day, [e]))} title={t('ts.repeatHint')}>
+                      <span>{e.description || e.taskName || t('untitled')}</span>
+                      <span className="muted">{fmtHM(entryMs(e))}</span>
+                      <Icon name="add" size={16} />
+                    </button>
+                  ))}
+              </div>
+            )}
+            {gapMs >= 60_000 && (
+              <div className="cell-add-head">
+                <span title={gaps.map((g) => g.taskName).filter(Boolean).join(', ')}>{t('ts.addPlan')}</span>
+                <button className="btn ghost small" onClick={() => addHours(gapMs, (d) => fillGaps(d, day, gaps))}>
+                  <Icon name="add" size={16} /> {fmtHM(gapMs)}
+                </button>
+              </div>
+            )}
+          </div>
+        )
       )}
-      <EntryFeed day={day} entries={entries} mode="hours" projectId={projectId || null} readOnly={readOnly} prefill={prefill} />
-      {readOnly && <p className="muted small">{t('ts.readOnly')}</p>}
       <TrailSummary day={day} />
     </Modal>
   );
