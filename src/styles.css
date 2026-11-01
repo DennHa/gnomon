@@ -1221,7 +1221,7 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .tl-handle { position: absolute; top: 0; width: 12px; height: 24px; margin-left: -6px; border-radius: 4px; background: var(--ok); cursor: ew-resize; z-index: 1; }
 .tl-handle.fixed { cursor: pointer; opacity: 0.6; }
 .tl-handle.sel, .tl-break.sel, .tl-handle:focus-visible, .tl-break:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.tl-break { position: absolute; top: 2px; height: 20px; display: grid; place-items: center; overflow: hidden; border-radius: 4px; background: var(--surface); border: 1px dashed var(--muted); color: var(--muted); box-sizing: border-box; cursor: grab; z-index: 1; }
+.tl-break { position: absolute; top: 2px; height: 20px; display: flex; align-items: center; justify-content: center; gap: 3px; overflow: hidden; border-radius: 4px; background: var(--surface); border: 1px dashed var(--muted); color: var(--muted); box-sizing: border-box; cursor: grab; z-index: 1; }
 .tl-break.fixed { cursor: pointer; }
 .tl-overlap { position: absolute; border-radius: 4px; background: var(--danger-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent); pointer-events: none; }
 .tl-now { position: absolute; top: 0; bottom: 18px; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
@@ -1261,6 +1261,11 @@ html.daylight .hero-clock { text-shadow: var(--daylight-text-shadow); }
 .tl-break.ghost { background: none; border-color: var(--border); pointer-events: none; }
 .tl-handle.ghost { background: none; border: 1.5px dashed var(--muted); box-sizing: border-box; pointer-events: none; }
 .tl-handle.ask { background: var(--accent); }
+.tl-clock { position: absolute; top: 5px; font-size: 10px; line-height: 14px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+.tl-clock.end { transform: translateX(-100%); }
+.tl-clock.ask { color: var(--accent-strong); }
+.tl-clocked-dot { width: 8px; height: 8px; margin-right: 2px; background: var(--ok); }
+.tl-break-length { font-size: 10px; font-variant-numeric: tabular-nums; }
 .tl-ask { position: relative; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; margin-top: 2px; border-radius: 10px; background: var(--warn-bg); }
 .tl-ask::before { content: ''; position: absolute; top: -5px; left: var(--x); width: 10px; height: 10px; background: var(--warn-bg); transform: rotate(45deg); }
 

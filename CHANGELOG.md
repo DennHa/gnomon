@@ -3,6 +3,12 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
+## Unreleased
+
+- **The green line explains itself:** the clock-in and clock-out times now sit right beside the handles, with *In* and
+  *Out* where there's room, and they follow a drag live. A green dot next to *Clocked* ties the number to the line, and
+  a break shows its length on the gap when it fits.
+
 ## 0.1.27 · 2026-10-31
 
 - **Your typical day on the timeline:** faint bands show when you usually start, pause and stop, worked out from your
