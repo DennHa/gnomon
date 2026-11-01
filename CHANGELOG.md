@@ -3,7 +3,7 @@
 What's new in each version of Gnomon. The app shows this under **Info & feedback**, and the download page on a
 Gnomon server shows the newest entry.
 
-## Unreleased
+## 0.1.28 · 2026-11-01
 
 - **The green line explains itself:** the clock-in and clock-out times now sit right beside the handles, with *In* and
   *Out* where there's room, and they follow a drag live. A green dot next to *Clocked* ties the number to the line, and
